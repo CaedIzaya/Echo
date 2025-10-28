@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import ProgressRing from './ProgressRing';
 import BottomNavigation from './BottomNavigation';
+import UserMenu from './UserMenu';
+import PrimaryPlanCard from './PrimaryPlanCard';
+import AchievementPanel from './AchievementPanel';
+import QuickSearchGuide from './QuickSearchGuide';
+import { getAchievementManager, AchievementManager } from './AchievementSystem';
 
 interface Project {
   id: string;
@@ -26,6 +31,346 @@ interface DashboardStats {
   todayGoal: number;
   weeklyMinutes: number;
   streakDays: number;
+  completedGoals: number;
+}
+
+interface FlowMetrics {
+  // 专注时长相关
+  totalFocusMinutes: number;
+  averageSessionLength: number;
+  longestSession: number;
+  
+  // 专注频率相关
+  sessionCount: number;
+  consistencyScore: number;
+  
+  // 专注质量相关
+  averageRating: number;
+  completionRate: number;
+  interruptionRate: number;
+  
+  // 持续成长相关
+  currentStreak: number;
+  improvementTrend: number;
+}
+
+interface FlowIndexResult {
+  score: number;
+  level: string;
+  breakdown: {
+    quality: number;
+    duration: number;
+    consistency: number;
+  };
+}
+
+// 每日小结组件
+function DailySummarySection() {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [lastSession, setLastSession] = useState<any>(null);
+  const [yesterdayData, setYesterdayData] = useState<any>(null);
+
+  useEffect(() => {
+    // 从localStorage获取最近的小结
+    const recentSummary = localStorage.getItem('recentFocusSummary');
+    if (recentSummary) {
+      const summary = JSON.parse(recentSummary);
+      setLastSession(summary);
+    }
+
+    // 计算昨日数据
+    const stats = JSON.parse(localStorage.getItem('dashboardStats') || '{}');
+    const yesterday = stats.yesterdayMinutes || 0;
+    const lastWeek = stats.lastWeekMinutes || 0;
+    
+    if (yesterday > 0) {
+      const comparison = calculateWeeklyComparison(yesterday, lastWeek);
+      setYesterdayData({
+        totalMinutes: yesterday,
+        sessionCount: Math.floor(yesterday / 30),
+        primaryProject: '专注计划',
+        comparison
+      });
+    }
+  }, []);
+
+  const formatTimeAgo = (timestamp: string): string => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    
+    if (diffInHours < 1) return '刚刚';
+    if (diffInHours < 24) return `${Math.floor(diffInHours)}小时前`;
+    if (diffInHours < 48) return '昨天';
+    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}天前`;
+    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="mb-6 transition-all duration-300">
+      {/* 标题和展开按钮 */}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <span>📊</span>
+          周报小结
+        </h2>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-sm text-gray-500 hover:text-gray-700 transition"
+        >
+          {isExpanded ? '收起 ▲' : '展开 ▼'}
+        </button>
+      </div>
+
+      {/* 可展开的内容 */}
+      <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-96' : 'max-h-0'}`}>
+        <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 最近小结 */}
+            <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-xl p-4 border border-teal-100">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span>📝</span>
+                最近小结
+              </h3>
+              {lastSession ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-medium">
+                      {lastSession.projectName || '专注计划'}
+                    </span>
+                    <span className="text-gray-500">{formatTimeAgo(lastSession.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                    {Array.from({ length: lastSession.rating || 2 }).map((_, i) => (
+                      <span key={i}>⭐</span>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-700 line-clamp-2">
+                    {lastSession.note || '无备注'}
+                  </p>
+                  <div className="text-xs text-gray-500">
+                    专注 {Math.floor(lastSession.duration / 60)} 分钟
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">完成第一次专注并记录小结吧</p>
+                  <small className="text-xs text-gray-400">你的成长值得被记住</small>
+                </div>
+              )}
+            </div>
+
+            {/* 昨日汇报 */}
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span>📊</span>
+                昨日专注
+              </h3>
+              {yesterdayData ? (
+                <div className="space-y-3">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-purple-600">
+                      {yesterdayData.totalMinutes}
+                    </div>
+                    <div className="text-xs text-gray-500">分钟</div>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>{yesterdayData.sessionCount} 次专注</div>
+                    <div className="text-xs">主要投入: {yesterdayData.primaryProject}</div>
+                  </div>
+                  {/* 周对比 */}
+                  <div className={`rounded-lg p-2 text-xs ${
+                    yesterdayData.comparison.type === 'increase' ? 'bg-green-50 text-green-700' :
+                    yesterdayData.comparison.type === 'decrease' ? 'bg-amber-50 text-amber-700' :
+                    'bg-blue-50 text-blue-700'
+                  }`}>
+                    <div className="flex items-center gap-1 font-medium">
+                      {yesterdayData.comparison.type === 'increase' && '📈'}
+                      {yesterdayData.comparison.type === 'decrease' && '📉'}
+                      {yesterdayData.comparison.type === 'same' && '➡️'}
+                      较上周 {yesterdayData.comparison.type === 'increase' ? '+' : ''}
+                      {yesterdayData.comparison.percentage}%
+                    </div>
+                    <div className="text-xs mt-1 opacity-80">
+                      {yesterdayData.comparison.description}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">昨日没有专注记录</p>
+                  <small className="text-xs text-gray-400">今天就是新的开始</small>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 成就展开组件（默认展开）- 显示真实成就数据
+function AchievementsSection() {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // 监听localStorage变化以自动刷新成就
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'achievedAchievements') {
+        setRefreshKey(prev => prev + 1);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 设置定时器定期刷新（每2秒）
+    const interval = setInterval(() => {
+      const manager = getAchievementManager();
+      const currentAchievements = manager.getAllAchievements().filter(a => manager.isAchievementUnlocked(a.id));
+      if (currentAchievements.length !== achievements.length) {
+        setRefreshKey(prev => prev + 1);
+      }
+    }, 2000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [achievements.length]);
+  
+  useEffect(() => {
+    const manager = getAchievementManager();
+    const allAchievements = manager.getAllAchievements();
+    
+    // 过滤出已解锁的成就，并按类别排序以获得更好的显示顺序
+    const unlockedAchievements = allAchievements
+      .filter(a => manager.isAchievementUnlocked(a.id))
+      .sort((a, b) => {
+        // 按类别优先级排序
+        const order = { 'first': 0, 'flow': 1, 'time': 2, 'daily': 3, 'milestone': 4 };
+        return (order[a.category] || 5) - (order[b.category] || 5);
+      });
+    
+    setAchievements(unlockedAchievements);
+  }, [refreshKey]);
+  
+  // 获取成就背景渐变色
+  const getAchievementGradient = (category: string) => {
+    switch(category) {
+      case 'flow':
+        return 'from-purple-400 to-pink-500';
+      case 'time':
+        return 'from-blue-400 to-cyan-500';
+      case 'daily':
+        return 'from-green-400 to-emerald-500';
+      case 'milestone':
+        return 'from-yellow-400 to-orange-500';
+      case 'first':
+        return 'from-indigo-400 to-purple-500';
+      default:
+        return 'from-gray-400 to-gray-500';
+    }
+  };
+  
+  // 获取最近5个成就
+  const recentAchievements = achievements.slice(0, 5);
+  
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <span>🏆</span>
+          最近成就
+          {achievements.length > 0 && (
+            <span className="text-sm font-normal text-gray-500">
+              ({achievements.length}个已解锁)
+            </span>
+          )}
+        </h2>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-sm text-gray-500 hover:text-gray-700 transition"
+        >
+          {isExpanded ? '收起 ▲' : '展开 ▼'}
+        </button>
+      </div>
+      <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-64' : 'max-h-0'}`}>
+        {recentAchievements.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-6xl mb-3 opacity-30">🏆</div>
+            <p className="text-gray-500">完成一次专注，解锁你的第一个成就吧！</p>
+          </div>
+        ) : (
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {recentAchievements.map((achievement) => (
+              <div
+                key={achievement.id}
+                className={`flex-shrink-0 w-32 bg-gradient-to-br ${getAchievementGradient(achievement.category)} rounded-2xl p-4 text-center shadow-lg hover:shadow-xl transition-all transform hover:scale-105`}
+                title={achievement.description}
+              >
+                <div className="text-4xl mb-2">{achievement.icon}</div>
+                <p className="text-xs text-white font-semibold line-clamp-2">{achievement.name}</p>
+              </div>
+            ))}
+            
+            {/* 如果成就少于5个，显示待解锁卡片 */}
+            {Array.from({ length: 5 - recentAchievements.length }).map((_, idx) => (
+              <div
+                key={`empty-${idx}`}
+                className="flex-shrink-0 w-32 bg-gray-100 rounded-2xl p-4 text-center border-2 border-dashed border-gray-300 flex items-center justify-center"
+              >
+                <p className="text-xs text-gray-400">待解锁</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 计算周对比函数
+function calculateWeeklyComparison(currentWeek: number, lastWeek: number) {
+  if (lastWeek === 0 && currentWeek === 0) {
+    return {
+      type: 'same' as const,
+      percentage: 0,
+      description: '从零开始，专注当下'
+    };
+  }
+
+  if (lastWeek === 0) {
+    return {
+      type: 'increase' as const,
+      percentage: 100,
+      description: '全新的开始！'
+    };
+  }
+
+  const percentage = Math.round(((currentWeek - lastWeek) / lastWeek) * 100);
+  
+  let type: 'increase' | 'decrease' | 'same' = 'same';
+  if (percentage > 5) type = 'increase';
+  if (percentage < -5) type = 'decrease';
+
+  const descriptions = {
+    increase: percentage > 50 ? '爆发式成长！继续保持' :
+               percentage > 20 ? '显著进步，为你骄傲' :
+               '稳步提升，积少成多',
+    decrease: percentage < -30 ? '调整节奏，重新出发' :
+               percentage < -10 ? '小小波动，无需担心' :
+               '休息是为了走更远的路',
+    same: '保持稳定，专注当下'
+  };
+
+  return {
+    type,
+    percentage: Math.abs(percentage),
+    description: descriptions[type]
+  };
 }
 
 export default function Dashboard() {
@@ -44,12 +389,206 @@ export default function Dashboard() {
   }, [sessionStatus, userId]);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [stats] = useState<DashboardStats>({
-    todayMinutes: 0,
-    todayGoal: 30,
-    weeklyMinutes: 125,
-    streakDays: 3
+  // 从localStorage加载统计数据
+  const [stats, setStats] = useState<DashboardStats>(() => {
+    if (typeof window !== 'undefined') {
+      const savedStats = localStorage.getItem('dashboardStats');
+      return savedStats ? JSON.parse(savedStats) : {
+        todayMinutes: 0,
+        todayGoal: 0,
+        weeklyMinutes: 0,
+        streakDays: 0,
+        completedGoals: 0
+      };
+    }
+    return {
+      todayMinutes: 0,
+      todayGoal: 0,
+      weeklyMinutes: 0,
+      streakDays: 0,
+      completedGoals: 0
+    };
   });
+
+  // 主要计划状态 - 从localStorage加载
+  const [primaryPlan, setPrimaryPlan] = useState<Project | null>(() => {
+    if (typeof window !== 'undefined') {
+      const savedPlans = localStorage.getItem('userPlans');
+      const plans = savedPlans ? JSON.parse(savedPlans) : [];
+      return plans.find((p: Project) => p.isPrimary) || null;
+    }
+    return null;
+  });
+
+  // 成就系统相关 - 必须在所有条件返回之前声明
+  const [achievementManager, setAchievementManager] = useState<AchievementManager | null>(null);
+  const [showAchievementPanel, setShowAchievementPanel] = useState(false);
+  const [newAchievements, setNewAchievements] = useState<any[]>([]);
+  const [unviewedAchievements, setUnviewedAchievements] = useState<any[]>([]);
+  const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
+
+  // 更新统计数据
+  const updateStats = (newStats: Partial<DashboardStats>) => {
+    setStats(prev => {
+      const updated = { ...prev, ...newStats };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dashboardStats', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  // 增加完成的小目标计数
+  const incrementCompletedGoals = (count: number) => {
+    updateStats({
+      completedGoals: stats.completedGoals + count
+    });
+  };
+
+  // 切换小目标状态 - 设置为已完成（支持多个ID）
+  const handleMilestoneToggle = (milestoneId: string) => {
+    setPrimaryPlan(prev => {
+      if (!prev) return prev;
+      
+      const updatedMilestones = prev.milestones.map(m =>
+        m.id === milestoneId ? { ...m, isCompleted: true } : m
+      );
+
+      const updatedPlan = {
+        ...prev,
+        milestones: updatedMilestones
+      };
+
+      // 同步到localStorage
+      if (typeof window !== 'undefined') {
+        const savedPlans = localStorage.getItem('userPlans');
+        const plans = savedPlans ? JSON.parse(savedPlans) : [];
+        const updatedPlans = plans.map((p: Project) => 
+          p.id === updatedPlan.id ? updatedPlan : p
+        );
+        localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      }
+
+      return updatedPlan;
+    });
+  };
+
+  // 批量完成多个小目标
+  const handleBulkMilestoneToggle = (milestoneIds: string[]) => {
+    setPrimaryPlan(prev => {
+      if (!prev) return prev;
+      
+      const updatedMilestones = prev.milestones.map(m =>
+        milestoneIds.includes(m.id) ? { ...m, isCompleted: true } : m
+      );
+
+      const updatedPlan = {
+        ...prev,
+        milestones: updatedMilestones
+      };
+
+      // 同步到localStorage
+      if (typeof window !== 'undefined') {
+        const savedPlans = localStorage.getItem('userPlans');
+        const plans = savedPlans ? JSON.parse(savedPlans) : [];
+        const updatedPlans = plans.map((p: Project) => 
+          p.id === updatedPlan.id ? updatedPlan : p
+        );
+        localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      }
+
+      return updatedPlan;
+    });
+  };
+
+  // 更新心流指标
+  const updateFlowMetrics = (sessionMinutes: number, rating?: number) => {
+    const flowData = localStorage.getItem('flowMetrics');
+    let metrics: FlowMetrics = flowData ? JSON.parse(flowData) : {
+      totalFocusMinutes: 0,
+      averageSessionLength: 0,
+      longestSession: 0,
+      sessionCount: 0,
+      consistencyScore: 0.5,
+      averageRating: 2.0,
+      completionRate: 0.7,
+      interruptionRate: 0.2,
+      currentStreak: 0,
+      improvementTrend: 0
+    };
+
+    // 更新基本指标
+    metrics.totalFocusMinutes += sessionMinutes;
+    metrics.sessionCount += 1;
+    metrics.longestSession = Math.max(metrics.longestSession, sessionMinutes);
+    metrics.averageSessionLength = metrics.totalFocusMinutes / metrics.sessionCount;
+    
+    // 更新评分
+    if (rating) {
+      metrics.averageRating = ((metrics.averageRating * (metrics.sessionCount - 1)) + rating) / metrics.sessionCount;
+    }
+
+    // 计算一致性（基于最近7天的专注频率）
+    const recentSessions = metrics.sessionCount;
+    metrics.consistencyScore = Math.min(recentSessions / 14, 1); // 假设每天2次为满分
+
+    // 保存更新后的指标
+    localStorage.setItem('flowMetrics', JSON.stringify(metrics));
+  };
+
+  // 专注完成后更新统计数据（由focus页面调用）
+  const handleFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true) => {
+    const status = completed ? '✅ 完成' : '⚠️ 中断';
+    console.log('📈 Dashboard收到专注报告', { 
+      status,
+      minutes, 
+      rating, 
+      currentStats: stats 
+    });
+    
+    const today = new Date().toISOString().split('T')[0];
+    const lastFocusDate = localStorage.getItem('lastFocusDate');
+    const isNewDay = lastFocusDate !== today;
+
+    const newTodayMinutes = stats.todayMinutes + minutes;
+    const newWeeklyMinutes = stats.weeklyMinutes + minutes;
+    
+    console.log('📊 更新统计数据', {
+      oldToday: stats.todayMinutes,
+      newToday: newTodayMinutes,
+      oldWeek: stats.weeklyMinutes,
+      newWeek: newWeeklyMinutes
+    });
+    
+    // 更新连续天数
+    let newStreakDays = stats.streakDays;
+    if (isNewDay) {
+      newStreakDays = stats.streakDays + 1;
+      localStorage.setItem('lastFocusDate', today);
+      console.log('🔥 连续天数已更新', { old: stats.streakDays, new: newStreakDays });
+    }
+
+    updateStats({
+      todayMinutes: newTodayMinutes,
+      weeklyMinutes: newWeeklyMinutes,
+      streakDays: newStreakDays
+    });
+
+    // 更新心流指标（仅完成时更新质量相关指标）
+    if (completed && rating) {
+      updateFlowMetrics(minutes, rating);
+    } else {
+      // 中断时只更新时长统计
+      updateFlowMetrics(minutes);
+    }
+    
+    console.log('✅ 统计数据已更新完成');
+  };
+
+  // 暴露给focus页面使用的函数
+  if (typeof window !== 'undefined') {
+    (window as any).reportFocusSessionComplete = handleFocusSessionComplete;
+  }
 
   // 简化的认证检查 - 不加载任何数据
   useEffect(() => {
@@ -76,19 +615,181 @@ export default function Dashboard() {
     }
   }, [authKey]);
 
-  // UI 辅助函数
+  // 计算心流指数（需要在早期计算以确保 useEffect 可以使用）
+  const flowIndex = useMemo(() => {
+    // 安全检查：确保只在客户端执行
+    if (typeof window === 'undefined') {
+      return {
+        score: 0,
+        level: '初识心流',
+        breakdown: {
+          quality: 0,
+          duration: 0,
+          consistency: 0
+        }
+      };
+    }
+
+    const flowData = localStorage.getItem('flowMetrics');
+    const metrics: FlowMetrics = flowData 
+      ? JSON.parse(flowData)
+      : {
+          totalFocusMinutes: stats.weeklyMinutes,
+          averageSessionLength: 30,
+          longestSession: 60,
+          sessionCount: Math.floor(stats.weeklyMinutes / 30),
+          consistencyScore: 0.5,
+          averageRating: 2.0,
+          completionRate: 0.7,
+          interruptionRate: 0.2,
+          currentStreak: stats.streakDays,
+          improvementTrend: 0.1
+        };
+
+    const normalize = (value: number, min: number, max: number): number => {
+      return Math.min(Math.max((value - min) / (max - min), 0), 1);
+    };
+
+    const WEIGHTS = {
+      averageRating: 0.15,
+      completionRate: 0.15,
+      interruptionRate: 0.10,
+      averageSessionLength: 0.20,
+      longestSession: 0.10,
+      sessionCount: 0.10,
+      consistencyScore: 0.10,
+      currentStreak: 0.05,
+      improvementTrend: 0.05
+    };
+
+    const normalized = {
+      averageSessionLength: normalize(metrics.averageSessionLength, 15, 120),
+      sessionCount: normalize(metrics.sessionCount, 0, 20),
+      consistencyScore: Math.max(0, Math.min(metrics.consistencyScore, 1)),
+      averageRating: normalize(metrics.averageRating, 1, 3),
+      completionRate: Math.max(0, Math.min(metrics.completionRate, 1)),
+      interruptionRate: 1 - normalize(metrics.interruptionRate, 0, 0.5),
+      currentStreak: normalize(metrics.currentStreak, 0, 14),
+      improvementTrend: normalize(metrics.improvementTrend + 0.5, 0, 1),
+      longestSession: normalize(metrics.longestSession, 30, 180)
+    };
+
+    const qualityScore = 
+      normalized.averageRating * WEIGHTS.averageRating +
+      normalized.completionRate * WEIGHTS.completionRate +
+      normalized.interruptionRate * WEIGHTS.interruptionRate;
+
+    const durationScore = 
+      normalized.averageSessionLength * WEIGHTS.averageSessionLength +
+      normalized.longestSession * WEIGHTS.longestSession;
+
+    const consistencyScore = 
+      normalized.sessionCount * WEIGHTS.sessionCount +
+      normalized.consistencyScore * WEIGHTS.consistencyScore +
+      normalized.currentStreak * WEIGHTS.currentStreak +
+      normalized.improvementTrend * WEIGHTS.improvementTrend;
+
+    const totalScore = (qualityScore + durationScore + consistencyScore) * 100;
+
+    const getFlowLevel = (score: number): string => {
+      if (score >= 85) return '深度心流';
+      if (score >= 70) return '稳定心流';
+      if (score >= 55) return '成长心流';
+      if (score >= 40) return '探索心流';
+      return '初识心流';
+    };
+
+    return {
+      score: Math.round(totalScore),
+      level: getFlowLevel(totalScore),
+      breakdown: {
+        quality: Math.round(qualityScore * 100),
+        duration: Math.round(durationScore * 100),
+        consistency: Math.round(consistencyScore * 100)
+      }
+    };
+  }, [stats.weeklyMinutes, stats.streakDays]);
+
+  // 初始化成就管理器
+  useEffect(() => {
+    const manager = getAchievementManager();
+    setAchievementManager(manager);
+    
+    // 检查当前状态的成就
+    const flowAchievements = manager.checkFlowIndexAchievements(flowIndex.score);
+    
+    // 检查总时长成就（小时）
+    const totalHours = Math.floor(stats.weeklyMinutes / 60);
+    const timeAchievements = manager.checkTotalTimeAchievements(totalHours);
+    
+    // 检查今日时长成就
+    const todayHours = stats.todayMinutes / 60;
+    const dailyAchievements = manager.checkDailyTimeAchievements(todayHours);
+    
+    // 检查小目标成就
+    const milestoneAchievements = manager.checkMilestoneAchievements(stats.completedGoals);
+    
+    // 检查第一次完成专注成就
+    const firstFocusAchievement = stats.todayMinutes > 0 
+      ? manager.checkFirstTimeAchievements('focus')
+      : [];
+    
+    const allNew = [
+      ...flowAchievements, 
+      ...timeAchievements, 
+      ...dailyAchievements, 
+      ...milestoneAchievements,
+      ...firstFocusAchievement
+    ];
+    
+    if (allNew.length > 0) {
+      setNewAchievements(allNew);
+      // 添加到未查看列表
+      setUnviewedAchievements(allNew);
+      
+      // 保存未查看成就到localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('unviewedAchievements', JSON.stringify(allNew));
+      }
+      
+      // 3秒后自动隐藏弹窗（但不清除未查看标记）
+      setTimeout(() => setNewAchievements([]), 3000);
+    }
+  }, [flowIndex.score, stats.weeklyMinutes, stats.todayMinutes, stats.completedGoals]);
+  
+  // 从localStorage加载未查看的成就
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('unviewedAchievements');
+      if (saved) {
+        try {
+          const unviewed = JSON.parse(saved);
+          if (unviewed.length > 0) {
+            setUnviewedAchievements(unviewed);
+          }
+        } catch (e) {
+          console.error('加载未查看成就失败:', e);
+        }
+      }
+    }
+  }, []);
+
+  // UI 辅助函数 - 红绿灯机制
   const getProgressColor = (progress: number): string => {
-    if (progress < 0.33) return '#ef4444';
-    if (progress < 1) return '#eab308';
-    return '#22c55e';
+    if (progress < 0.33) return '#ef4444'; // 红色 - 未完成
+    if (progress < 1) return '#eab308';    // 黄色 - 部分完成
+    return '#22c55e';                      // 绿色 - 完成
   };
 
   const getGreeting = (): string => {
     const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return '早上';
-    if (hour >= 12 && hour < 18) return '下午';
-    return '晚上';
+    if (hour >= 5 && hour < 12) return '早上好';
+    if (hour >= 12 && hour < 18) return '下午好';
+    return '晚上好';
   };
+  
+  // 获取用户名 - 添加 session 存在性检查
+  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || '小伙伴';
 
   // 处理函数
   const handleStartFocus = () => {
@@ -112,109 +813,310 @@ export default function Dashboard() {
     return null;
   }
 
-  // 计算进度
-  const progress = stats.todayGoal > 0 ? stats.todayMinutes / stats.todayGoal : 0;
+  // 计算进度 - 今日完成目标百分比 = 已专注时间/每日目标
+  const todayGoal = primaryPlan?.dailyGoalMinutes || 0;
+  // 使用primaryPlan的dailyGoalMinutes作为今天的goal
+  const progress = todayGoal > 0 ? Math.min(1, stats.todayMinutes / todayGoal) : 0;
   const progressColor = getProgressColor(progress);
   const greeting = getGreeting();
 
+  // 成就通知组件
+  const AchievementNotification = () => {
+    if (newAchievements.length === 0) return null;
+
+    return (
+      <div className="fixed top-4 right-4 z-50 space-y-2 animate-slide-in">
+        {newAchievements.map((achievement) => (
+          <div
+            key={achievement.id}
+            className="bg-white rounded-2xl shadow-2xl p-4 border-2 border-teal-400 animate-bounce"
+            style={{ maxWidth: '300px' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-4xl">{achievement.icon}</div>
+              <div className="flex-1">
+                <div className="font-bold text-gray-900">{achievement.name}</div>
+                <div className="text-sm text-gray-600">{achievement.description}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="p-4 sm:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20">
+      {/* 成就通知 */}
+      <AchievementNotification />
+      
+      <div className="p-6 sm:p-8 pt-20">
         {/* 头部 */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">数字静默</h1>
-            <p className="text-gray-600 mt-1">
-              {greeting}好，专注者
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {greeting}，{userName}
+            </h1>
+            <p className="text-gray-500 mt-1">准备好夺回今天的时间了吗？</p>
           </div>
           
-          <div className="relative">
-            <button className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium text-sm hover:bg-blue-700 transition">
-              {session.user?.name?.[0]?.toUpperCase() || session.user?.email?.[0]?.toUpperCase() || 'U'}
+          <div className="flex items-center gap-3">
+            {/* 搜索指南按钮 */}
+            <button
+              onClick={() => setShowQuickSearchGuide(true)}
+              className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-110"
+              title="快速查找指南"
+            >
+              <span className="text-2xl">🔍</span>
             </button>
+
+            {/* 成就按钮 */}
+            <button
+              onClick={() => setShowAchievementPanel(true)}
+              className="relative w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-110"
+            >
+              <span className="text-2xl">🏆</span>
+              {/* 显示未查看的成就数量 */}
+              {unviewedAchievements.length > 0 && (
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+                  <span className="text-xs text-white font-bold">
+                    {unviewedAchievements.length}
+                  </span>
+                </div>
+              )}
+            </button>
+            
+            <UserMenu 
+              userInitial={session?.user?.name?.[0]?.toUpperCase() || session?.user?.email?.[0]?.toUpperCase() || 'U'}
+            />
           </div>
         </div>
 
-        {/* 今日进度 */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">今日进度</h2>
-            <span className="text-sm text-gray-500">
-              {stats.todayMinutes} / {stats.todayGoal} 分钟
-            </span>
+        {/* 主数据区域 - 带动态边框 */}
+        <div className="relative mb-8 bg-white/50 backdrop-blur-sm rounded-3xl p-6 shadow-lg border-4 border-teal-500/30 animate-pulse-border">
+          {/* 动态边框动画 */}
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-teal-400/50 via-transparent to-cyan-400/50 animate-gradient-x"></div>
+          
+          <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6">
+            {/* 左侧 - 艺术版环形进度图（更大） */}
+            <div className="flex-shrink-0">
+              <div className="relative">
+                {/* 进度环 - 使用红绿灯机制 */}
+                <ProgressRing 
+                  progress={progress}
+                  color={progressColor}
+                  size={240}
+                  strokeWidth={12}
+                />
+                
+                {/* 中心内容 */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-6xl font-bold text-gray-900 mb-1">
+                      {Math.round(progress * 100)}%
+                    </p>
+                    <p className="text-sm text-gray-500">今日完成</p>
+                  </div>
+                </div>
+                
+                {/* 动态花朵装饰 */}
+                <div className="absolute -top-2 -right-2 text-4xl animate-bounce" style={{ animationDuration: '2s' }}>
+                  🌸
+                </div>
+                <div className="absolute -bottom-2 -left-2 text-3xl animate-pulse" style={{ animationDuration: '1.5s' }}>
+                  ✨
+                </div>
+                <div className="absolute -top-2 -left-2 text-3xl animate-bounce" style={{ animationDuration: '3s' }}>
+                  🌼
+                </div>
+                <div className="absolute -bottom-2 -right-2 text-4xl animate-pulse">
+                  🌺
+                </div>
+              </div>
+            </div>
+
+            {/* 右侧 - 统计卡片单列（紧凑） */}
+            <div className="flex-1 flex flex-col gap-3 w-full lg:w-auto">
+              {/* 本周专注 */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📈</span>
+                    <p className="text-xs text-gray-500">本周专注</p>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900">
+                    {Math.floor(stats.weeklyMinutes / 60)}h{stats.weeklyMinutes % 60}m
+                  </p>
+                </div>
+              </div>
+
+              {/* 连续天数 */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🔥</span>
+                    <p className="text-xs text-gray-500">连续专注</p>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900">{stats.streakDays}天</p>
+                </div>
+              </div>
+
+              {/* 心流指数 */}
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 backdrop-blur-sm rounded-xl p-4 shadow-sm hover:shadow-md transition-all border border-purple-100">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🌟</span>
+                    <p className="text-xs font-medium text-gray-700">心流指数</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-purple-600">{flowIndex.score}</p>
+                    <p className="text-xs text-gray-500">{flowIndex.level}</p>
+                  </div>
+                </div>
+                
+                {/* 分解指标 */}
+                <div className="space-y-1.5 mt-2 pt-2 border-t border-purple-100">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">专注质量</span>
+                    <span className="font-medium text-purple-700">{flowIndex.breakdown.quality}%</span>
+                  </div>
+                  <div className="w-full bg-purple-100 rounded-full h-1">
+                    <div 
+                      className="bg-purple-500 h-1 rounded-full transition-all"
+                      style={{ width: `${flowIndex.breakdown.quality}%` }}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">专注时长</span>
+                    <span className="font-medium text-cyan-700">{flowIndex.breakdown.duration}%</span>
+                  </div>
+                  <div className="w-full bg-cyan-100 rounded-full h-1">
+                    <div 
+                      className="bg-cyan-500 h-1 rounded-full transition-all"
+                      style={{ width: `${flowIndex.breakdown.duration}%` }}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">专注习惯</span>
+                    <span className="font-medium text-teal-700">{flowIndex.breakdown.consistency}%</span>
+                  </div>
+                  <div className="w-full bg-teal-100 rounded-full h-1">
+                    <div 
+                      className="bg-teal-500 h-1 rounded-full transition-all"
+                      style={{ width: `${flowIndex.breakdown.consistency}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 个性化提示 */}
+                <div className="mt-2 pt-2 border-t border-purple-100">
+                  <p className="text-xs text-gray-600 italic">
+                    {flowIndex.score < 40 && '💡 建议：从每天15分钟开始，建立专注习惯'}
+                    {flowIndex.score >= 40 && flowIndex.score < 55 && '🚀 很好！尝试延长单次专注时间'}
+                    {flowIndex.score >= 55 && flowIndex.score < 70 && '🎯 优秀！保持节奏，提高专注质量'}
+                    {flowIndex.score >= 70 && flowIndex.score < 85 && '🌟 太棒了！你已形成稳定的心流状态'}
+                    {flowIndex.score >= 85 && '🔥 大师级！你在深度心流中创造价值'}
+                  </p>
+                </div>
+              </div>
+
+              {/* 累计完成的小目标 */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🎯</span>
+                    <p className="text-xs text-gray-500">累计完成目标</p>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900">{stats.completedGoals}个</p>
+                </div>
+              </div>
+            </div>
           </div>
           
-          <div className="flex flex-col items-center">
-            <ProgressRing 
-              progress={progress}
-              color={progressColor}
-              size={120}
-              strokeWidth={8}
-            />
-            <div className="mt-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">
-                {Math.round(progress * 100)}%
-              </p>
-              <p className="text-sm text-gray-600 mt-1">已完成</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-100">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">本周专注</p>
-              <p className="text-lg font-bold text-gray-900">
-                {Math.floor(stats.weeklyMinutes / 60)}h {stats.weeklyMinutes % 60}m
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-gray-600">连续专注</p>
-              <p className="text-lg font-bold text-gray-900">{stats.streakDays}天</p>
-            </div>
-          </div>
+          {/* CSS for animated gradient */}
+          <style jsx>{`
+            @keyframes gradient-x {
+              0%, 100% {
+                background-position: 0% 50%;
+              }
+              50% {
+                background-position: 100% 50%;
+              }
+            }
+            .animate-gradient-x {
+              background-size: 200% auto;
+              animation: gradient-x 3s ease infinite;
+            }
+            @keyframes slide-in {
+              from {
+                transform: translateX(100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateX(0);
+                opacity: 1;
+              }
+            }
+            .animate-slide-in {
+              animation: slide-in 0.5s ease-out;
+            }
+          `}</style>
         </div>
 
-        {/* 开始专注按钮 */}
-        <div className="mb-6">
+        {/* 固定位置 - 开始专注按钮 */}
+        <div className="fixed bottom-28 right-8 z-10">
           <button
             onClick={handleStartFocus}
-            className="w-full bg-green-600 text-white py-4 rounded-2xl font-semibold text-lg hover:bg-green-700 transition shadow-md"
+            className="bg-teal-500 text-white py-6 px-12 rounded-full font-semibold text-lg hover:bg-teal-600 transition shadow-lg hover:shadow-xl flex items-center gap-3"
           >
-            🎯 开始专注
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            开始专注
           </button>
         </div>
 
-        {/* 简化版主要计划 */}
+        {/* 周报小结区域 - 可展开 */}
+        <DailySummarySection />
+
+        {/* 最近成就 - 可展开（默认展开） */}
+        <AchievementsSection />
+
+        {/* 计划区域 */}
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-4">主要计划</h2>
           
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-            <div className="text-5xl mb-4">🎯</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              专注模式已启用
-            </h3>
-            <p className="text-gray-600 mb-6">
-              现在可以开始专注了！Projects 功能暂时禁用以解决性能问题。
-            </p>
-            <div className="space-y-3">
-              <button 
-                onClick={() => router.push('/onboarding')}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 font-medium transition"
-              >
-                设置项目
-              </button>
-              <button 
-                onClick={() => router.push('/focus')}
-                className="w-full px-6 py-3 bg-green-600 text-white rounded-full hover:bg-green-700 font-medium transition"
-              >
-                直接开始专注
-              </button>
-            </div>
-          </div>
+          <PrimaryPlanCard 
+            plan={primaryPlan}
+            onMilestoneToggle={handleMilestoneToggle}
+            onBulkMilestoneToggle={handleBulkMilestoneToggle}
+            onGoalCountIncrement={incrementCompletedGoals}
+          />
         </div>
       </div>
 
       <BottomNavigation active="home" />
+      
+      {/* 成就面板 */}
+      {showAchievementPanel && (
+        <AchievementPanel 
+          onClose={() => {
+            // 关闭面板时清除未查看标记
+            setUnviewedAchievements([]);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('unviewedAchievements');
+            }
+            setShowAchievementPanel(false);
+          }} 
+        />
+      )}
+      
+      {/* 快速查找指南 */}
+      {showQuickSearchGuide && (
+        <QuickSearchGuide onClose={() => setShowQuickSearchGuide(false)} />
+      )}
     </div>
   );
 }

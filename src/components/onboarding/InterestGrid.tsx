@@ -13,6 +13,7 @@ interface InterestGridProps {
 }
 
 // 精选的3x4兴趣网格 - 在组件内部定义
+// 使用与其他页面统一的emoji风格
 const INTERESTS: Interest[] = [
   // 第一行 - 创造表达
   { id: '1', name: '游戏', icon: '🎮', color: 'bg-purple-100 border-purple-300 text-purple-700' },
@@ -32,6 +33,12 @@ const INTERESTS: Interest[] = [
   { id: '11', name: '观影', icon: '🎬', color: 'bg-rose-100 border-rose-300 text-rose-700' },
   { id: '12', name: '写作', icon: '✍️', color: 'bg-cyan-100 border-cyan-300 text-cyan-700' }
 ];
+
+// 导出图标列表供其他组件使用
+export const PLAN_ICONS = INTERESTS.map(interest => ({
+  icon: interest.icon,
+  label: interest.name
+}));
 
 
 export default function InterestGrid({ onSelectionChange }: InterestGridProps) {

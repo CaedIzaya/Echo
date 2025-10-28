@@ -41,20 +41,20 @@ export default function BottomNavigation({ active }: BottomNavigationProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-gray-100 px-4 py-3 shadow-lg shadow-gray-100">
       <div className="flex justify-around items-center max-w-4xl mx-auto">
         {navItems.map((item) => (
           <button
             key={item.key}
             onClick={() => router.push(item.path)}
-            className={`flex flex-col items-center px-4 py-2 rounded-xl transition-all ${
+            className={`flex flex-col items-center px-4 py-2 rounded-2xl transition-all duration-200 ${
               active === item.key 
-                ? 'text-blue-600 bg-blue-50' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-teal-500 bg-teal-50 scale-105' 
+                : 'text-gray-500 hover:text-teal-500 hover:bg-teal-50/50'
             }`}
           >
             <span className="mb-1">{item.icon}</span>
-            <span className="text-xs font-medium">{item.label}</span>
+            <span className="text-xs font-semibold">{item.label}</span>
           </button>
         ))}
       </div>

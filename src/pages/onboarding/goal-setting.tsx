@@ -74,37 +74,62 @@ useEffect(() => {
     try {
       console.log("开始提交表单...");
       
-      const response = await fetch('/api/user/complete-onboarding', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-  
-      console.log("API 响应状态:", response.status);
+      // 创建计划数据
+      const newPlan = {
+        id: Date.now().toString(),
+        name: formData.projectName,
+        icon: focusedInterest.icon,
+        dailyGoalMinutes: formData.dailyMinTime,
+        milestones: [
+          {
+            id: `milestone-${Date.now()}`,
+            title: formData.firstMilestone,
+            isCompleted: false,
+            order: 1
+          }
+        ],
+        isActive: true,
+        isPrimary: false,
+        isCompleted: false
+      };
       
-      const result = await response.json();
-      console.log("API 响应数据:", result);
-  
-      if (response.ok && result.success) {
-        console.log("Onboarding 完成，准备跳转...");
-        
-        // 添加短暂延迟让用户看到成功状态
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 500);
-        
-      } else {
-        console.error("API 返回错误:", result);
-        throw new Error(result.error || `更新状态失败 (${response.status})`);
+      // 从localStorage获取现有计划
+      const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
+      const activePlans = existingPlans.filter((p: any) => p.isActive && !p.isCompleted);
+      
+      // 如果是第一个计划，设为主要
+      if (activePlans.length === 0) {
+        newPlan.isPrimary = true;
+        // 清除其他计划的主要标志
+        existingPlans.forEach((p: any) => {
+          p.isPrimary = false;
+        });
       }
+      
+      // 添加新计划
+      existingPlans.push(newPlan);
+      
+      // 保存到localStorage
+      localStorage.setItem('userPlans', JSON.stringify(existingPlans));
+      
+      console.log('计划已创建:', newPlan);
+      
+      // TODO: 这里后续需要调用API保存到数据库
+      // const response = await fetch('/api/user/complete-onboarding', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ plan: newPlan })
+      // });
+      
+      // 跳转到dashboard
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 500);
+      
     } catch (error) {
       console.error('提交失败详情:', error);
-      
-      // 提供更友好的错误信息
       const errorMessage = error instanceof Error ? error.message : '未知错误';
-      alert(`提交失败: ${errorMessage}\n\n请检查控制台获取详细信息。`);
+      alert(`提交失败: ${errorMessage}`);
     }
   };
 
@@ -180,9 +205,20 @@ useEffect(() => {
 
             {/* 第一个里程碑 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 第一个里程碑
-                <span className="text-gray-500 text-xs ml-2">（可达成的小目标）</span>
+                <span className="text-gray-500 text-xs">（可达成的小目标）</span>
+                {/* 提示图标 */}
+                <div className="group relative">
+                  <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center cursor-help">
+                    <span className="text-blue-600 text-xs font-bold">!</span>
+                  </div>
+                  {/* Tooltip */}
+                  <div className="absolute left-0 bottom-full mb-2 w-48 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    作为计划中第一个最小可实现的小目标
+                    <div className="absolute left-2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                  </div>
+                </div>
               </label>
               <input
                 type="text"
@@ -230,6 +266,7 @@ useEffect(() => {
                 type="date"
                 value={formData.targetDate || ''}
                 onChange={(e) => handleInputChange('targetDate', e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               />
             </div>
@@ -277,43 +314,5 @@ useEffect(() => {
       </div>
     </>
   );
-  {/* 在表单底部添加调试区域 */}
-<div className="mt-8 p-4 bg-gray-100 rounded-lg border">
-  <h3 className="text-sm font-medium text-gray-700 mb-2">调试区域</h3>
-  <div className="flex space-x-2">
-    <button
-      onClick={async () => {
-        const response = await fetch('/api/debug/user-status');
-        const data = await response.json();
-        console.log('用户状态:', data);
-        alert(`用户状态: ${JSON.stringify(data, null, 2)}`);
-      }}
-      className="px-3 py-1 bg-gray-500 text-white text-xs rounded"
-    >
-      检查用户状态
-    </button>
-    <button
-      onClick={async () => {
-        const response = await fetch('/api/debug/test-db');
-        const data = await response.json();
-        console.log('数据库测试:', data);
-        alert(`数据库测试: ${JSON.stringify(data, null, 2)}`);
-      }}
-      className="px-3 py-1 bg-gray-500 text-white text-xs rounded"
-    >
-      测试数据库
-    </button>
-    <button
-      onClick={() => {
-        console.log('当前表单数据:', formData);
-        console.log('当前聚焦兴趣:', focusedInterest);
-        alert('已输出到控制台');
-      }}
-      className="px-3 py-1 bg-gray-500 text-white text-xs rounded"
-    >
-      输出当前数据
-    </button>
-  </div>
-</div>
 }
 

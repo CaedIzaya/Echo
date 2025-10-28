@@ -1,0 +1,195 @@
+import React from 'react';
+
+interface Milestone {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+  order: number;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  icon: string;
+  dailyGoalMinutes: number;
+  milestones: Milestone[];
+  isActive: boolean;
+  isPrimary?: boolean;
+  isCompleted?: boolean;
+}
+
+interface PlanCardProps {
+  plan: Project;
+  isPrimary?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  isCompleted?: boolean;
+  onSelect?: (planId: string) => void;
+  onSwitchPrimary?: () => void;
+  onEdit?: () => void;
+  onAddMilestone?: (planId: string) => void;
+}
+
+export default function PlanCard({
+  plan,
+  isPrimary = false,
+  selectable = false,
+  selected = false,
+  isCompleted = false,
+  onSelect,
+  onSwitchPrimary,
+  onEdit,
+  onAddMilestone,
+}: PlanCardProps) {
+  const completedMilestones = plan.milestones.filter(m => m.isCompleted).length;
+  const totalMilestones = plan.milestones.length;
+  const activeMilestones = plan.milestones.filter(m => !m.isCompleted);
+
+  // 检查是否可以添加小目标（基于活跃小目标数量，限制为10个）
+  const canAddMilestone = activeMilestones.length < 10;
+
+  const handleCardClick = () => {
+    if (selectable && onSelect) {
+      onSelect(plan.id);
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) {
+      onEdit();
+    }
+  };
+
+  const handleSwitchClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSwitchPrimary) {
+      onSwitchPrimary();
+    }
+  };
+
+  if (isCompleted) {
+    return (
+      <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-200 opacity-60">
+        <div className="flex items-center gap-4">
+          <div className="text-4xl">{plan.icon}</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-lg font-semibold text-gray-700">{plan.name}</h3>
+              <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                已完成
+              </span>
+            </div>
+            <p className="text-sm text-gray-500">
+              {plan.dailyGoalMinutes}分钟/天 • {completedMilestones}/{totalMilestones}个小目标
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={handleCardClick}
+      className={`bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm transition-all cursor-pointer ${
+        selected 
+          ? 'ring-4 ring-teal-500 ring-opacity-50 border-teal-500' 
+          : 'hover:shadow-md border border-transparent'
+      } ${isPrimary ? 'border-4 border-teal-500 animate-pulse-border' : ''}`}
+    >
+      {/* 主要计划标识 */}
+      {isPrimary && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs bg-teal-100 text-teal-600 px-3 py-1 rounded-full font-medium">
+            🌟 主要计划
+          </span>
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-4">
+        {/* 左侧内容 */}
+        <div className="flex items-start gap-4 flex-1">
+          {/* 图标 */}
+          <div className="text-5xl flex-shrink-0">{plan.icon}</div>
+
+          {/* 计划信息 */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+            
+            {/* 每日目标 */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm text-gray-500">每日目标</span>
+              <span className="text-sm font-semibold text-teal-600">
+                {plan.dailyGoalMinutes}分钟
+              </span>
+            </div>
+
+            {/* 小目标预览 - 只显示未完成的目标 */}
+            <div className="space-y-2">
+              {(() => {
+                // 只获取未完成的小目标
+                const activeMilestones = plan.milestones.filter(m => !m.isCompleted);
+                
+                return activeMilestones.length > 0 ? (
+                  <>
+                    {activeMilestones.slice(0, 3).map(milestone => (
+                      <div
+                        key={milestone.id}
+                        className="text-sm text-gray-700 flex items-start gap-2"
+                      >
+                        <span className="text-teal-500 mt-1">•</span>
+                        <span>{milestone.title}</span>
+                      </div>
+                    ))}
+                    {activeMilestones.length > 3 && (
+                      <p className="text-xs text-gray-400">
+                        +{activeMilestones.length - 3}个更多小目标
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    {plan.milestones.length > 0 ? '所有小目标已完成' : '暂无小目标'}
+                  </p>
+                );
+              })()}
+
+              {/* 快速添加小目标 */}
+              {canAddMilestone && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddMilestone?.(plan.id);
+                  }}
+                  className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1 mt-2"
+                >
+                  ➕ 添加小目标
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 右侧操作按钮 */}
+        <div className="flex flex-col gap-2 flex-shrink-0">
+          {isPrimary && (
+            <button
+              onClick={handleSwitchClick}
+              className="bg-teal-100 text-teal-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-teal-200 transition"
+            >
+              🔄
+            </button>
+          )}
+          <button
+            onClick={handleEditClick}
+            className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm hover:bg-gray-200 transition"
+          >
+            ⚙️
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
