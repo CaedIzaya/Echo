@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface Milestone {
   id: string;
@@ -41,6 +41,7 @@ export default function PlanCard({
   onEdit,
   onAddMilestone,
 }: PlanCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const completedMilestones = plan.milestones.filter(m => m.isCompleted).length;
   const totalMilestones = plan.milestones.length;
   const activeMilestones = plan.milestones.filter(m => !m.isCompleted);
@@ -133,7 +134,8 @@ export default function PlanCard({
                 
                 return activeMilestones.length > 0 ? (
                   <>
-                    {activeMilestones.slice(0, 3).map(milestone => (
+                    {/* 显示的小目标数量：展开时显示全部，折叠时只显示前3个 */}
+                    {(isExpanded ? activeMilestones : activeMilestones.slice(0, 3)).map(milestone => (
                       <div
                         key={milestone.id}
                         className="text-sm text-gray-700 flex items-start gap-2"
@@ -142,10 +144,19 @@ export default function PlanCard({
                         <span>{milestone.title}</span>
                       </div>
                     ))}
+                    {/* 如果有超过3个小目标，显示展开/折叠按钮 */}
                     {activeMilestones.length > 3 && (
-                      <p className="text-xs text-gray-400">
-                        +{activeMilestones.length - 3}个更多小目标
-                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsExpanded(!isExpanded);
+                        }}
+                        className="text-xs text-teal-600 hover:text-teal-700 font-medium transition-colors cursor-pointer"
+                      >
+                        {isExpanded 
+                          ? '收起' 
+                          : `+${activeMilestones.length - 3}个更多小目标`}
+                      </button>
                     )}
                   </>
                 ) : (

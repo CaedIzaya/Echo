@@ -8,6 +8,7 @@ import PrimaryPlanCard from './PrimaryPlanCard';
 import AchievementPanel from './AchievementPanel';
 import QuickSearchGuide from './QuickSearchGuide';
 import { getAchievementManager, AchievementManager } from './AchievementSystem';
+import { LevelManager, UserLevel } from './LevelSystem';
 
 interface Project {
   id: string;
@@ -26,10 +27,19 @@ interface Milestone {
   order: number;
 }
 
+// 分离的数据结构 - 今日数据和累计数据独立
+interface TodayStats {
+  minutes: number;
+  date: string;  // 日期如 "2025-10-29"
+}
+
+interface WeeklyStats {
+  totalMinutes: number;
+  weekStart: string;  // 本周开始日期
+}
+
 interface DashboardStats {
-  todayMinutes: number;
-  todayGoal: number;
-  weeklyMinutes: number;
+  yesterdayMinutes: number;  // 昨日专注时长（用于显示）
   streakDays: number;
   completedGoals: number;
 }
@@ -62,152 +72,6 @@ interface FlowIndexResult {
     duration: number;
     consistency: number;
   };
-}
-
-// 每日小结组件
-function DailySummarySection() {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [lastSession, setLastSession] = useState<any>(null);
-  const [yesterdayData, setYesterdayData] = useState<any>(null);
-
-  useEffect(() => {
-    // 从localStorage获取最近的小结
-    const recentSummary = localStorage.getItem('recentFocusSummary');
-    if (recentSummary) {
-      const summary = JSON.parse(recentSummary);
-      setLastSession(summary);
-    }
-
-    // 计算昨日数据
-    const stats = JSON.parse(localStorage.getItem('dashboardStats') || '{}');
-    const yesterday = stats.yesterdayMinutes || 0;
-    const lastWeek = stats.lastWeekMinutes || 0;
-    
-    if (yesterday > 0) {
-      const comparison = calculateWeeklyComparison(yesterday, lastWeek);
-      setYesterdayData({
-        totalMinutes: yesterday,
-        sessionCount: Math.floor(yesterday / 30),
-        primaryProject: '专注计划',
-        comparison
-      });
-    }
-  }, []);
-
-  const formatTimeAgo = (timestamp: string): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 1) return '刚刚';
-    if (diffInHours < 24) return `${Math.floor(diffInHours)}小时前`;
-    if (diffInHours < 48) return '昨天';
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}天前`;
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-  };
-
-  return (
-    <div className="mb-6 transition-all duration-300">
-      {/* 标题和展开按钮 */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <span>📊</span>
-          周报小结
-        </h2>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="text-sm text-gray-500 hover:text-gray-700 transition"
-        >
-          {isExpanded ? '收起 ▲' : '展开 ▼'}
-        </button>
-      </div>
-
-      {/* 可展开的内容 */}
-      <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-96' : 'max-h-0'}`}>
-        <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 最近小结 */}
-            <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-xl p-4 border border-teal-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span>📝</span>
-                最近小结
-              </h3>
-              {lastSession ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-medium">
-                      {lastSession.projectName || '专注计划'}
-                    </span>
-                    <span className="text-gray-500">{formatTimeAgo(lastSession.createdAt)}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs">
-                    {Array.from({ length: lastSession.rating || 2 }).map((_, i) => (
-                      <span key={i}>⭐</span>
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-700 line-clamp-2">
-                    {lastSession.note || '无备注'}
-                  </p>
-                  <div className="text-xs text-gray-500">
-                    专注 {Math.floor(lastSession.duration / 60)} 分钟
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-500">完成第一次专注并记录小结吧</p>
-                  <small className="text-xs text-gray-400">你的成长值得被记住</small>
-                </div>
-              )}
-            </div>
-
-            {/* 昨日汇报 */}
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span>📊</span>
-                昨日专注
-              </h3>
-              {yesterdayData ? (
-                <div className="space-y-3">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-purple-600">
-                      {yesterdayData.totalMinutes}
-                    </div>
-                    <div className="text-xs text-gray-500">分钟</div>
-                  </div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <div>{yesterdayData.sessionCount} 次专注</div>
-                    <div className="text-xs">主要投入: {yesterdayData.primaryProject}</div>
-                  </div>
-                  {/* 周对比 */}
-                  <div className={`rounded-lg p-2 text-xs ${
-                    yesterdayData.comparison.type === 'increase' ? 'bg-green-50 text-green-700' :
-                    yesterdayData.comparison.type === 'decrease' ? 'bg-amber-50 text-amber-700' :
-                    'bg-blue-50 text-blue-700'
-                  }`}>
-                    <div className="flex items-center gap-1 font-medium">
-                      {yesterdayData.comparison.type === 'increase' && '📈'}
-                      {yesterdayData.comparison.type === 'decrease' && '📉'}
-                      {yesterdayData.comparison.type === 'same' && '➡️'}
-                      较上周 {yesterdayData.comparison.type === 'increase' ? '+' : ''}
-                      {yesterdayData.comparison.percentage}%
-                    </div>
-                    <div className="text-xs mt-1 opacity-80">
-                      {yesterdayData.comparison.description}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-500">昨日没有专注记录</p>
-                  <small className="text-xs text-gray-400">今天就是新的开始</small>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // 成就展开组件（默认展开）- 显示真实成就数据
@@ -389,22 +253,67 @@ export default function Dashboard() {
   }, [sessionStatus, userId]);
   
   const [isLoading, setIsLoading] = useState(true);
-  // 从localStorage加载统计数据
+  
+  // 获取今日日期的工具函数
+  const getTodayDate = () => new Date().toISOString().split('T')[0];
+  
+  // 获取今日数据的工具函数
+  const getTodayStats = (): TodayStats => {
+    if (typeof window === 'undefined') return { minutes: 0, date: '' };
+    const today = getTodayDate();
+    const todayStatsData = localStorage.getItem('todayStats');
+    const allTodayStats = todayStatsData ? JSON.parse(todayStatsData) : {};
+    return allTodayStats[today] || { minutes: 0, date: today };
+  };
+  
+  // 获取本周数据的工具函数
+  const getWeeklyStats = (): WeeklyStats => {
+    if (typeof window === 'undefined') return { totalMinutes: 0, weekStart: '' };
+    const saved = localStorage.getItem('weeklyStats');
+    if (saved) return JSON.parse(saved);
+    
+    // 计算本周开始日期（周一）
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // 调整为周一
+    const weekStart = new Date(now.setDate(diff));
+    return { totalMinutes: 0, weekStart: weekStart.toISOString().split('T')[0] };
+  };
+  
+  // 保存今日数据
+  const saveTodayStats = (minutes: number) => {
+    if (typeof window === 'undefined') return;
+    const today = getTodayDate();
+    const todayStatsData = localStorage.getItem('todayStats');
+    const allTodayStats = todayStatsData ? JSON.parse(todayStatsData) : {};
+    allTodayStats[today] = { minutes, date: today };
+    localStorage.setItem('todayStats', JSON.stringify(allTodayStats));
+  };
+  
+  // 保存本周数据
+  const saveWeeklyStats = (totalMinutes: number, weekStart: string) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('weeklyStats', JSON.stringify({ totalMinutes, weekStart }));
+  };
+  
+  // 今日数据状态
+  const [todayStats, setTodayStats] = useState<TodayStats>(() => getTodayStats());
+  
+  // 本周数据状态
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>(() => getWeeklyStats());
+  
+  // 从localStorage加载统计数据（其他数据）
   const [stats, setStats] = useState<DashboardStats>(() => {
     if (typeof window !== 'undefined') {
       const savedStats = localStorage.getItem('dashboardStats');
       return savedStats ? JSON.parse(savedStats) : {
-        todayMinutes: 0,
-        todayGoal: 0,
-        weeklyMinutes: 0,
+        yesterdayMinutes: 0,
         streakDays: 0,
         completedGoals: 0
       };
     }
     return {
-      todayMinutes: 0,
-      todayGoal: 0,
-      weeklyMinutes: 0,
+      yesterdayMinutes: 0,
       streakDays: 0,
       completedGoals: 0
     };
@@ -426,6 +335,8 @@ export default function Dashboard() {
   const [newAchievements, setNewAchievements] = useState<any[]>([]);
   const [unviewedAchievements, setUnviewedAchievements] = useState<any[]>([]);
   const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
+  const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
+  const [isFlowIndexExpanded, setIsFlowIndexExpanded] = useState(false);
 
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
@@ -469,6 +380,22 @@ export default function Dashboard() {
         localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
       }
 
+      // 小目标完成获得经验值
+      if (typeof window !== 'undefined') {
+        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+        const milestoneExp = LevelManager.calculateMilestoneExp(); // 5 EXP
+        const newExp = currentExp + milestoneExp;
+        localStorage.setItem('userExp', newExp.toString());
+        
+        const oldLevel = LevelManager.calculateLevel(currentExp);
+        const newLevel = LevelManager.calculateLevel(newExp);
+        setUserLevel(newLevel);
+        
+        if (newLevel.currentLevel > oldLevel.currentLevel) {
+          console.log('🎉 等级提升！（完成小目标触发）', newLevel);
+        }
+      }
+
       return updatedPlan;
     });
   };
@@ -495,6 +422,22 @@ export default function Dashboard() {
           p.id === updatedPlan.id ? updatedPlan : p
         );
         localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      }
+
+      // 批量完成小目标获得经验值
+      if (typeof window !== 'undefined') {
+        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+        const milestoneExp = LevelManager.calculateMilestoneExp(); // 每个5 EXP
+        const totalExp = currentExp + (milestoneExp * milestoneIds.length);
+        localStorage.setItem('userExp', totalExp.toString());
+        
+        const oldLevel = LevelManager.calculateLevel(currentExp);
+        const newLevel = LevelManager.calculateLevel(totalExp);
+        setUserLevel(newLevel);
+        
+        if (newLevel.currentLevel > oldLevel.currentLevel) {
+          console.log('🎉 等级提升！（批量完成小目标触发）', newLevel);
+        }
       }
 
       return updatedPlan;
@@ -542,36 +485,58 @@ export default function Dashboard() {
     console.log('📈 Dashboard收到专注报告', { 
       status,
       minutes, 
-      rating, 
-      currentStats: stats 
+      rating
     });
     
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDate();
     const lastFocusDate = localStorage.getItem('lastFocusDate');
     const isNewDay = lastFocusDate !== today;
 
-    const newTodayMinutes = stats.todayMinutes + minutes;
-    const newWeeklyMinutes = stats.weeklyMinutes + minutes;
-    
-    console.log('📊 更新统计数据', {
-      oldToday: stats.todayMinutes,
-      newToday: newTodayMinutes,
-      oldWeek: stats.weeklyMinutes,
-      newWeek: newWeeklyMinutes
-    });
-    
-    // 更新连续天数
-    let newStreakDays = stats.streakDays;
+    // 处理新的一天：归档昨日数据并重置今日数据
     if (isNewDay) {
-      newStreakDays = stats.streakDays + 1;
+      // 归档昨日数据
+      const yesterdayDate = lastFocusDate || today;
+      const yesterdayStatsData = localStorage.getItem('todayStats');
+      const allTodayStats = yesterdayStatsData ? JSON.parse(yesterdayStatsData) : {};
+      const yesterdayMinutes = allTodayStats[yesterdayDate]?.minutes || 0;
+      
+      console.log('📅 新的一天开始！', {
+        yesterdayDate,
+        yesterdayMinutes,
+        today
+      });
+      
+      // 更新昨日数据到主统计数据
+      updateStats({ yesterdayMinutes });
+      
+      // 更新连续天数
+      const newStreakDays = stats.streakDays + (yesterdayMinutes > 0 ? 1 : 0);
+      updateStats({ streakDays: newStreakDays });
+      
+      // 保存今日日期标记
       localStorage.setItem('lastFocusDate', today);
-      console.log('🔥 连续天数已更新', { old: stats.streakDays, new: newStreakDays });
+      
+      // 重置今日数据（从0开始）
+      saveTodayStats(0);
+      setTodayStats({ minutes: 0, date: today });
+      
+      console.log('🔄 日期已更新', { today, newStreakDays });
     }
-
-    updateStats({
-      todayMinutes: newTodayMinutes,
-      weeklyMinutes: newWeeklyMinutes,
-      streakDays: newStreakDays
+    
+    // 更新今日数据
+    const newTodayMinutes = todayStats.minutes + minutes;
+    saveTodayStats(newTodayMinutes);
+    setTodayStats(prev => ({ ...prev, minutes: newTodayMinutes }));
+    
+    // 更新本周数据（独立于今日数据，不受重置影响）
+    const currentWeeklyTotal = weeklyStats.totalMinutes;
+    const newWeeklyMinutes = currentWeeklyTotal + minutes;
+    saveWeeklyStats(newWeeklyMinutes, weeklyStats.weekStart);
+    setWeeklyStats(prev => ({ ...prev, totalMinutes: newWeeklyMinutes }));
+    
+    console.log('📊 数据已更新', {
+      today: { minutes: newTodayMinutes },
+      week: { totalMinutes: newWeeklyMinutes }
     });
 
     // 更新心流指标（仅完成时更新质量相关指标）
@@ -581,8 +546,45 @@ export default function Dashboard() {
       // 中断时只更新时长统计
       updateFlowMetrics(minutes);
     }
+
+    // 更新等级经验值
+    updateUserExp(minutes, rating, completed);
     
     console.log('✅ 统计数据已更新完成');
+  };
+
+  // 更新用户经验值
+  const updateUserExp = (minutes: number, rating?: number, completed: boolean = true) => {
+    const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+    
+    // 计算此次专注获得的经验值
+    const sessionExp = LevelManager.calculateSessionExp(minutes, rating, stats.streakDays);
+    
+    const newTotalExp = currentExp + sessionExp;
+    const oldLevel = LevelManager.calculateLevel(currentExp);
+    const newLevel = LevelManager.calculateLevel(newTotalExp);
+    
+    // 保存经验值
+    localStorage.setItem('userExp', newTotalExp.toString());
+    
+    // 检测等级提升
+    if (newLevel.currentLevel > oldLevel.currentLevel) {
+      console.log('🎉 等级提升！', {
+        oldLevel: oldLevel.currentLevel,
+        newLevel: newLevel.currentLevel,
+        newTitle: newLevel.title
+      });
+      // 可以在这里触发升级动画或通知
+      setUserLevel(newLevel);
+    } else {
+      setUserLevel(newLevel);
+    }
+    
+    console.log('📈 经验值更新', { 
+      gained: sessionExp, 
+      total: newTotalExp, 
+      level: newLevel.currentLevel 
+    });
   };
 
   // 暴露给focus页面使用的函数
@@ -634,10 +636,10 @@ export default function Dashboard() {
     const metrics: FlowMetrics = flowData 
       ? JSON.parse(flowData)
       : {
-          totalFocusMinutes: stats.weeklyMinutes,
+          totalFocusMinutes: weeklyStats.totalMinutes,
           averageSessionLength: 30,
           longestSession: 60,
-          sessionCount: Math.floor(stats.weeklyMinutes / 30),
+          sessionCount: Math.floor(weeklyStats.totalMinutes / 30),
           consistencyScore: 0.5,
           averageRating: 2.0,
           completionRate: 0.7,
@@ -708,7 +710,7 @@ export default function Dashboard() {
         consistency: Math.round(consistencyScore * 100)
       }
     };
-  }, [stats.weeklyMinutes, stats.streakDays]);
+  }, [weeklyStats.totalMinutes, stats.streakDays]);
 
   // 初始化成就管理器
   useEffect(() => {
@@ -718,19 +720,19 @@ export default function Dashboard() {
     // 检查当前状态的成就
     const flowAchievements = manager.checkFlowIndexAchievements(flowIndex.score);
     
-    // 检查总时长成就（小时）
-    const totalHours = Math.floor(stats.weeklyMinutes / 60);
+    // 检查总时长成就（小时）- 使用本周累计
+    const totalHours = Math.floor(weeklyStats.totalMinutes / 60);
     const timeAchievements = manager.checkTotalTimeAchievements(totalHours);
     
     // 检查今日时长成就
-    const todayHours = stats.todayMinutes / 60;
+    const todayHours = todayStats.minutes / 60;
     const dailyAchievements = manager.checkDailyTimeAchievements(todayHours);
     
     // 检查小目标成就
     const milestoneAchievements = manager.checkMilestoneAchievements(stats.completedGoals);
     
     // 检查第一次完成专注成就
-    const firstFocusAchievement = stats.todayMinutes > 0 
+    const firstFocusAchievement = todayStats.minutes > 0 
       ? manager.checkFirstTimeAchievements('focus')
       : [];
     
@@ -752,10 +754,28 @@ export default function Dashboard() {
         localStorage.setItem('unviewedAchievements', JSON.stringify(allNew));
       }
       
+      // 成就解锁获得经验值（每个成就20 EXP）
+      if (typeof window !== 'undefined') {
+        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+        const achievementExp = LevelManager.calculateAchievementExp('common'); // 基础成就20 EXP
+        const totalExp = currentExp + (achievementExp * allNew.length);
+        localStorage.setItem('userExp', totalExp.toString());
+        
+        const oldLevel = LevelManager.calculateLevel(currentExp);
+        const newLevel = LevelManager.calculateLevel(totalExp);
+        setUserLevel(newLevel);
+        
+        console.log(`🎁 解锁${allNew.length}个成就，获得${achievementExp * allNew.length} EXP`);
+        
+        if (newLevel.currentLevel > oldLevel.currentLevel) {
+          console.log('🎉 等级提升！（成就解锁触发）', newLevel);
+        }
+      }
+      
       // 3秒后自动隐藏弹窗（但不清除未查看标记）
       setTimeout(() => setNewAchievements([]), 3000);
     }
-  }, [flowIndex.score, stats.weeklyMinutes, stats.todayMinutes, stats.completedGoals]);
+  }, [flowIndex.score, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
   
   // 从localStorage加载未查看的成就
   useEffect(() => {
@@ -773,6 +793,17 @@ export default function Dashboard() {
       }
     }
   }, []);
+
+  // 加载和计算用户等级
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const userExp = parseFloat(localStorage.getItem('userExp') || '0');
+    const levelInfo = LevelManager.calculateLevel(userExp);
+    setUserLevel(levelInfo);
+    
+    console.log('📊 用户等级信息', levelInfo);
+  }, [todayStats.minutes, weeklyStats.totalMinutes, stats.streakDays]);
 
   // UI 辅助函数 - 红绿灯机制
   const getProgressColor = (progress: number): string => {
@@ -816,7 +847,7 @@ export default function Dashboard() {
   // 计算进度 - 今日完成目标百分比 = 已专注时间/每日目标
   const todayGoal = primaryPlan?.dailyGoalMinutes || 0;
   // 使用primaryPlan的dailyGoalMinutes作为今天的goal
-  const progress = todayGoal > 0 ? Math.min(1, stats.todayMinutes / todayGoal) : 0;
+  const progress = todayGoal > 0 ? Math.min(1, todayStats.minutes / todayGoal) : 0;
   const progressColor = getProgressColor(progress);
   const greeting = getGreeting();
 
@@ -857,7 +888,9 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold text-gray-900">
               {greeting}，{userName}
             </h1>
-            <p className="text-gray-500 mt-1">准备好夺回今天的时间了吗？</p>
+            <p className="text-gray-500 mt-1">
+              {progress >= 1 ? '恭喜你，我们将铭记今天所夺回的时光' : '准备好夺回今天的时间了吗？'}
+            </p>
           </div>
           
           <div className="flex items-center gap-3">
@@ -937,20 +970,31 @@ export default function Dashboard() {
 
             {/* 右侧 - 统计卡片单列（紧凑） */}
             <div className="flex-1 flex flex-col gap-3 w-full lg:w-auto">
-              {/* 本周专注 */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">📈</span>
-                    <p className="text-xs text-gray-500">本周专注</p>
+              {/* 用户等级 - 第一个 */}
+              {userLevel && (
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 shadow-sm hover:shadow-md transition-all text-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">⭐</span>
+                      <p className="text-xs text-white/90">等级</p>
+                    </div>
+                    <p className="text-xl font-bold">LV.{userLevel.currentLevel}</p>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">
-                    {Math.floor(stats.weeklyMinutes / 60)}h{stats.weeklyMinutes % 60}m
+                  <p className="text-xs text-white/80 mb-1">{userLevel.title}</p>
+                  {/* 经验值进度条 */}
+                  <div className="w-full bg-white/20 rounded-full h-1.5">
+                    <div 
+                      className="bg-white h-1.5 rounded-full transition-all duration-300"
+                      style={{ width: `${userLevel.progress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-white/70 mt-1">
+                    {userLevel.currentExp} / {userLevel.nextLevelExp} EXP
                   </p>
                 </div>
-              </div>
+              )}
 
-              {/* 连续天数 */}
+              {/* 连续天数 - 第二个 */}
               <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -961,8 +1005,35 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 心流指数 */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 backdrop-blur-sm rounded-xl p-4 shadow-sm hover:shadow-md transition-all border border-purple-100">
+              {/* 本周专注 - 第三个 */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📈</span>
+                    <p className="text-xs text-gray-500">本周专注</p>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900">
+                    {Math.floor(weeklyStats.totalMinutes / 60)}h{weeklyStats.totalMinutes % 60}m
+                  </p>
+                </div>
+              </div>
+
+              {/* 小目标完成 - 第四个 */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🎯</span>
+                    <p className="text-xs text-gray-500">小目标完成</p>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900">{stats.completedGoals}个</p>
+                </div>
+              </div>
+
+              {/* 心流指数 - 第五个 */}
+              <div 
+                className="bg-gradient-to-br from-purple-50 to-pink-50 backdrop-blur-sm rounded-xl p-4 shadow-sm hover:shadow-md transition-all border border-purple-100 cursor-pointer"
+                onClick={() => setIsFlowIndexExpanded(!isFlowIndexExpanded)}
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🌟</span>
@@ -974,62 +1045,55 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                {/* 分解指标 */}
-                <div className="space-y-1.5 mt-2 pt-2 border-t border-purple-100">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600">专注质量</span>
-                    <span className="font-medium text-purple-700">{flowIndex.breakdown.quality}%</span>
+                {/* 分解指标 - 可展开/收起 */}
+                <div className={`overflow-hidden transition-all duration-300 ${
+                  isFlowIndexExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                }`}>
+                  <div className="space-y-1.5 mt-2 pt-2 border-t border-purple-100">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">专注质量</span>
+                      <span className="font-medium text-purple-700">{flowIndex.breakdown.quality}%</span>
+                    </div>
+                    <div className="w-full bg-purple-100 rounded-full h-1">
+                      <div 
+                        className="bg-purple-500 h-1 rounded-full transition-all"
+                        style={{ width: `${flowIndex.breakdown.quality}%` }}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">专注时长</span>
+                      <span className="font-medium text-cyan-700">{flowIndex.breakdown.duration}%</span>
+                    </div>
+                    <div className="w-full bg-cyan-100 rounded-full h-1">
+                      <div 
+                        className="bg-cyan-500 h-1 rounded-full transition-all"
+                        style={{ width: `${flowIndex.breakdown.duration}%` }}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">专注习惯</span>
+                      <span className="font-medium text-teal-700">{flowIndex.breakdown.consistency}%</span>
+                    </div>
+                    <div className="w-full bg-teal-100 rounded-full h-1">
+                      <div 
+                        className="bg-teal-500 h-1 rounded-full transition-all"
+                        style={{ width: `${flowIndex.breakdown.consistency}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-purple-100 rounded-full h-1">
-                    <div 
-                      className="bg-purple-500 h-1 rounded-full transition-all"
-                      style={{ width: `${flowIndex.breakdown.quality}%` }}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600">专注时长</span>
-                    <span className="font-medium text-cyan-700">{flowIndex.breakdown.duration}%</span>
-                  </div>
-                  <div className="w-full bg-cyan-100 rounded-full h-1">
-                    <div 
-                      className="bg-cyan-500 h-1 rounded-full transition-all"
-                      style={{ width: `${flowIndex.breakdown.duration}%` }}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600">专注习惯</span>
-                    <span className="font-medium text-teal-700">{flowIndex.breakdown.consistency}%</span>
-                  </div>
-                  <div className="w-full bg-teal-100 rounded-full h-1">
-                    <div 
-                      className="bg-teal-500 h-1 rounded-full transition-all"
-                      style={{ width: `${flowIndex.breakdown.consistency}%` }}
-                    />
-                  </div>
-                </div>
 
-                {/* 个性化提示 */}
-                <div className="mt-2 pt-2 border-t border-purple-100">
-                  <p className="text-xs text-gray-600 italic">
-                    {flowIndex.score < 40 && '💡 建议：从每天15分钟开始，建立专注习惯'}
-                    {flowIndex.score >= 40 && flowIndex.score < 55 && '🚀 很好！尝试延长单次专注时间'}
-                    {flowIndex.score >= 55 && flowIndex.score < 70 && '🎯 优秀！保持节奏，提高专注质量'}
-                    {flowIndex.score >= 70 && flowIndex.score < 85 && '🌟 太棒了！你已形成稳定的心流状态'}
-                    {flowIndex.score >= 85 && '🔥 大师级！你在深度心流中创造价值'}
-                  </p>
-                </div>
-              </div>
-
-              {/* 累计完成的小目标 */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🎯</span>
-                    <p className="text-xs text-gray-500">累计完成目标</p>
+                  {/* 个性化提示 */}
+                  <div className="mt-2 pt-2 border-t border-purple-100">
+                    <p className="text-xs text-gray-600 italic">
+                      {flowIndex.score < 40 && '💡 建议：从每天15分钟开始，建立专注习惯'}
+                      {flowIndex.score >= 40 && flowIndex.score < 55 && '🚀 很好！尝试延长单次专注时间'}
+                      {flowIndex.score >= 55 && flowIndex.score < 70 && '🎯 优秀！保持节奏，提高专注质量'}
+                      {flowIndex.score >= 70 && flowIndex.score < 85 && '🌟 太棒了！你已形成稳定的心流状态'}
+                      {flowIndex.score >= 85 && '🔥 大师级！你在深度心流中创造价值'}
+                    </p>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{stats.completedGoals}个</p>
                 </div>
               </div>
             </div>
@@ -1077,9 +1141,6 @@ export default function Dashboard() {
             开始专注
           </button>
         </div>
-
-        {/* 周报小结区域 - 可展开 */}
-        <DailySummarySection />
 
         {/* 最近成就 - 可展开（默认展开） */}
         <AchievementsSection />

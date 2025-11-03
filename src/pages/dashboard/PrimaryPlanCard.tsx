@@ -249,12 +249,6 @@ export default function PrimaryPlanCard({ plan, onMilestoneToggle, onBulkMilesto
         >
           管理计划
         </button>
-        <button 
-          onClick={() => router.push('/focus')}
-          className="w-full px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 font-medium transition"
-        >
-          开始专注
-        </button>
       </div>
 
       <style jsx>{`

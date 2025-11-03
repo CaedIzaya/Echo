@@ -41,7 +41,7 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-50">
           <div className="py-1">
             <button
               onClick={handleSignOut}
@@ -58,6 +58,11 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
     </div>
   );
 }
+
+
+
+
+
 
 
 

@@ -60,12 +60,7 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
               <span>🧭</span>
               快速导航
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <a href="/dashboard" className="block p-4 bg-white rounded-xl hover:shadow-md transition-all border-2 border-blue-100">
-                <div className="text-3xl mb-2">📊</div>
-                <div className="font-semibold text-gray-900">数据概览</div>
-                <div className="text-sm text-gray-500">查看专注统计与进度</div>
-              </a>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <a href="/focus" className="block p-4 bg-white rounded-xl hover:shadow-md transition-all border-2 border-teal-100">
                 <div className="text-3xl mb-2">⏱️</div>
                 <div className="font-semibold text-gray-900">专注计时</div>
@@ -90,7 +85,6 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
               {[
                 { icon: '📈', name: '本周统计', desc: '查看本周专注时长与趋势', path: 'dashboard#stats' },
                 { icon: '🏆', name: '成就系统', desc: '查看已解锁成就与徽章', path: 'dashboard#achievements' },
-                { icon: '📝', name: '每日小结', desc: '回顾今日专注记录', path: 'dashboard#summary' },
                 { icon: '🎯', name: '小目标', desc: '管理计划中的小目标', path: 'dashboard#milestones' },
                 { icon: '⭐', name: '心流指数', desc: '查看专注质量评分', path: 'dashboard#flow' },
                 { icon: '🔥', name: '连续天数', desc: '查看连续专注记录', path: 'dashboard#streak' },
@@ -199,3 +193,5 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
     </div>
   );
 }
+
+

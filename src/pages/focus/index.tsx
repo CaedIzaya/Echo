@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import FocusSummaryModal from './FocusSummaryModal';
-import FocusSummary from './FocusSummary';
 import BottomNavigation from '../dashboard/BottomNavigation';
+import InterruptedSessionAlert from './InterruptedSessionAlert';
 
 type FocusState = 
   | 'preparing'      // 准备中（设置时长）
@@ -18,10 +17,11 @@ type FocusState =
 interface FocusSession {
   sessionId: string;
   plannedDuration: number;  // 计划时长（分钟）
-  elapsedTime: number;      // 已专注时长（秒）
+  elapsedTime: number;      // 已专注时长（秒）- 基于时间戳计算
   status: FocusState;
-  startTime: string;
-  pauseStart?: string;
+  startTime: string;        // 开始时间戳（ISO格式）
+  pauseStart?: string;      // 暂停开始时间戳
+  totalPauseTime: number;   // 累计暂停时间（秒）
   pauseCount: number;
   customDuration: number;   // 用户自定义时长（分钟）
 }
@@ -37,18 +37,19 @@ export default function Focus() {
   const [customDuration, setCustomDuration] = useState(30);
   const [pauseCount, setPauseCount] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [pauseStartTime, setPauseStartTime] = useState<Date | null>(null);
+  const [totalPauseTime, setTotalPauseTime] = useState(0); // 累计暂停时间（秒）
   const [showEndOptions, setShowEndOptions] = useState(false);
   const [pauseUpdateTrigger, setPauseUpdateTrigger] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [sessionName, setSessionName] = useState('');
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
-  const [showSummary, setShowSummary] = useState(false);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [planMilestones, setPlanMilestones] = useState<Array<{ id: string; title: string; completed: boolean; order: number }>>([]);
   const [customGoals, setCustomGoals] = useState<Array<{ id: string; title: string; completed: boolean }>>([]);
+  const [showInterruptedAlert, setShowInterruptedAlert] = useState(false);
+  const [interruptedSessionData, setInterruptedSessionData] = useState<{ minutes: number; timestamp: string } | null>(null);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionRef = useRef<FocusSession | null>(null);
@@ -140,29 +141,35 @@ export default function Focus() {
 
   // 初始化：加载计划与默认值 - 实时同步
   useEffect(() => {
-    const loadPlans = () => {
-      console.log('🔄 重新加载计划数据...');
+    let isInitialLoad = true; // 标记是否为初次加载
+    
+    const loadPlans = (shouldResetSelection: boolean = false) => {
+      console.log('🔄 重新加载计划数据...', { shouldResetSelection });
       // 加载可用计划
       const plans = JSON.parse(localStorage.getItem('userPlans') || '[]');
       setAvailablePlans(plans);
       const primary = plans.find((p:any) => p.isPrimary);
       
-      if (primary) {
-        setSelectedPlanId(primary.id);
-        setSessionName(`${primary.name} - ${mockPlans.date}`);
-        setPlannedMinutes(primary.dailyGoalMinutes || 30);
-        // 加载主要计划的小目标 - 过滤已完成的目标
-        if (primary.milestones) {
-          console.log('📋 加载小目标，总数:', primary.milestones.length);
-          const uncompleted = primary.milestones.filter((m: any) => !m.isCompleted);
-          console.log('✅ 未完成的小目标:', uncompleted.length);
-          setPlanMilestones(uncompleted);
+      // 只有在初始加载或shouldResetSelection为true时才重置计划选择
+      if (shouldResetSelection || isInitialLoad) {
+        if (primary) {
+          setSelectedPlanId(primary.id);
+          setSessionName(`${primary.name} - ${mockPlans.date}`);
+          setPlannedMinutes(primary.dailyGoalMinutes || 30);
+          // 加载主要计划的小目标 - 过滤已完成的目标
+          if (primary.milestones) {
+            console.log('📋 加载小目标，总数:', primary.milestones.length);
+            const uncompleted = primary.milestones.filter((m: any) => !m.isCompleted);
+            console.log('✅ 未完成的小目标:', uncompleted.length);
+            setPlanMilestones(uncompleted);
+          }
+        } else {
+          setSelectedPlanId('free');
+          setSessionName(`${mockPlans.name} - ${mockPlans.date}`);
+          setPlannedMinutes(30);
+          setPlanMilestones([]);
         }
-      } else {
-        setSelectedPlanId('free');
-        setSessionName(`${mockPlans.name} - ${mockPlans.date}`);
-        setPlannedMinutes(30);
-        setPlanMilestones([]);
+        isInitialLoad = false; // 标记已完成初始加载
       }
     };
 
@@ -186,7 +193,7 @@ export default function Focus() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'userPlans') {
         console.log('🔔 检测到计划数据变化，重新加载...');
-        loadPlans();
+        loadPlans(false); // 不重置选择，只更新计划列表
       }
     };
 
@@ -196,14 +203,13 @@ export default function Focus() {
         // 如果页面变为可见且不在运行状态，重新加载计划数据
         if (state === 'preparing') {
           console.log('🔔 页面可见，重新加载计划数据...');
-          loadPlans();
+          loadPlans(false); // 不重置选择，只更新计划列表
         } else if (state !== 'running' && state !== 'paused') {
           // 如果页面从隐藏变为可见且不在运行状态，重置到准备状态
           console.log('🔄 检测到页面状态变化，重置会话');
           localStorage.removeItem('focusSession');
           setElapsedTime(0);
           setState('preparing');
-          setShowSummary(false);
           setShowEndOptions(false);
           // 重新初始化
           const newSession: FocusSession = {
@@ -216,8 +222,8 @@ export default function Focus() {
             customDuration: plannedMinutes
           };
           sessionRef.current = newSession;
-          // 重新加载计划数据
-          loadPlans();
+          // 重新加载计划数据（需要重置选择）
+          loadPlans(true);
         }
       }
     };
@@ -228,7 +234,7 @@ export default function Focus() {
     // 每2秒检查一次计划数据是否有变化（备用机制）
     const interval = setInterval(() => {
       if (state === 'preparing') {
-        loadPlans();
+        loadPlans(false); // 不重置用户的选择，只更新计划列表
       }
     }, 2000);
 
@@ -260,54 +266,99 @@ export default function Focus() {
           return;
         }
         
-        const lastSaved = localStorage.getItem('focusTimerLastSaved');
+        const startTime = session.startTime;
+        const totalPauseTime = session.totalPauseTime || 0;
+        
+        // 使用基于时间戳的方式计算已专注时长
+        const restoredElapsedTime = calculateElapsedTime(
+          startTime,
+          totalPauseTime,
+          session.status === 'paused',
+          session.pauseStart
+        );
+        
+        console.log('🔄 恢复专注状态', {
+          startTime,
+          totalPauseTime,
+          restoredElapsedTime: Math.floor(restoredElapsedTime / 60) + '分钟',
+          goal: session.plannedDuration + '分钟'
+        });
+        
+        // 如果距离开始时间在24小时内
         const now = new Date();
+        const startTimeObj = new Date(startTime);
+        const totalDiff = Math.floor((now.getTime() - startTimeObj.getTime()) / 1000);
         
-        // 计算自上次保存以来的时间差（用于恢复计时）
-        let timeDiff = 0;
-        if (lastSaved && session.status === 'running') {
-          const lastSavedTime = new Date(lastSaved);
-          timeDiff = Math.floor((now.getTime() - lastSavedTime.getTime()) / 1000);
-          console.log('🔄 检测到中断的计时器，继续运行...', { 
-            savedTime: session.elapsedTime, 
-            timeDiff, 
-            total: session.elapsedTime + timeDiff 
-          });
-        }
-        
-        const startTime = new Date(session.startTime);
-        const totalDiff = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-        
-        // 如果距离上次专注在24小时内
         if (totalDiff < 24 * 3600) {
-          const restoredElapsedTime = session.elapsedTime + timeDiff;
-          
           sessionRef.current = session;
           setElapsedTime(restoredElapsedTime);
+          setTotalPauseTime(totalPauseTime);
           setPlannedMinutes(session.plannedDuration);
           setCustomDuration(session.customDuration);
           setPauseCount(session.pauseCount);
           
+          // 检查是否超过24小时未返回
+          const hoursDiff = totalDiff / 3600;
+          if (hoursDiff >= 24) {
+            console.log('⏰ 专注会话已过期（超过24小时），清理状态并记录已专注时间');
+            
+            // 使用基于时间戳的方式计算最终已专注时间
+            const finalElapsed = calculateElapsedTime(
+              session.startTime,
+              session.totalPauseTime || 0,
+              false
+            );
+            const recordedMinutes = Math.floor(finalElapsed / 60);
+            if (recordedMinutes > 0 && typeof window !== 'undefined' && (window as any).reportFocusSessionComplete) {
+              console.log('📊 记录意外退出的专注时长', { minutes: recordedMinutes });
+              
+              // 记录到dashboard
+              (window as any).reportFocusSessionComplete(recordedMinutes, undefined, false);
+              
+              // 显示意外结束提示
+              setInterruptedSessionData({
+                minutes: recordedMinutes,
+                timestamp: session.startTime
+              });
+              setShowInterruptedAlert(true);
+              
+              // 清理过期会话
+              localStorage.removeItem('focusSession');
+              localStorage.removeItem('focusSessionEnded');
+              localStorage.removeItem('focusTimerLastSaved');
+              setState('preparing');
+              return;
+            }
+            
+            // 清理过期会话
+            localStorage.removeItem('focusSession');
+            localStorage.removeItem('focusSessionEnded');
+            localStorage.removeItem('focusTimerLastSaved');
+            setState('preparing');
+            return;
+          }
+          
           // 恢复状态
           if (session.status === 'running') {
-            // 如果计时器还在运行，自动恢复
+            console.log('▶️ 恢复运行状态');
             setState('running');
-            // 自动继续计时
-            setTimeout(() => {
-              intervalRef.current = setInterval(() => {
-                setElapsedTime(prev => {
-                  const newTime = prev + 1;
-                  saveState({ elapsedTime: newTime });
-                  
-                  // 检查是否达到目标时长
-                  if (newTime >= session.plannedDuration * 60) {
-                    setTimeout(() => endFocus(true), 100);
-                  }
-                  
-                  return newTime;
-                });
-              }, 1000);
-            }, 1000);
+            
+            // 启动基于时间戳的计时器
+            if (intervalRef.current === null) {
+              // 延迟启动，避免重复
+              setTimeout(() => {
+                // 再次检查，防止重复
+                if (intervalRef.current !== null) {
+                  console.log('⚠️ 计时器已在运行，跳过重复启动');
+                  return;
+                }
+                
+                console.log('▶️ 启动基于时间戳的计时器');
+                beginFocus(); // 使用新的 beginFocus 函数
+              }, 500);
+            } else {
+              console.log('⚠️ 已有计时器在运行，跳过重复启动');
+            }
             
             // 显示恢复通知
             console.log('✅ 已恢复专注计时器', { 
@@ -315,8 +366,12 @@ export default function Focus() {
               goal: session.plannedDuration + '分钟'
             });
           } else if (session.status === 'paused') {
+            console.log('⏸️ 恢复暂停状态');
             setState('paused');
             setIsPaused(true);
+            if (session.pauseStart) {
+              setPauseStartTime(new Date(session.pauseStart));
+            }
           } else if (session.status === 'completed' || session.status === 'interrupted') {
             // 如果是已完成或中断状态，冻结时间，不恢复计时器
             setState(session.status);
@@ -327,6 +382,7 @@ export default function Focus() {
         } else {
           console.log('⏰ 专注会话已过期（超过24小时），清理状态');
           localStorage.removeItem('focusSession');
+          localStorage.removeItem('focusSessionEnded');
           localStorage.removeItem('focusTimerLastSaved');
         }
       } catch (e) {
@@ -340,6 +396,7 @@ export default function Focus() {
         elapsedTime: 0,
         status: 'preparing',
         startTime: new Date().toISOString(),
+        totalPauseTime: 0,
         pauseCount: 0,
         customDuration: 30
       };
@@ -352,13 +409,14 @@ export default function Focus() {
   useEffect(() => {
     if (state === 'preparing') {
       setShowEndOptions(false);
-      setShowSummary(false);
       setShowConfetti(false);
       setPauseCount(0);
       setIsPaused(false);
       setCountdown(3);
+      setTotalPauseTime(0);
     }
   }, [state]);
+
 
   // 清理计时器
   const cleanupInterval = () => {
@@ -366,6 +424,29 @@ export default function Focus() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+  };
+
+  // 基于时间戳计算已专注时长（避免后台挂起时计时不准）
+  const calculateElapsedTime = (startTimeStr: string, totalPause: number, isCurrentlyPaused: boolean, pauseStartStr?: string): number => {
+    if (!startTimeStr) return 0;
+    
+    const startTime = new Date(startTimeStr).getTime();
+    const now = new Date().getTime();
+    
+    // 计算总经过时间
+    let totalElapsed = Math.floor((now - startTime) / 1000);
+    
+    // 减去累计暂停时间
+    totalElapsed -= totalPause;
+    
+    // 如果当前正在暂停，减去当前暂停时长
+    if (isCurrentlyPaused && pauseStartStr) {
+      const pauseStart = new Date(pauseStartStr).getTime();
+      const currentPauseTime = Math.floor((now - pauseStart) / 1000);
+      totalElapsed -= currentPauseTime;
+    }
+    
+    return Math.max(0, totalElapsed);
   };
 
   // 开始专注流程
@@ -422,41 +503,78 @@ export default function Focus() {
   const beginFocus = () => {
     if (!sessionRef.current) return;
     
+    // 检查是否已有计时器在运行，防止重复启动
+    if (intervalRef.current !== null) {
+      console.log('⚠️ 计时器已在运行，跳过重复启动');
+      return;
+    }
+    
     // 清理可能存在的旧计时器
     cleanupInterval();
     
-    setState('running');
-    saveState({ 
-      status: 'running',
-      startTime: new Date().toISOString()
-    });
+    // 如果是新开始，记录开始时间
+    if (!sessionRef.current.startTime || sessionRef.current.status === 'preparing') {
+      const startTime = new Date().toISOString();
+      sessionRef.current.startTime = startTime;
+      sessionRef.current.totalPauseTime = 0;
+      saveState({ 
+        status: 'running',
+        startTime,
+        totalPauseTime: 0
+      });
+    } else {
+      // 恢复时，确保状态更新
+      saveState({ 
+        status: 'running'
+      });
+    }
     
-    // 开始计时
-    intervalRef.current = setInterval(() => {
-      setElapsedTime(prev => {
-        const newTime = prev + 1;
-        saveState({ elapsedTime: newTime });
-        
-        // 检查是否达到目标时长
-        if (newTime >= plannedMinutes * 60) {
-          // 自动结束并标记为完成
-          setTimeout(() => endFocus(true), 100);
+    setState('running');
+    
+    // 开始计时（基于时间戳的实时计算）
+    if (intervalRef.current === null) {
+      intervalRef.current = setInterval(() => {
+        if (!sessionRef.current) {
+          cleanupInterval();
+          return;
         }
         
-        return newTime;
-      });
-    }, 1000);
+        // 基于时间戳实时计算已专注时长
+        const calculatedTime = calculateElapsedTime(
+          sessionRef.current.startTime,
+          sessionRef.current.totalPauseTime || 0,
+          false
+        );
+        
+        setElapsedTime(calculatedTime);
+        saveState({ elapsedTime: calculatedTime });
+        
+        // 检查是否达到目标时长
+        if (calculatedTime >= plannedMinutes * 60) {
+          // 达到目标时长，不自动结束，继续计时（显示金色背景）
+          // 用户可以手动结束
+        }
+      }, 100); // 每100ms更新一次，确保显示流畅
+    }
   };
 
   // 暂停专注
   const pauseFocus = () => {
     if (!sessionRef.current || pauseCount >= 1) return;
     
-    // 立即停止计时
+    // 立即停止计时器
     cleanupInterval();
+    
+    // 计算当前已专注时长并保存
+    const currentElapsed = calculateElapsedTime(
+      sessionRef.current.startTime,
+      sessionRef.current.totalPauseTime || 0,
+      false
+    );
     
     // 记录暂停开始时间
     const now = new Date();
+    const pauseStartStr = now.toISOString();
     setPauseStartTime(now);
     setIsPaused(true);
     setPauseCount(prev => prev + 1);
@@ -464,8 +582,9 @@ export default function Focus() {
     
     saveState({ 
       status: 'paused',
-      pauseStart: now.toISOString(),
-      pauseCount: pauseCount + 1
+      pauseStart: pauseStartStr,
+      pauseCount: pauseCount + 1,
+      elapsedTime: currentElapsed
     });
   };
 
@@ -473,11 +592,29 @@ export default function Focus() {
   const resumeFocus = () => {
     if (!sessionRef.current || !isPaused) return;
     
+    // 计算暂停期间的时间并累加到 totalPauseTime
+    if (pauseStartTime && sessionRef.current.pauseStart) {
+      const pauseStart = new Date(sessionRef.current.pauseStart).getTime();
+      const pauseEnd = new Date().getTime();
+      const pauseDuration = Math.floor((pauseEnd - pauseStart) / 1000);
+      
+      const newTotalPauseTime = (sessionRef.current.totalPauseTime || 0) + pauseDuration;
+      setTotalPauseTime(newTotalPauseTime);
+      sessionRef.current.totalPauseTime = newTotalPauseTime;
+      sessionRef.current.pauseStart = undefined;
+    }
+    
     setState('running');
     setIsPaused(false);
+    setPauseStartTime(null);
+    
+    saveState({ 
+      status: 'running',
+      totalPauseTime: sessionRef.current.totalPauseTime,
+      pauseStart: undefined
+    });
     
     beginFocus();
-    saveState({ status: 'running' });
   };
 
   // 结束专注
@@ -485,16 +622,20 @@ export default function Focus() {
     // 立即停止所有计时器（彻底清理）
     cleanupInterval();
     
-    // 强制清除所有可能的计时器
-    if (intervalRef.current) {
+    // 再次确保清除
+    if (intervalRef.current !== null) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
     
     if (!sessionRef.current) return;
     
-    // 确保时间是固定的（不会继续增加）
-    const finalElapsedTime = elapsedTime;
+    // 使用基于时间戳的方式计算最终已专注时间（确保准确）
+    const finalElapsedTime = calculateElapsedTime(
+      sessionRef.current.startTime,
+      sessionRef.current.totalPauseTime || 0,
+      false
+    );
     
     // 保存最终状态 - 标记为完成或中断，时间被冻结
     const finalState = completed ? 'completed' : 'interrupted';
@@ -522,7 +663,7 @@ export default function Focus() {
         hasFunction: typeof (window as any).reportFocusSessionComplete 
       });
       
-      // 获取用户评分（如果有，且仅完成时）
+      // 获取用户评分（如果有，且仅完成时）- 保留用于心流指数计算
       const rating = completed ? localStorage.getItem('lastFocusRating') : null;
       const numericRating = rating ? parseFloat(rating) : undefined;
       
@@ -537,18 +678,26 @@ export default function Focus() {
       } else {
         console.warn('⚠️ reportFocusSessionComplete 函数不存在，使用备用方案');
         
-        // 备用方案：直接更新localStorage
+        // 备用方案：直接更新新的数据结构
         try {
-          const currentStats = JSON.parse(localStorage.getItem('dashboardStats') || '{}');
-          const updatedStats = {
-            todayMinutes: (currentStats.todayMinutes || 0) + minutes,
-            todayGoal: currentStats.todayGoal || 0,
-            weeklyMinutes: (currentStats.weeklyMinutes || 0) + minutes,
-            streakDays: currentStats.streakDays || 0,
-            completedGoals: currentStats.completedGoals || 0
-          };
-          localStorage.setItem('dashboardStats', JSON.stringify(updatedStats));
-          console.log('📦 备用方案：已直接更新localStorage', updatedStats);
+          // 更新今日数据
+          const today = new Date().toISOString().split('T')[0];
+          const todayStatsData = localStorage.getItem('todayStats');
+          const allTodayStats = todayStatsData ? JSON.parse(todayStatsData) : {};
+          const currentTodayMinutes = allTodayStats[today]?.minutes || 0;
+          allTodayStats[today] = { minutes: currentTodayMinutes + minutes, date: today };
+          localStorage.setItem('todayStats', JSON.stringify(allTodayStats));
+          
+          // 更新本周数据
+          const weeklyData = localStorage.getItem('weeklyStats');
+          const weeklyStats = weeklyData ? JSON.parse(weeklyData) : { totalMinutes: 0, weekStart: today };
+          weeklyStats.totalMinutes = (weeklyStats.totalMinutes || 0) + minutes;
+          localStorage.setItem('weeklyStats', JSON.stringify(weeklyStats));
+          
+          console.log('📦 备用方案：已直接更新localStorage', {
+            todayMinutes: currentTodayMinutes + minutes,
+            weeklyTotal: weeklyStats.totalMinutes
+          });
         } catch (e) {
           console.error('❌ 更新统计数据失败:', e);
         }
@@ -620,71 +769,6 @@ export default function Focus() {
     }, 100);
   };
 
-  // 做小结
-  const openSummary = () => {
-    setShowSummary(true);
-  };
-
-  // 保存小结
-  const handleSummarySave = async (rating: number, note: string) => {
-    try {
-      // 保存评分到localStorage，供心流指数计算使用
-      localStorage.setItem('lastFocusRating', rating.toString());
-      
-      // 保存到后端
-      await fetch('/api/focus/save-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: sessionRef.current?.sessionId,
-          duration: elapsedTime,
-          rating,
-          note,
-          timestamp: new Date().toISOString(),
-        }),
-      });
-    } catch (error) {
-      console.error('保存小结失败:', error);
-    }
-    // 注意：这里不关闭小结页面，让FocusSummary组件自己处理成功显示
-  };
-
-  // 跳过小结（返回到选项页面）
-  const handleSummarySkip = () => {
-    setShowSummary(false);
-    setShowEndOptions(true);
-  };
-
-  // 保存专注小结
-  const handleSaveSummary = async (summary: string, rating: number) => {
-    try {
-      const response = await fetch('/api/focus/save-summary', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId: sessionRef.current?.sessionId,
-          duration: elapsedTime,
-          summary,
-          rating,
-          timestamp: new Date().toISOString(),
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('保存专注小结失败');
-      }
-    } catch (error) {
-      console.error('保存专注小结出错:', error);
-    }
-  };
-
-  // 关闭小结并返回
-  const handleCloseSummary = () => {
-    setShowSummaryModal(false);
-    router.push('/dashboard');
-  };
 
   // 格式化时间显示
   const formatTime = (seconds: number) => {
@@ -917,27 +1001,39 @@ export default function Focus() {
 
   // 专注进行中UI - 黑匣子模式
   if (state === 'running') {
+    // 实时计算已专注时长（基于时间戳，避免后台挂起时计时不准）
+    const currentElapsed = sessionRef.current 
+      ? calculateElapsedTime(
+          sessionRef.current.startTime,
+          sessionRef.current.totalPauseTime || 0,
+          false
+        )
+      : elapsedTime;
+    
     const totalSeconds = plannedMinutes * 60;
-    const progress = Math.min(elapsedTime / totalSeconds, 1);
-    const remainingSeconds = Math.max(totalSeconds - elapsedTime, 0);
+    const progress = Math.min(currentElapsed / totalSeconds, 1);
 
-    // 超额完成检测
-    const isOverTime = elapsedTime > totalSeconds;
+    // 超额完成检测（超过最小专注时长）
+    const isOverTime = currentElapsed > totalSeconds;
 
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-colors duration-300 ${
-        isOverTime ? 'bg-gradient-to-br from-amber-900 to-yellow-900' : 'bg-gradient-to-br from-teal-900 to-cyan-900'
+        isOverTime ? 'bg-gradient-to-br from-amber-500 to-yellow-400' : 'bg-gradient-to-br from-teal-600 to-cyan-500'
       }`}>
         {/* 小目标和计划信息 */}
         {(selectedGoalInfo || sessionName) && (
           <div className="absolute top-8 left-1/2 transform -translate-x-1/2 text-center max-w-2xl px-4">
             {selectedGoalInfo && (
-              <p className="text-white/70 text-lg font-medium mb-1">
+              <p className={`text-lg font-medium mb-1 ${
+                isOverTime ? 'text-yellow-900/80' : 'text-white/80'
+              }`}>
                 正在专注 · {selectedGoalInfo.title}
               </p>
             )}
             {sessionName && (
-              <p className="text-white/50 text-sm">
+              <p className={`text-sm ${
+                isOverTime ? 'text-yellow-900/60' : 'text-white/60'
+              }`}>
                 {sessionName} · 投资中
               </p>
             )}
@@ -946,23 +1042,26 @@ export default function Focus() {
         
         {/* 中央计时器区域 - PC端优化 */}
         <div className="text-center max-w-md mx-auto flex flex-col items-center">
-          <div className={`text-7xl sm:text-8xl md:text-9xl font-bold mb-8 transition-all duration-300 leading-tight ${
-            isOverTime ? 'text-yellow-300' : 'text-white'
+          {/* 正向计时显示（从0开始） */}
+          <div className={`text-7xl sm:text-8xl md:text-9xl font-bold mb-4 transition-all duration-300 leading-tight ${
+            isOverTime ? 'text-yellow-50' : 'text-white'
           }`}>
-            {formatTime(isOverTime ? elapsedTime : remainingSeconds)}
+            {formatTime(currentElapsed)}
           </div>
           
-          {isOverTime && (
-            <div className="mb-6 text-yellow-300 text-xl animate-pulse">
-              ✨ 超额完成中 ✨
-            </div>
-          )}
-          
-          {!isOverTime && (
-            <p className="text-white/70 text-lg mb-12">
-              {Math.floor(progress * 100)}% 完成
+          {/* 目标时长和完成百分比 */}
+          <div className="mb-8">
+            <p className={`text-lg font-medium mb-2 ${
+              isOverTime ? 'text-yellow-900/90' : 'text-white/80'
+            }`}>
+              目标: {plannedMinutes} 分钟 · {Math.floor(progress * 100)}% 完成
             </p>
-          )}
+            {isOverTime && (
+              <div className="text-yellow-50 text-xl animate-pulse mt-2 font-semibold">
+                ✨ 超额完成中 ✨
+              </div>
+            )}
+          </div>
 
           {/* 进度环 - PC端居中优化 */}
           <div className="relative w-48 h-48 mb-12 mx-auto">
@@ -974,7 +1073,7 @@ export default function Focus() {
                 stroke="currentColor"
                 strokeWidth="8"
                 fill="none"
-                className="text-white/20"
+                className={isOverTime ? 'text-yellow-900/20' : 'text-white/20'}
               />
               <circle
                 cx="96"
@@ -986,7 +1085,7 @@ export default function Focus() {
                 strokeDasharray={`${2 * Math.PI * 88}`}
                 strokeDashoffset={`${2 * Math.PI * 88 * (1 - progress)}`}
                 className={`transition-all duration-1000 ${
-                  isOverTime ? 'text-yellow-300' : 'text-teal-300'
+                  isOverTime ? 'text-yellow-50' : 'text-white'
                 }`}
                 strokeLinecap="round"
               />
@@ -997,13 +1096,21 @@ export default function Focus() {
             <button
               onClick={pauseFocus}
               disabled={pauseCount >= 1}
-              className="px-6 py-3 bg-white/20 text-white rounded-full font-semibold hover:bg-white/30 transition-all backdrop-blur-sm disabled:opacity-30"
+              className={`px-6 py-3 rounded-full font-semibold transition-all backdrop-blur-sm disabled:opacity-30 ${
+                isOverTime 
+                  ? 'bg-yellow-900/30 text-yellow-50 hover:bg-yellow-900/40' 
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
             >
               {pauseCount >= 1 ? '暂停已用' : '暂停'}
             </button>
             <button
               onClick={() => endFocus(false)}
-              className="px-6 py-3 bg-white/20 text-white rounded-full font-semibold hover:bg-white/30 transition-all backdrop-blur-sm"
+              className={`px-6 py-3 rounded-full font-semibold transition-all backdrop-blur-sm ${
+                isOverTime 
+                  ? 'bg-yellow-900/30 text-yellow-50 hover:bg-yellow-900/40' 
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
             >
               结束
             </button>
@@ -1015,13 +1122,25 @@ export default function Focus() {
 
   // 暂停状态UI
   if (state === 'paused') {
-    const totalSeconds = plannedMinutes * 60;
-    const progress = elapsedTime / totalSeconds;
+    // 在暂停状态时，使用基于时间戳的方式实时计算已专注时长
+    const currentElapsed = sessionRef.current 
+      ? calculateElapsedTime(
+          sessionRef.current.startTime,
+          sessionRef.current.totalPauseTime || 0,
+          true,
+          sessionRef.current.pauseStart
+        )
+      : elapsedTime;
     
-    // 计算已暂停时长
+    const totalSeconds = plannedMinutes * 60;
+    const progress = Math.min(currentElapsed / totalSeconds, 1);
+    
+    // 计算当前暂停时长
     const getPauseDuration = () => {
-      if (!pauseStartTime) return 0;
-      return Math.floor((new Date().getTime() - pauseStartTime.getTime()) / 1000);
+      if (!sessionRef.current?.pauseStart) return 0;
+      const pauseStart = new Date(sessionRef.current.pauseStart).getTime();
+      const now = new Date().getTime();
+      return Math.floor((now - pauseStart) / 1000);
     };
     
     const pauseDuration = getPauseDuration();
@@ -1030,7 +1149,7 @@ export default function Focus() {
       <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center">
           <div className="text-6xl font-bold text-white mb-6">
-            {formatTime(elapsedTime)}
+            {formatTime(currentElapsed)}
           </div>
           
           <p className="text-blue-300 text-sm mb-2">
@@ -1098,17 +1217,6 @@ export default function Focus() {
     );
   }
 
-  // 显示小结页面（优先级最高）
-  if (showSummary) {
-    return (
-      <FocusSummary
-        duration={elapsedTime}
-        plannedMinutes={plannedMinutes}
-        onSave={handleSummarySave}
-        onSkip={handleSummarySkip}
-      />
-    );
-  }
 
   // 完成状态UI
   if (state === 'completed' || state === 'interrupted') {
@@ -1152,7 +1260,7 @@ export default function Focus() {
         )}
 
         {/* 如果正在显示选择按钮 */}
-        {showEndOptions && !showSummary && (
+        {showEndOptions && (
           <div className={`min-h-screen flex items-center justify-center p-6 bg-gradient-to-br ${
             completed ? 'from-teal-500 to-cyan-600' : 'from-purple-500 to-pink-600'
           }`}>
@@ -1168,12 +1276,6 @@ export default function Focus() {
             </p>
             
             <div className="space-y-3 mt-8">
-              <button
-                onClick={openSummary}
-                className="w-full rounded-xl bg-yellow-400 px-4 py-4 text-gray-900 font-semibold text-lg hover:bg-yellow-300 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-              >
-                ✍️ 做个小结
-              </button>
               <button
                 onClick={goToDashboard}
                 className="w-full rounded-xl bg-white px-4 py-4 text-teal-600 font-semibold text-lg hover:bg-gray-100 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
@@ -1220,18 +1322,24 @@ export default function Focus() {
     );
   }
 
-  // 显示小结弹窗
-  if (showSummaryModal) {
+
+  // 意外中断提示弹窗
+  if (showInterruptedAlert && interruptedSessionData) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <FocusSummaryModal
-          isOpen={showSummaryModal}
-          duration={elapsedTime}
-          onClose={handleCloseSummary}
-          onSave={handleSaveSummary}
-          onSkip={handleCloseSummary}
+      <>
+        <InterruptedSessionAlert
+          minutes={interruptedSessionData.minutes}
+          timestamp={interruptedSessionData.timestamp}
+          onConfirm={() => {
+            setShowInterruptedAlert(false);
+            setInterruptedSessionData(null);
+            // 延迟一下确保状态清理完成
+            setTimeout(() => {
+              router.push('/dashboard');
+            }, 100);
+          }}
         />
-      </div>
+      </>
     );
   }
 

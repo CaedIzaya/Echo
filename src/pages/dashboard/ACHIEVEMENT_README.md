@@ -174,3 +174,8 @@ interface Achievement {
 4. 获得成就时会自动显示通知
 
 
+
+
+
+
+
