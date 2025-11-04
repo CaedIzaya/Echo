@@ -7,8 +7,8 @@ import UserMenu from './UserMenu';
 import PrimaryPlanCard from './PrimaryPlanCard';
 import AchievementPanel from './AchievementPanel';
 import QuickSearchGuide from './QuickSearchGuide';
-import { getAchievementManager, AchievementManager } from './AchievementSystem';
-import { LevelManager, UserLevel } from './LevelSystem';
+import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
+import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 
 interface Project {
   id: string;
