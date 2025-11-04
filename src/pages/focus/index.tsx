@@ -788,7 +788,7 @@ export default function Focus() {
       if (state === 'running' || state === 'paused') {
         // 保存最终状态（包括累计时间）
         if (sessionRef.current) {
-          saveState({ elapsedTime, lastSync: new Date().toISOString() });
+          saveState({ elapsedTime });
         }
         // 记录保存时间戳
         localStorage.setItem('focusTimerLastSaved', new Date().toISOString());
