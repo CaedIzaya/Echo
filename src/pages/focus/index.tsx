@@ -803,7 +803,7 @@ export default function Focus() {
     if (state === 'running') {
       saveInterval = setInterval(() => {
         if (sessionRef.current) {
-          saveState({ elapsedTime, lastSync: new Date().toISOString() });
+          saveState({ elapsedTime });
           console.log('⏱️ 自动保存中...', { elapsedTime, timestamp: new Date().toISOString() });
         }
       }, 10000); // 每10秒保存一次
