@@ -639,8 +639,8 @@ export default function Focus() {
     );
     
     // 保存最终状态 - 标记为完成或中断，时间被冻结
-    const finalState = completed ? 'completed' : 'interrupted';
-    const finalSession = {
+    const finalState: FocusState = completed ? 'completed' : 'interrupted';
+    const finalSession: FocusSession = {
       ...sessionRef.current,
       status: finalState,
       elapsedTime: finalElapsedTime
