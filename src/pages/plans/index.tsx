@@ -44,7 +44,14 @@ export default function PlansPage() {
   const [plans, setPlans] = useState<Project[]>(() => {
     if (typeof window !== 'undefined') {
       const savedPlans = localStorage.getItem('userPlans');
-      return savedPlans ? JSON.parse(savedPlans) : [];
+      if (savedPlans) {
+        const parsed = JSON.parse(savedPlans);
+        // Ensure all plans have milestones array
+        return parsed.map((plan: Project) => ({
+          ...plan,
+          milestones: plan.milestones || []
+        }));
+      }
     }
     return [];
   });

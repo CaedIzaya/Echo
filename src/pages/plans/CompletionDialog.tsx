@@ -30,7 +30,7 @@ export default function CompletionDialog({
   onReview,
   onSkip,
 }: CompletionDialogProps) {
-  if (!visible || !plan) return null;
+  if (!visible || !plan || !plan.milestones) return null;
 
   const completedMilestones = plan.milestones.filter(m => m.isCompleted).length;
   const totalMilestones = plan.milestones.length;

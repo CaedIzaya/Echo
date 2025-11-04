@@ -42,6 +42,12 @@ export default function PlanCard({
   onAddMilestone,
 }: PlanCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Guard against undefined plan or milestones during static generation/SSR
+  if (!plan || !plan.milestones) {
+    return null;
+  }
+  
   const completedMilestones = plan.milestones.filter(m => m.isCompleted).length;
   const totalMilestones = plan.milestones.length;
   const activeMilestones = plan.milestones.filter(m => !m.isCompleted);
