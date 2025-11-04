@@ -183,11 +183,3 @@ export function getLevelManager(): LevelManager {
   }
   return levelInstance;
 }
-
-
-
-
-
-
-
-

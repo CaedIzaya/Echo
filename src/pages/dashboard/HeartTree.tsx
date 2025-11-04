@@ -3,7 +3,7 @@ import {
   HeartTreeManager,
   HeartTree,
   GROWTH_THRESHOLDS
-} from './HeartTreeSystem';
+} from '~/lib/HeartTreeSystem';
 
 interface HeartTreeProps {
   flowIndex?: number;
