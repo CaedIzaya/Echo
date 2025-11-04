@@ -394,6 +394,12 @@ export default function Dashboard() {
         if (newLevel.currentLevel > oldLevel.currentLevel) {
           console.log('🎉 等级提升！（完成小目标触发）', newLevel);
         }
+        
+        // 心树功能暂时屏蔽
+        // 增加浇水机会（小目标完成）
+        // const completedCount = updatedMilestones.filter((m: Milestone) => m.isCompleted).length;
+        // const { HeartTreeManager } = require('./HeartTreeSystem');
+        // HeartTreeManager.addWaterOpportunityOnMilestoneComplete(completedCount);
       }
 
       return updatedPlan;
@@ -438,6 +444,12 @@ export default function Dashboard() {
         if (newLevel.currentLevel > oldLevel.currentLevel) {
           console.log('🎉 等级提升！（批量完成小目标触发）', newLevel);
         }
+        
+        // 心树功能暂时屏蔽
+        // 增加浇水机会（批量完成小目标）
+        // const completedCount = updatedMilestones.filter((m: Milestone) => m.isCompleted).length;
+        // const { HeartTreeManager } = require('./HeartTreeSystem');
+        // HeartTreeManager.addWaterOpportunityOnMilestoneComplete(completedCount);
       }
 
       return updatedPlan;
@@ -549,6 +561,13 @@ export default function Dashboard() {
 
     // 更新等级经验值
     updateUserExp(minutes, rating, completed);
+    
+    // 心树功能暂时屏蔽
+    // 增加浇水机会（每次专注完成）
+    // if (completed && typeof window !== 'undefined') {
+    //   const { HeartTreeManager } = require('./HeartTreeSystem');
+    //   HeartTreeManager.addWaterOpportunityOnFocusComplete();
+    // }
     
     console.log('✅ 统计数据已更新完成');
   };
@@ -770,6 +789,11 @@ export default function Dashboard() {
         if (newLevel.currentLevel > oldLevel.currentLevel) {
           console.log('🎉 等级提升！（成就解锁触发）', newLevel);
         }
+        
+        // 心树功能暂时屏蔽
+        // 增加施肥机会（成就解锁）
+        // const { HeartTreeManager } = require('./HeartTreeSystem');
+        // HeartTreeManager.addFertilizeOpportunityOnAchievementUnlock(allNew.length);
       }
       
       // 3秒后自动隐藏弹窗（但不清除未查看标记）
@@ -804,6 +828,25 @@ export default function Dashboard() {
     
     console.log('📊 用户等级信息', levelInfo);
   }, [todayStats.minutes, weeklyStats.totalMinutes, stats.streakDays]);
+
+  // 检查是否完成每日目标并给予奖励（仅一次）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!primaryPlan) return;
+    
+    const todayGoal = primaryPlan.dailyGoalMinutes || 0;
+    if (todayGoal <= 0) return;
+    
+    const progress = todayStats.minutes / todayGoal;
+    if (progress >= 1) {
+      // 心树功能暂时屏蔽
+      // const { HeartTreeManager } = require('./HeartTreeSystem');
+      // 完成100%目标：给予一次浇水机会和一次施肥机会
+      // HeartTreeManager.addRewardOnGoalComplete();
+      // 完成每日目标：给予一次施肥机会
+      // HeartTreeManager.addFertilizeOpportunityOnDailyGoalComplete();
+    }
+  }, [primaryPlan, todayStats.minutes]);
 
   // UI 辅助函数 - 红绿灯机制
   const getProgressColor = (progress: number): string => {

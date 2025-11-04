@@ -731,7 +731,6 @@ export default function Focus() {
     setElapsedTime(0);
     setState('preparing');
     setShowEndOptions(false);
-    setShowSummary(false);
     setShowConfetti(false);
     cleanupInterval(); // 确保停止所有计时器
     router.push('/dashboard');
@@ -742,7 +741,6 @@ export default function Focus() {
     // 重置状态
     setState('preparing');
     setShowEndOptions(false);
-    setShowSummary(false);
     setShowConfetti(false);
     setElapsedTime(0);
     // 清理所有标志和旧的会话
