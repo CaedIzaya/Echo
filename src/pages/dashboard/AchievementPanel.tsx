@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAchievementManager } from './AchievementSystem';
+import { getAchievementManager } from '~/lib/AchievementSystem';
 
 interface AchievementPanelProps {
   onClose: () => void;
