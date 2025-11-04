@@ -78,7 +78,7 @@ useEffect(() => {
       const newPlan = {
         id: Date.now().toString(),
         name: formData.projectName,
-        icon: focusedInterest.icon,
+        icon: focusedInterest?.icon || '📝',
         dailyGoalMinutes: formData.dailyMinTime,
         milestones: [
           {
