@@ -65,7 +65,7 @@ export default function Focus() {
   // 所有目标（计划小目标 + 自定义）- 只显示未完成的
   const allGoals = [
     ...planMilestones
-      .filter(m => !m.isCompleted) // 确保只显示未完成的
+      .filter(m => !m.completed) // 确保只显示未完成的
       .map(m => ({ 
         id: m.id, 
         title: m.title, 
