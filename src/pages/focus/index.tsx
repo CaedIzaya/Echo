@@ -219,6 +219,7 @@ export default function Focus() {
             status: 'preparing',
             startTime: new Date().toISOString(),
             pauseCount: 0,
+            totalPauseTime: 0,
             customDuration: plannedMinutes
           };
           sessionRef.current = newSession;
