@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import InterestGrid from '../../components/onboarding/InterestGrid';
 
@@ -35,45 +35,90 @@ const INTERESTS: Interest[] = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
-// 在 /src/pages/onboarding/index.tsx 中更新
-// 更新状态定义
-const [selectedInterestObjects, setSelectedInterestObjects] = useState<Interest[]>([]);
+  // 在 /src/pages/onboarding/index.tsx 中更新
+  // 更新状态定义
+  const [selectedInterestObjects, setSelectedInterestObjects] = useState<Interest[]>([]);
 
-// 更新处理函数
-const handleInterestsSelected = (interestIds: string[], interestObjects?: Interest[]) => {
-  setSelectedInterests(interestIds);
-  if (interestObjects) {
-    setSelectedInterestObjects(interestObjects);
-  } else {
-    // 如果没有传递对象数组，从INTERESTS重建
-    const objects = INTERESTS.filter(interest => interestIds.includes(interest.id));
-    setSelectedInterestObjects(objects);
-  }
-};
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const session = await response.json();
 
-// 更新导航函数
-const handleContinue = () => {
-  if (selectedInterests.length > 0) {
-    // 确保使用完整的兴趣对象数组
-    const interestsToPass = selectedInterestObjects.length > 0 
-      ? selectedInterestObjects 
-      : INTERESTS.filter(interest => selectedInterests.includes(interest.id));
-    
-    console.log('传递到第二步的兴趣:', interestsToPass);
-    
-    router.push({
-      pathname: '/onboarding/focus-selection',
-      query: { interests: JSON.stringify(interestsToPass) }
-    });
-  }
-};
+        if (!session?.user) {
+          router.replace('/auth/signin');
+          return;
+        }
+
+        if (session.user.hasCompletedOnboarding) {
+          router.replace('/dashboard');
+          return;
+        }
+
+        setIsAuthorized(true);
+      } catch (error) {
+        console.error('验证登录状态失败:', error);
+        router.replace('/auth/signin');
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    verifySession();
+  }, [router]);
+
+  // 更新处理函数
+  const handleInterestsSelected = (interestIds: string[], interestObjects?: Interest[]) => {
+    setSelectedInterests(interestIds);
+    if (interestObjects) {
+      setSelectedInterestObjects(interestObjects);
+    } else {
+      // 如果没有传递对象数组，从INTERESTS重建
+      const objects = INTERESTS.filter(interest => interestIds.includes(interest.id));
+      setSelectedInterestObjects(objects);
+    }
+  };
+
+  // 更新导航函数
+  const handleContinue = () => {
+    if (selectedInterests.length > 0) {
+      // 确保使用完整的兴趣对象数组
+      const interestsToPass = selectedInterestObjects.length > 0 
+        ? selectedInterestObjects 
+        : INTERESTS.filter(interest => selectedInterests.includes(interest.id));
+      
+      console.log('传递到第二步的兴趣:', interestsToPass);
+      
+      router.push({
+        pathname: '/onboarding/focus-selection',
+        query: { interests: JSON.stringify(interestsToPass) }
+      });
+    }
+  };
 
   const handleSkip = () => {
     // 跳过引导，进入主界面
     router.push('/dashboard');
   };
+
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">正在验证登录状态...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">

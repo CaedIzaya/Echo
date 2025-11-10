@@ -16,6 +16,23 @@ export default function SignIn() {
   const [authStatus, setAuthStatus] = useState("未检测");
   const [hasRedirected, setHasRedirected] = useState(false);
 
+  const shouldForceOnboarding = () => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return sessionStorage.getItem("forceOnboarding") === "true";
+  };
+
+  const markOnboardingCompleteSilently = async () => {
+    try {
+      await fetch("/api/user/complete-onboarding", {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("自动更新 onboarding 状态失败:", error);
+    }
+  };
+
   // 检查认证状态的替代方法
   const checkAuthStatus = async () => {
     // 防止重复跳转
@@ -35,12 +52,21 @@ export default function SignIn() {
         // 标记已跳转，防止重复跳转
         setHasRedirected(true);
         
-        // 如果已登录，自动跳转
+        const forceOnboarding = shouldForceOnboarding();
+        console.log("是否需要强制进入 onboarding:", forceOnboarding);
+
+        if (forceOnboarding) {
+          router.push("/onboarding");
+          return;
+        }
+
         if (session.user.hasCompletedOnboarding) {
           router.push("/dashboard");
-        } else {
-          router.push("/onboarding");
+          return;
         }
+
+        await markOnboardingCompleteSilently();
+        router.push("/dashboard");
       } else {
         setAuthStatus("未登录");
       }
@@ -65,8 +91,15 @@ export default function SignIn() {
         console.log("用户已完成 onboarding，跳转到仪表盘");
         router.push("/dashboard");
       } else {
-        console.log("用户未完成 onboarding，跳转到引导页");
-        router.push("/onboarding");
+        const forceOnboarding = shouldForceOnboarding();
+        console.log("登录后是否需要强制进入 onboarding:", forceOnboarding);
+
+        if (forceOnboarding) {
+          router.push("/onboarding");
+        } else {
+          await markOnboardingCompleteSilently();
+          router.push("/dashboard");
+        }
       }
     } catch (error) {
       console.error("跳转逻辑出错:", error);
@@ -138,6 +171,9 @@ export default function SignIn() {
           if (loginResult?.ok) {
             console.log("注册后自动登录成功");
             // 新注册用户直接进入 onboarding
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("forceOnboarding", "true");
+            }
             router.push("/onboarding");
           } else {
             alert("注册成功，但自动登录失败，请手动登录");

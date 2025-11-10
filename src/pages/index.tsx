@@ -8,6 +8,23 @@ export default function Home() {
   const [authStatus, setAuthStatus] = useState('检查中...');
   const [loading, setLoading] = useState(true);
 
+  const shouldForceOnboarding = () => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return sessionStorage.getItem('forceOnboarding') === 'true';
+  };
+
+  const markOnboardingCompleteSilently = async () => {
+    try {
+      await fetch('/api/user/complete-onboarding', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('首页自动更新 onboarding 状态失败:', error);
+    }
+  };
+
   useEffect(() => {
     checkAuthAndRedirect();
   }, []);
@@ -26,11 +43,26 @@ export default function Home() {
         
         // 短暂延迟让用户看到状态
         setTimeout(() => {
+          const forceOnboarding = shouldForceOnboarding();
+          console.log('首页：是否需要强制引导流程:', forceOnboarding);
+
+          if (forceOnboarding) {
+            router.push('/onboarding');
+            return;
+          }
+
           if (session.user.hasCompletedOnboarding) {
             router.push('/dashboard');
-          } else {
-            router.push('/onboarding');
+            return;
           }
+
+          markOnboardingCompleteSilently()
+            .catch(() => {
+              // 已记录日志，忽略错误
+            })
+            .finally(() => {
+              router.push('/dashboard');
+            });
         }, 1000);
       } else {
         setAuthStatus('未登录');

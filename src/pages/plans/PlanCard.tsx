@@ -25,8 +25,6 @@ interface PlanCardProps {
   selected?: boolean;
   isCompleted?: boolean;
   onSelect?: (planId: string) => void;
-  onSwitchPrimary?: () => void;
-  onEdit?: () => void;
   onAddMilestone?: (planId: string) => void;
 }
 
@@ -37,8 +35,6 @@ export default function PlanCard({
   selected = false,
   isCompleted = false,
   onSelect,
-  onSwitchPrimary,
-  onEdit,
   onAddMilestone,
 }: PlanCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -58,20 +54,6 @@ export default function PlanCard({
   const handleCardClick = () => {
     if (selectable && onSelect) {
       onSelect(plan.id);
-    }
-  };
-
-  const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onEdit) {
-      onEdit();
-    }
-  };
-
-  const handleSwitchClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onSwitchPrimary) {
-      onSwitchPrimary();
     }
   };
 
@@ -96,14 +78,24 @@ export default function PlanCard({
     );
   }
 
+  const cardClassNames = [
+    'bg-white/70 backdrop-blur-md rounded-[24px] p-6 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.25)] transition-all cursor-pointer transform border border-slate-200/80 hover:-translate-y-1 hover:shadow-[0_22px_55px_-30px_rgba(15,23,42,0.3)]',
+  ];
+
+  if (selected) {
+    cardClassNames.push('ring-4 ring-teal-500 ring-opacity-50 border-teal-500');
+  } else {
+    cardClassNames.push('hover:border-teal-200/80');
+  }
+
+  if (isPrimary) {
+    cardClassNames.push('scale-[1.02] md:scale-[1.04] border-teal-500 ring-4 ring-teal-200 ring-opacity-40 outline outline-1 outline-white/70 animate-pulse-border');
+  }
+
   return (
     <div
       onClick={handleCardClick}
-      className={`bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm transition-all cursor-pointer ${
-        selected 
-          ? 'ring-4 ring-teal-500 ring-opacity-50 border-teal-500' 
-          : 'hover:shadow-md border border-transparent'
-      } ${isPrimary ? 'border-4 border-teal-500 animate-pulse-border' : ''}`}
+      className={cardClassNames.join(' ')}
     >
       {/* 主要计划标识 */}
       {isPrimary && (
@@ -114,7 +106,7 @@ export default function PlanCard({
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start gap-4">
         {/* 左侧内容 */}
         <div className="flex items-start gap-4 flex-1">
           {/* 图标 */}
@@ -186,24 +178,6 @@ export default function PlanCard({
               )}
             </div>
           </div>
-        </div>
-
-        {/* 右侧操作按钮 */}
-        <div className="flex flex-col gap-2 flex-shrink-0">
-          {isPrimary && (
-            <button
-              onClick={handleSwitchClick}
-              className="bg-teal-100 text-teal-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-teal-200 transition"
-            >
-              🔄
-            </button>
-          )}
-          <button
-            onClick={handleEditClick}
-            className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm hover:bg-gray-200 transition"
-          >
-            ⚙️
-          </button>
         </div>
       </div>
     </div>

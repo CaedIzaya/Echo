@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import PlanCard from './PlanCard';
-import PlanSelector from './PlanSelector';
 import PlanManagement from './PlanManagement';
 import CompletionDialog from './CompletionDialog';
 import AddMilestoneModal from './AddMilestoneModal';
@@ -34,7 +33,6 @@ export default function PlansPage() {
   const [pageState, setPageState] = useState<PageState>('browsing');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [showPlanSelector, setShowPlanSelector] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [completionPlan, setCompletionPlan] = useState<Project | null>(null);
   const [showAddMilestone, setShowAddMilestone] = useState(false);
@@ -56,8 +54,23 @@ export default function PlansPage() {
     return [];
   });
 
-  const primaryPlanId = plans.find(p => p.isPrimary)?.id || null;
   const selectedPlan = plans.find(p => p.id === selectedPlanId);
+
+  const activePlans = useMemo(() => {
+    const actives = plans
+      .filter(p => p.isActive && !p.isCompleted);
+
+    actives.sort((a, b) => {
+      if (a.isPrimary === b.isPrimary) return 0;
+      return a.isPrimary ? -1 : 1;
+    });
+
+    return actives;
+  }, [plans]);
+
+  const completedPlans = useMemo(() => {
+    return plans.filter(p => p.isCompleted);
+  }, [plans]);
 
   // 进入管理状态
   const handleEnterManagement = () => {
@@ -135,48 +148,6 @@ export default function PlansPage() {
     setPageState('browsing');
   };
 
-  // 切换主要计划（从卡片触发）
-  const handleShowPlanSelector = () => {
-    setShowPlanSelector(true);
-  };
-
-  const handlePlanSelect = (planId: string) => {
-    if (planId === primaryPlanId) {
-      setShowPlanSelector(false);
-      return;
-    }
-
-    // 检查24小时CD
-    const lastSwitchTime = localStorage.getItem('lastPrimaryPlanSwitch');
-    if (lastSwitchTime) {
-      const timeSinceLastSwitch = Date.now() - parseInt(lastSwitchTime);
-      const hoursSinceSwitch = timeSinceLastSwitch / (1000 * 60 * 60);
-      
-      if (hoursSinceSwitch < 24) {
-        const hoursRemaining = (24 - hoursSinceSwitch).toFixed(1);
-        alert(`计划切换需要24小时冷却时间，还需等待 ${hoursRemaining} 小时`);
-        setShowPlanSelector(false);
-        return;
-      }
-    }
-
-    if (confirm(`确定要将主要计划切换到"${plans.find(p => p.id === planId)?.name}"吗？`)) {
-      const updatedPlans = plans.map(plan => ({
-        ...plan,
-        isPrimary: plan.id === planId
-      }));
-      
-      setPlans(updatedPlans);
-      // 同步到localStorage
-      localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
-      
-      // 记录切换时间
-      localStorage.setItem('lastPrimaryPlanSwitch', Date.now().toString());
-      
-      setShowPlanSelector(false);
-    }
-  };
-
   // 庆祝弹窗处理
   const handleReviewJourney = () => {
     setShowCompletionDialog(false);
@@ -236,11 +207,6 @@ export default function PlansPage() {
     });
   };
 
-  // 编辑计划
-  const handleEditPlan = (planId: string) => {
-    router.push(`/plans/${planId}/edit`);
-  };
-
   // 打开添加小目标模态框
   const handleOpenAddMilestone = (planId: string) => {
     setMilestoneTargetPlanId(planId);
@@ -280,9 +246,6 @@ export default function PlansPage() {
     setMilestoneTargetPlanId(null);
   };
 
-  const activePlans = plans.filter(p => p.isActive && !p.isCompleted);
-  const completedPlans = plans.filter(p => p.isCompleted);
-
   // 认证检查
   useEffect(() => {
     if (sessionStatus === 'loading') {
@@ -317,10 +280,10 @@ export default function PlansPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20">
-      <div className="p-6 sm:p-8 pt-20">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-24">
+      <div className="w-full max-w-5xl mx-auto px-5 sm:px-10 pt-20">
         {/* 头部 */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {pageState === 'browsing' ? '我的计划' : '选择要操作的计划'}
@@ -359,7 +322,7 @@ export default function PlansPage() {
 
         {/* 计划列表 */}
         {activePlans.length > 0 ? (
-          <div className="space-y-4 mb-8">
+          <div className="space-y-5 mb-12">
             {activePlans.map(plan => (
               <PlanCard
                 key={plan.id}
@@ -368,8 +331,6 @@ export default function PlansPage() {
                 selectable={pageState === 'managing'}
                 selected={selectedPlanId === plan.id}
                 onSelect={handleSelectPlan}
-                onSwitchPrimary={handleShowPlanSelector}
-                onEdit={() => handleEditPlan(plan.id)}
                 onAddMilestone={handleOpenAddMilestone}
               />
             ))}
@@ -420,15 +381,6 @@ export default function PlansPage() {
           onComplete={handleCompletePlan}
         />
       )}
-
-      {/* 主要计划选择浮层 */}
-      <PlanSelector
-        visible={showPlanSelector}
-        currentPrimary={primaryPlanId}
-        plans={activePlans}
-        onSelect={handlePlanSelect}
-        onClose={() => setShowPlanSelector(false)}
-      />
 
       {/* 计划完成庆祝弹窗 */}
       <CompletionDialog

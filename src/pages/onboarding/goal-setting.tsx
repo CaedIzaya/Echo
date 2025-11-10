@@ -10,6 +10,8 @@ interface Interest {
 
 export default function GoalSetting() {
   const router = useRouter();
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [focusedInterest, setFocusedInterest] = useState<Interest | null>(null);
   const [formData, setFormData] = useState({
     projectName: '',
@@ -19,44 +21,76 @@ export default function GoalSetting() {
     targetDate: '' as string | null,
   });
 
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const session = await response.json();
+
+        if (!session?.user) {
+          router.replace('/auth/signin');
+          return;
+        }
+
+        if (session.user.hasCompletedOnboarding) {
+          router.replace('/dashboard');
+          return;
+        }
+
+        setIsAuthorized(true);
+      } catch (error) {
+        console.error('验证登录状态失败:', error);
+        router.replace('/auth/signin');
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    verifySession();
+  }, [router]);
+
   // 从路由参数获取聚焦的兴趣
   // 在 /src/pages/onboarding/goal-setting.tsx 中更新参数接收
-useEffect(() => {
-  if (router.query.interestId) {
-    try {
-      // 从查询参数重建兴趣对象
-      const interest = {
-        id: router.query.interestId as string,
-        name: router.query.interestName as string,
-        icon: router.query.interestIcon as string,
-      };
-      
-      setFocusedInterest(interest);
-      // 自动生成项目名称
-      setFormData(prev => ({
-        ...prev,
-        projectName: `我为${interest.name}而投资`
-      }));
-    } catch (error) {
-      console.error('解析兴趣数据失败:', error);
-      // 如果解析失败，退回第一步
-      router.push('/onboarding');
+  useEffect(() => {
+    if (!isAuthorized) {
+      return;
     }
-  } else if (router.query.focusedInterest) {
-    // 保持对旧格式的兼容
-    try {
-      const interest = JSON.parse(router.query.focusedInterest as string);
-      setFocusedInterest(interest);
-      setFormData(prev => ({
-        ...prev,
-        projectName: `我为${interest.name}而投资`
-      }));
-    } catch (error) {
-      console.error('解析兴趣数据失败:', error);
-      router.push('/onboarding');
+
+    if (router.query.interestId) {
+      try {
+        // 从查询参数重建兴趣对象
+        const interest = {
+          id: router.query.interestId as string,
+          name: router.query.interestName as string,
+          icon: router.query.interestIcon as string,
+        };
+        
+        setFocusedInterest(interest);
+        // 自动生成项目名称
+        setFormData(prev => ({
+          ...prev,
+          projectName: `我为${interest.name}而投资`
+        }));
+      } catch (error) {
+        console.error('解析兴趣数据失败:', error);
+        // 如果解析失败，退回第一步
+        router.push('/onboarding');
+      }
+    } else if (router.query.focusedInterest) {
+      // 保持对旧格式的兼容
+      try {
+        const interest = JSON.parse(router.query.focusedInterest as string);
+        setFocusedInterest(interest);
+        setFormData(prev => ({
+          ...prev,
+          projectName: `我为${interest.name}而投资`
+        }));
+      } catch (error) {
+        console.error('解析兴趣数据失败:', error);
+        router.push('/onboarding');
+      }
     }
-  }
-}, [router.query]);
+  }, [isAuthorized, router.query]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
@@ -136,6 +170,21 @@ useEffect(() => {
   const handleBack = () => {
     router.back();
   };
+
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">正在验证登录状态...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return null;
+  }
 
   if (!focusedInterest) {
     return (
