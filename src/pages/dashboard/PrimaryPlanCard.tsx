@@ -13,6 +13,7 @@ interface PrimaryPlanCardProps {
   plan: {
     id: string;
     name: string;
+    focusBranch?: string; // 计划分支
     icon: string;
     dailyGoalMinutes: number;
     milestones: Milestone[];
@@ -140,7 +141,9 @@ export default function PrimaryPlanCard({ plan, onMilestoneToggle, onBulkMilesto
         <div className="text-5xl">{plan.icon}</div>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+            <h3 className="text-xl font-bold text-gray-900">
+              {plan.focusBranch || plan.name}
+            </h3>
             <span className="text-xs bg-teal-100 text-teal-600 px-2 py-1 rounded-full">
               主要计划
             </span>

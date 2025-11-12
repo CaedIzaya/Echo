@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import InterestGrid from '../../components/onboarding/InterestGrid';
 
@@ -43,33 +43,44 @@ export default function OnboardingPage() {
   // 更新状态定义
   const [selectedInterestObjects, setSelectedInterestObjects] = useState<Interest[]>([]);
 
+  const { isReady, query, replace } = router;
+
+  const allowReturn = useMemo(() => {
+    if (!isReady) return false;
+    const fromParam = Array.isArray(query.from) ? query.from[0] : query.from;
+    const allowParam = Array.isArray(query.allowReturn) ? query.allowReturn[0] : query.allowReturn;
+    return fromParam === 'plans' || allowParam === '1';
+  }, [isReady, query.from, query.allowReturn]);
+
   useEffect(() => {
+    if (!isReady) return;
+
     const verifySession = async () => {
       try {
         const response = await fetch('/api/auth/session');
         const session = await response.json();
 
         if (!session?.user) {
-          router.replace('/auth/signin');
+          replace('/auth/signin');
           return;
         }
 
-        if (session.user.hasCompletedOnboarding) {
-          router.replace('/dashboard');
+        if (session.user.hasCompletedOnboarding && !allowReturn) {
+          replace('/dashboard');
           return;
         }
 
         setIsAuthorized(true);
       } catch (error) {
         console.error('验证登录状态失败:', error);
-        router.replace('/auth/signin');
+        replace('/auth/signin');
       } finally {
         setIsCheckingSession(false);
       }
     };
 
     verifySession();
-  }, [router]);
+  }, [isReady, allowReturn, replace]);
 
   // 更新处理函数
   const handleInterestsSelected = (interestIds: string[], interestObjects?: Interest[]) => {
@@ -93,9 +104,16 @@ export default function OnboardingPage() {
       
       console.log('传递到第二步的兴趣:', interestsToPass);
       
+      // 传递from参数，以便后续页面识别来源
+      const queryParams: any = { interests: JSON.stringify(interestsToPass) };
+      if (allowReturn) {
+        queryParams.from = query.from || 'plans';
+        queryParams.allowReturn = '1';
+      }
+      
       router.push({
         pathname: '/onboarding/focus-selection',
-        query: { interests: JSON.stringify(interestsToPass) }
+        query: queryParams
       });
     }
   };

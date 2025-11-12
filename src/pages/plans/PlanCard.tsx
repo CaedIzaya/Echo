@@ -10,12 +10,14 @@ interface Milestone {
 interface Project {
   id: string;
   name: string;
+  focusBranch?: string; // 计划分支
   icon: string;
   dailyGoalMinutes: number;
   milestones: Milestone[];
   isActive: boolean;
   isPrimary?: boolean;
   isCompleted?: boolean;
+  isBlank?: boolean; // 是否为空白计划
 }
 
 interface PlanCardProps {
@@ -26,6 +28,7 @@ interface PlanCardProps {
   isCompleted?: boolean;
   onSelect?: (planId: string) => void;
   onAddMilestone?: (planId: string) => void;
+  onEdit?: (planId: string) => void; // 编辑回调
 }
 
 export default function PlanCard({
@@ -36,17 +39,20 @@ export default function PlanCard({
   isCompleted = false,
   onSelect,
   onAddMilestone,
+  onEdit,
 }: PlanCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // Guard against undefined plan or milestones during static generation/SSR
-  if (!plan || !plan.milestones) {
+  // Guard against undefined plan
+  if (!plan) {
     return null;
   }
   
-  const completedMilestones = plan.milestones.filter(m => m.isCompleted).length;
-  const totalMilestones = plan.milestones.length;
-  const activeMilestones = plan.milestones.filter(m => !m.isCompleted);
+  // 确保milestones是数组
+  const milestones = plan.milestones || [];
+  const completedMilestones = milestones.filter(m => m.isCompleted).length;
+  const totalMilestones = milestones.length;
+  const activeMilestones = milestones.filter(m => !m.isCompleted);
 
   // 检查是否可以添加小目标（基于活跃小目标数量，限制为10个）
   const canAddMilestone = activeMilestones.length < 10;
@@ -64,7 +70,9 @@ export default function PlanCard({
           <div className="text-4xl">{plan.icon}</div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-lg font-semibold text-gray-700">{plan.name}</h3>
+              <h3 className="text-lg font-semibold text-gray-700">
+                {plan.focusBranch || plan.name}
+              </h3>
               <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
                 已完成
               </span>
@@ -114,7 +122,26 @@ export default function PlanCard({
 
           {/* 计划信息 */}
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-bold text-gray-900">
+                {plan.focusBranch || plan.name}
+              </h3>
+              {/* 编辑按钮 - 位置与计划名称平行 */}
+              {onEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(plan.id);
+                  }}
+                  className="text-gray-400 hover:text-teal-600 transition-colors p-1 rounded-lg hover:bg-teal-50"
+                  title="编辑计划"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              )}
+            </div>
             
             {/* 每日目标 */}
             <div className="flex items-center gap-2 mb-3">
@@ -128,7 +155,7 @@ export default function PlanCard({
             <div className="space-y-2">
               {(() => {
                 // 只获取未完成的小目标
-                const activeMilestones = plan.milestones.filter(m => !m.isCompleted);
+                const activeMilestones = milestones.filter(m => !m.isCompleted);
                 
                 return activeMilestones.length > 0 ? (
                   <>
@@ -159,13 +186,17 @@ export default function PlanCard({
                   </>
                 ) : (
                   <p className="text-sm text-gray-400">
-                    {plan.milestones.length > 0 ? '所有小目标已完成' : '暂无小目标'}
+                    {plan.isBlank 
+                      ? '空白计划，点击编辑开始设置' 
+                      : milestones.length > 0 
+                        ? '所有小目标已完成' 
+                        : '暂无小目标'}
                   </p>
                 );
               })()}
 
               {/* 快速添加小目标 */}
-              {canAddMilestone && (
+              {canAddMilestone && !plan.isBlank && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

@@ -920,41 +920,41 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50/40 via-cyan-50/30 to-blue-50/40 pb-20">
       {/* 成就通知 */}
       <AchievementNotification />
       
-      <div className="p-6 sm:p-8 pt-20">
-        {/* 头部 */}
-        <div className="flex justify-between items-center mb-6">
+      <div className="p-6 sm:p-8 md:p-10 lg:p-12 pt-24 max-w-7xl mx-auto">
+        {/* 头部 - 更精致的排版 */}
+        <div className="flex justify-between items-start mb-10">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 tracking-tight">
               {greeting}，{userName}
             </h1>
-            <p className="text-gray-500 mt-1">
+            <p className="text-gray-600 text-base md:text-lg font-medium">
               {progress >= 1 ? '恭喜你，我们将铭记今天所夺回的时光' : '准备好夺回今天的时间了吗？'}
             </p>
           </div>
           
           <div className="flex items-center gap-3">
-            {/* 搜索指南按钮 */}
+            {/* 搜索指南按钮 - 更精致 */}
             <button
               onClick={() => setShowQuickSearchGuide(true)}
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-110"
+              className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-110 hover:rotate-3"
               title="快速查找指南"
             >
               <span className="text-2xl">🔍</span>
             </button>
 
-            {/* 成就按钮 */}
+            {/* 成就按钮 - 更精致 */}
             <button
               onClick={() => setShowAchievementPanel(true)}
-              className="relative w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-110"
+              className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-yellow-500/30 hover:shadow-xl hover:shadow-yellow-500/40 transition-all duration-300 transform hover:scale-110 hover:rotate-3"
             >
               <span className="text-2xl">🏆</span>
               {/* 显示未查看的成就数量 */}
               {unviewedAchievements.length > 0 && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg">
                   <span className="text-xs text-white font-bold">
                     {unviewedAchievements.length}
                   </span>
@@ -968,162 +968,170 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 主数据区域 - 带动态边框 */}
-        <div className="relative mb-8 bg-white/50 backdrop-blur-sm rounded-3xl p-6 shadow-lg border-4 border-teal-500/30 animate-pulse-border">
-          {/* 动态边框动画 */}
-          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-teal-400/50 via-transparent to-cyan-400/50 animate-gradient-x"></div>
+        {/* 主数据区域 - 更精致的玻璃态设计 */}
+        <div className="relative mb-10 bg-white/60 backdrop-blur-2xl rounded-[2rem] p-8 md:p-12 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] border border-white/60 overflow-hidden">
+          {/* 顶部高光 */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent"></div>
           
-          <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6">
-            {/* 左侧 - 艺术版环形进度图（更大） */}
+          {/* 装饰性光点 */}
+          <div className="absolute top-6 right-6 w-2 h-2 bg-teal-400/30 rounded-full blur-sm"></div>
+          <div className="absolute bottom-6 left-6 w-1.5 h-1.5 bg-cyan-400/30 rounded-full blur-sm"></div>
+          
+          <div className="relative flex flex-col lg:flex-row items-center lg:items-start justify-between gap-8 lg:gap-12">
+            {/* 左侧 - 环形进度图 - 优化比例 */}
             <div className="flex-shrink-0">
               <div className="relative">
-                {/* 进度环 - 使用红绿灯机制 */}
+                {/* 进度环 - 使用红绿灯机制 - 调整大小 */}
                 <ProgressRing 
                   progress={progress}
                   color={progressColor}
-                  size={240}
-                  strokeWidth={12}
+                  size={200}
+                  strokeWidth={14}
                 />
                 
-                {/* 中心内容 */}
+                {/* 中心内容 - 更精致的排版 */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <p className="text-6xl font-bold text-gray-900 mb-1">
+                    <p className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-1 tracking-tight">
                       {Math.round(progress * 100)}%
                     </p>
-                    <p className="text-sm text-gray-500">今日完成</p>
+                    <p className="text-xs md:text-sm text-gray-500 font-medium">今日完成</p>
                   </div>
                 </div>
                 
-                {/* 动态花朵装饰 */}
-                <div className="absolute -top-2 -right-2 text-4xl animate-bounce" style={{ animationDuration: '2s' }}>
-                  🌸
-                </div>
-                <div className="absolute -bottom-2 -left-2 text-3xl animate-pulse" style={{ animationDuration: '1.5s' }}>
-                  ✨
-                </div>
-                <div className="absolute -top-2 -left-2 text-3xl animate-bounce" style={{ animationDuration: '3s' }}>
-                  🌼
-                </div>
-                <div className="absolute -bottom-2 -right-2 text-4xl animate-pulse">
-                  🌺
-                </div>
+                {/* 动态装饰 - 更精致 */}
+                {progress >= 1 && (
+                  <>
+                    <div className="absolute -top-3 -right-3 text-3xl animate-bounce" style={{ animationDuration: '2s' }}>
+                      ✨
+                    </div>
+                    <div className="absolute -bottom-3 -left-3 text-3xl animate-pulse" style={{ animationDuration: '1.5s' }}>
+                      🌟
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* 右侧 - 统计卡片单列（紧凑） */}
-            <div className="flex-1 flex flex-col gap-3 w-full lg:w-auto">
-              {/* 用户等级 - 第一个 */}
+            {/* 右侧 - 统计卡片 - 优化比例和设计 */}
+            <div className="flex-1 grid grid-cols-2 lg:grid-cols-1 gap-4 w-full lg:w-auto">
+              {/* 用户等级 - 第一个 - 更大更精致 */}
               {userLevel && (
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 shadow-sm hover:shadow-md transition-all text-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">⭐</span>
-                      <p className="text-xs text-white/90">等级</p>
+                <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 transition-all duration-300 text-white group">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl">⭐</span>
+                      <p className="text-sm font-semibold text-white/95">等级</p>
                     </div>
-                    <p className="text-xl font-bold">LV.{userLevel.currentLevel}</p>
+                    <p className="text-2xl md:text-3xl font-extrabold">LV.{userLevel.currentLevel}</p>
                   </div>
-                  <p className="text-xs text-white/80 mb-1">{userLevel.title}</p>
-                  {/* 经验值进度条 */}
-                  <div className="w-full bg-white/20 rounded-full h-1.5">
+                  <p className="text-sm text-white/90 mb-3 font-medium">{userLevel.title}</p>
+                  {/* 经验值进度条 - 更精致 */}
+                  <div className="w-full bg-white/25 rounded-full h-2 mb-2">
                     <div 
-                      className="bg-white h-1.5 rounded-full transition-all duration-300"
+                      className="bg-white h-2 rounded-full transition-all duration-500 shadow-sm"
                       style={{ width: `${userLevel.progress}%` }}
                     />
                   </div>
-                  <p className="text-xs text-white/70 mt-1">
+                  <p className="text-xs text-white/80 font-medium">
                     {userLevel.currentExp} / {userLevel.nextLevelExp} EXP
                   </p>
                 </div>
               )}
 
               {/* 连续天数 - 第二个 */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🔥</span>
-                    <p className="text-xs text-gray-500">连续专注</p>
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-md hover:shadow-lg transition-all duration-300 border border-white/50 group">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">🔥</span>
+                    <p className="text-xs font-semibold text-gray-600">连续专注</p>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{stats.streakDays}天</p>
+                  <p className="text-2xl md:text-3xl font-extrabold text-gray-900">{stats.streakDays}天</p>
                 </div>
               </div>
 
               {/* 本周专注 - 第三个 */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">📈</span>
-                    <p className="text-xs text-gray-500">本周专注</p>
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-md hover:shadow-lg transition-all duration-300 border border-white/50 group">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">📈</span>
+                    <p className="text-xs font-semibold text-gray-600">本周专注</p>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">
+                  <p className="text-2xl md:text-3xl font-extrabold text-gray-900">
                     {Math.floor(weeklyStats.totalMinutes / 60)}h{weeklyStats.totalMinutes % 60}m
                   </p>
                 </div>
               </div>
 
               {/* 小目标完成 - 第四个 */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🎯</span>
-                    <p className="text-xs text-gray-500">小目标完成</p>
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-md hover:shadow-lg transition-all duration-300 border border-white/50 group">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">🎯</span>
+                    <p className="text-xs font-semibold text-gray-600">小目标完成</p>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{stats.completedGoals}个</p>
+                  <p className="text-2xl md:text-3xl font-extrabold text-gray-900">{stats.completedGoals}个</p>
                 </div>
               </div>
 
-              {/* 心流指数 - 第五个 */}
+              {/* 心流指数 - 第五个 - 更精致 */}
               <div 
-                className="bg-gradient-to-br from-purple-50 to-pink-50 backdrop-blur-sm rounded-xl p-4 shadow-sm hover:shadow-md transition-all border border-purple-100 cursor-pointer"
+                className="col-span-2 lg:col-span-1 bg-gradient-to-br from-purple-50/80 via-pink-50/60 to-purple-50/80 backdrop-blur-sm rounded-2xl p-5 shadow-md hover:shadow-lg transition-all duration-300 border border-purple-100/60 cursor-pointer group"
                 onClick={() => setIsFlowIndexExpanded(!isFlowIndexExpanded)}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🌟</span>
-                    <p className="text-xs font-medium text-gray-700">心流指数</p>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">🌟</span>
+                    <p className="text-sm font-semibold text-gray-700">心流指数</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-purple-600">{flowIndex.score}</p>
-                    <p className="text-xs text-gray-500">{flowIndex.level}</p>
+                    <p className="text-3xl md:text-4xl font-extrabold text-purple-600">{flowIndex.score}</p>
+                    <p className="text-xs text-gray-600 font-medium mt-0.5">{flowIndex.level}</p>
                   </div>
                 </div>
                 
-                {/* 分解指标 - 可展开/收起 */}
-                <div className={`overflow-hidden transition-all duration-300 ${
+                {/* 分解指标 - 可展开/收起 - 更精致 */}
+                <div className={`overflow-hidden transition-all duration-500 ${
                   isFlowIndexExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                 }`}>
-                  <div className="space-y-1.5 mt-2 pt-2 border-t border-purple-100">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">专注质量</span>
-                      <span className="font-medium text-purple-700">{flowIndex.breakdown.quality}%</span>
-                    </div>
-                    <div className="w-full bg-purple-100 rounded-full h-1">
-                      <div 
-                        className="bg-purple-500 h-1 rounded-full transition-all"
-                        style={{ width: `${flowIndex.breakdown.quality}%` }}
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">专注时长</span>
-                      <span className="font-medium text-cyan-700">{flowIndex.breakdown.duration}%</span>
-                    </div>
-                    <div className="w-full bg-cyan-100 rounded-full h-1">
-                      <div 
-                        className="bg-cyan-500 h-1 rounded-full transition-all"
-                        style={{ width: `${flowIndex.breakdown.duration}%` }}
-                      />
+                  <div className="space-y-3 mt-4 pt-4 border-t border-purple-200/50">
+                    <div>
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-gray-700 font-medium">专注质量</span>
+                        <span className="font-bold text-purple-700">{flowIndex.breakdown.quality}%</span>
+                      </div>
+                      <div className="w-full bg-purple-100/50 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-500 shadow-sm"
+                          style={{ width: `${flowIndex.breakdown.quality}%` }}
+                        />
+                      </div>
                     </div>
                     
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">专注习惯</span>
-                      <span className="font-medium text-teal-700">{flowIndex.breakdown.consistency}%</span>
+                    <div>
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-gray-700 font-medium">专注时长</span>
+                        <span className="font-bold text-cyan-700">{flowIndex.breakdown.duration}%</span>
+                      </div>
+                      <div className="w-full bg-cyan-100/50 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-cyan-500 to-cyan-600 h-2 rounded-full transition-all duration-500 shadow-sm"
+                          style={{ width: `${flowIndex.breakdown.duration}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-teal-100 rounded-full h-1">
-                      <div 
-                        className="bg-teal-500 h-1 rounded-full transition-all"
-                        style={{ width: `${flowIndex.breakdown.consistency}%` }}
-                      />
+                    
+                    <div>
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-gray-700 font-medium">专注习惯</span>
+                        <span className="font-bold text-teal-700">{flowIndex.breakdown.consistency}%</span>
+                      </div>
+                      <div className="w-full bg-teal-100/50 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-teal-500 to-teal-600 h-2 rounded-full transition-all duration-500 shadow-sm"
+                          style={{ width: `${flowIndex.breakdown.consistency}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1172,25 +1180,27 @@ export default function Dashboard() {
           `}</style>
         </div>
 
-        {/* 固定位置 - 开始专注按钮 */}
-        <div className="fixed bottom-28 right-8 z-10">
+        {/* 固定位置 - 开始专注按钮 - 更精致 */}
+        <div className="fixed bottom-28 right-6 md:right-8 z-10">
           <button
             onClick={handleStartFocus}
-            className="bg-teal-500 text-white py-6 px-12 rounded-full font-semibold text-lg hover:bg-teal-600 transition shadow-lg hover:shadow-xl flex items-center gap-3"
+            className="group relative bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-white py-5 px-8 md:px-10 rounded-2xl font-bold text-base md:text-lg hover:from-teal-600 hover:via-teal-600 hover:to-cyan-600 transition-all duration-300 shadow-xl shadow-teal-500/30 hover:shadow-2xl hover:shadow-teal-500/40 flex items-center gap-3 transform hover:scale-105 overflow-hidden"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-6 h-6 transform group-hover:rotate-90 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            开始专注
+            <span className="relative z-10">开始专注</span>
+            {/* 按钮光效 */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
           </button>
         </div>
 
         {/* 最近成就 - 可展开（默认展开） */}
         <AchievementsSection />
 
-        {/* 计划区域 */}
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">主要计划</h2>
+        {/* 计划区域 - 更精致的标题 */}
+        <div className="mt-12">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 tracking-tight">主要计划</h2>
           
           <PrimaryPlanCard 
             plan={primaryPlan}

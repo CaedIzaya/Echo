@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -53,6 +53,7 @@ export default function Focus() {
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionRef = useRef<FocusSession | null>(null);
+  const isInitialLoadRef = useRef(true);
   
   // 加载主要计划作为默认
   const [availablePlans, setAvailablePlans] = useState<Array<{id:string; name:string; isPrimary:boolean; dailyGoalMinutes:number}>>([]);
@@ -100,16 +101,18 @@ export default function Focus() {
     setSelectedGoal(null);
     
     if (value === 'free') {
-      setSessionName(`${mockPlans.name} - ${mockPlans.date}`);
+      setSessionName(mockPlans.name);
       setPlannedMinutes(30);
+    setCustomDuration(30);
       // 自由时间：清空计划小目标，只显示自定义
       setPlanMilestones([]);
       setCustomGoals([]);
     } else {
       const plan = availablePlans.find(p => p.id === value);
       if (plan) {
-        setSessionName(`${plan.name} - ${mockPlans.date}`);
+        setSessionName(plan.name);
         setPlannedMinutes(plan.dailyGoalMinutes || 30);
+      setCustomDuration(plan.dailyGoalMinutes || 30);
         
         // 从localStorage加载计划的小目标 - 只加载未完成的
         const savedPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
@@ -141,8 +144,6 @@ export default function Focus() {
 
   // 初始化：加载计划与默认值 - 实时同步
   useEffect(() => {
-    let isInitialLoad = true; // 标记是否为初次加载
-    
     const loadPlans = (shouldResetSelection: boolean = false) => {
       console.log('🔄 重新加载计划数据...', { shouldResetSelection });
       // 加载可用计划
@@ -151,11 +152,12 @@ export default function Focus() {
       const primary = plans.find((p:any) => p.isPrimary);
       
       // 只有在初始加载或shouldResetSelection为true时才重置计划选择
-      if (shouldResetSelection || isInitialLoad) {
+      if (shouldResetSelection || isInitialLoadRef.current) {
         if (primary) {
           setSelectedPlanId(primary.id);
-          setSessionName(`${primary.name} - ${mockPlans.date}`);
+          setSessionName(primary.name);
           setPlannedMinutes(primary.dailyGoalMinutes || 30);
+          setCustomDuration(primary.dailyGoalMinutes || 30);
           // 加载主要计划的小目标 - 过滤已完成的目标
           if (primary.milestones) {
             console.log('📋 加载小目标，总数:', primary.milestones.length);
@@ -165,11 +167,12 @@ export default function Focus() {
           }
         } else {
           setSelectedPlanId('free');
-          setSessionName(`${mockPlans.name} - ${mockPlans.date}`);
+          setSessionName(mockPlans.name);
           setPlannedMinutes(30);
+          setCustomDuration(30);
           setPlanMilestones([]);
         }
-        isInitialLoad = false; // 标记已完成初始加载
+        isInitialLoadRef.current = false; // 标记已完成初始加载
       }
     };
 
@@ -245,6 +248,19 @@ export default function Focus() {
       clearInterval(interval);
     };
   }, [state, mockPlans.date]);
+
+  // 同步用户设定的专注时长到会话存储
+  useEffect(() => {
+    if (state !== 'preparing') return;
+    if (!sessionRef.current) return;
+
+    sessionRef.current.plannedDuration = plannedMinutes;
+    sessionRef.current.customDuration = plannedMinutes;
+    saveState({
+      plannedDuration: plannedMinutes,
+      customDuration: plannedMinutes
+    });
+  }, [plannedMinutes, state]);
 
 
   // 从localStorage恢复状态 - 增强版恢复机制
@@ -454,6 +470,14 @@ export default function Focus() {
   const startFocus = () => {
     if (!sessionRef.current) return;
     
+    // 以用户当前设置为准更新计划时长
+    sessionRef.current.plannedDuration = plannedMinutes;
+    sessionRef.current.customDuration = plannedMinutes;
+    saveState({
+      plannedDuration: plannedMinutes,
+      customDuration: plannedMinutes
+    });
+
     // 如果是选择计划（非自由时间），将自定义小目标添加到计划中
     if (selectedPlanId !== 'free' && customGoals.length > 0) {
       const savedPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
@@ -1105,7 +1129,7 @@ export default function Focus() {
               {pauseCount >= 1 ? '暂停已用' : '暂停'}
             </button>
             <button
-              onClick={() => endFocus(false)}
+              onClick={() => endFocus(currentElapsed >= totalSeconds)}
               className={`px-6 py-3 rounded-full font-semibold transition-all backdrop-blur-sm ${
                 isOverTime 
                   ? 'bg-yellow-900/30 text-yellow-50 hover:bg-yellow-900/40' 
@@ -1206,7 +1230,7 @@ export default function Focus() {
               继续专注
             </button>
             <button
-              onClick={() => endFocus(false)}
+              onClick={() => endFocus(currentElapsed >= totalSeconds)}
               className="w-full rounded-xl bg-white/20 px-4 py-4 text-white font-semibold text-lg hover:bg-white/30 transition-all backdrop-blur-sm"
             >
               结束专注
@@ -1223,6 +1247,8 @@ export default function Focus() {
     const completed = state === 'completed';
     const minutes = Math.floor(elapsedTime / 60);
     const seconds = elapsedTime % 60;
+    const plannedDurationMinutes = sessionRef.current?.plannedDuration ?? plannedMinutes;
+    const exceededTarget = completed && plannedDurationMinutes > 0 && elapsedTime >= plannedDurationMinutes * 60;
 
     return (
       <>
@@ -1306,14 +1332,18 @@ export default function Focus() {
               {completed ? '专注完成！' : '专注记录'}
             </h1>
             <p className="text-white/90 text-xl mb-8">
-              {completed 
-                ? `你本次专注共持续了 ${minutes} 分 ${seconds} 秒` 
+              {completed
+                ? exceededTarget && plannedDurationMinutes
+                  ? `你超额完成了目标 ${plannedDurationMinutes} 分钟 · 实际 ${minutes} 分 ${seconds} 秒`
+                  : `你本次专注共持续了 ${minutes} 分 ${seconds} 秒`
                 : `你已专注 ${minutes} 分 ${seconds} 秒`}
             </p>
             <div className="text-white/70">
               {completed 
-                ? '这证明你的热爱，比你的计划更加澎湃。' 
-                : '意识到自己状态的变化，本身就是一种觉察。'}
+                ? exceededTarget
+                  ? '超额完成，保持这股势头！'
+                  : '这证明你的热爱，比你的计划更加澎湃。'
+                : '意识到自己状态的变化，也是一种专注。'}
             </div>
           </div>
         </div>
@@ -1345,4 +1375,3 @@ export default function Focus() {
 
   return null;
 }
-

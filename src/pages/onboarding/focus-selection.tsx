@@ -23,7 +23,17 @@ export default function FocusSelection() {
     ? selectedInterests.filter((interest) => interest.id !== primaryInterest.id)
     : selectedInterests;
 
+  const { isReady, query } = router;
+
+  // 检查是否允许老用户返回（从plans页面来的）
+  const allowReturn = isReady && (
+    query.from === 'plans' || 
+    query.allowReturn === '1'
+  );
+
   useEffect(() => {
+    if (!isReady) return;
+
     const verifySession = async () => {
       try {
         const response = await fetch('/api/auth/session');
@@ -34,7 +44,8 @@ export default function FocusSelection() {
           return;
         }
 
-        if (session.user.hasCompletedOnboarding) {
+        // 如果已完成onboarding且不是从plans页面来的，才跳转
+        if (session.user.hasCompletedOnboarding && !allowReturn) {
           router.replace('/dashboard');
           return;
         }
@@ -49,7 +60,7 @@ export default function FocusSelection() {
     };
 
     verifySession();
-  }, [router]);
+  }, [router, isReady, allowReturn]);
 
   // 在useEffect中添加更健壮的解析逻辑
   useEffect(() => {
@@ -92,24 +103,39 @@ export default function FocusSelection() {
   const handleContinue = () => {
     if (focusedInterest) {
       console.log('导航到第三步，聚焦兴趣:', focusedInterest);
+      console.log('所有选择的兴趣:', selectedInterests);
       
-      // 直接导航，不传递复杂参数
+      // 传递from参数，以便后续页面识别来源
+      const queryParams: any = {
+        interestId: focusedInterest.id,
+        interestName: focusedInterest.name,
+        interestIcon: focusedInterest.icon,
+        // 传递所有选择的兴趣，用于创建空白计划卡片
+        allInterests: JSON.stringify(selectedInterests)
+      };
+      if (allowReturn) {
+        queryParams.from = query.from || 'plans';
+        queryParams.allowReturn = '1';
+      }
+      
       router.push({
         pathname: '/onboarding/goal-setting',
-        query: {
-          interestId: focusedInterest.id,
-          interestName: focusedInterest.name,
-          interestIcon: focusedInterest.icon
-        }
+        query: queryParams
       });
     }
   };
 
   const handleBack = () => {
-    // 返回第一步并携带当前选择的兴趣
+    // 返回第一步并携带当前选择的兴趣和from参数
+    const queryParams: any = { preselected: JSON.stringify(selectedInterests.map(i => i.id)) };
+    if (allowReturn) {
+      queryParams.from = query.from || 'plans';
+      queryParams.allowReturn = '1';
+    }
+    
     router.push({
       pathname: '/onboarding',
-      query: { preselected: JSON.stringify(selectedInterests.map(i => i.id)) }
+      query: queryParams
     });
   };
 

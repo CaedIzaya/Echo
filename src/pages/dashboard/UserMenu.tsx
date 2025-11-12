@@ -28,7 +28,7 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
   }, [isOpen]);
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/auth/signin' });
+    await signOut({ callbackUrl: '/' });
   };
 
   return (

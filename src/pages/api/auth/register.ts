@@ -16,6 +16,11 @@ export default async function handler(
     return res.status(400).json({ error: "邮箱和密码必填" });
   }
 
+  // 验证密码长度
+  if (password.length < 8) {
+    return res.status(400).json({ error: "密码至少需要8位字符" });
+  }
+
   try {
     // 检查用户是否已存在
     const existingUser = await db.user.findUnique({

@@ -171,7 +171,10 @@ export default function PlansPage() {
       return;
     }
     
-    router.push('/onboarding');
+    router.push({
+      pathname: '/onboarding',
+      query: { from: 'plans' }
+    });
   };
 
   // 添加新计划（从onboarding或其他地方调用）
@@ -211,6 +214,32 @@ export default function PlansPage() {
   const handleOpenAddMilestone = (planId: string) => {
     setMilestoneTargetPlanId(planId);
     setShowAddMilestone(true);
+  };
+
+  // 编辑计划 - 跳转到表单填写页面
+  const handleEditPlan = (planId: string) => {
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+
+    // 构建兴趣对象
+    const interest = {
+      id: planId,
+      name: plan.focusBranch || plan.name,
+      icon: plan.icon
+    };
+
+    // 跳转到goal-setting页面，传递计划信息用于编辑
+    router.push({
+      pathname: '/onboarding/goal-setting',
+      query: {
+        interestId: interest.id,
+        interestName: interest.name,
+        interestIcon: interest.icon,
+        editPlanId: planId, // 标记为编辑模式
+        from: 'plans',
+        allowReturn: '1'
+      }
+    });
   };
 
   // 添加小目标
@@ -332,6 +361,7 @@ export default function PlansPage() {
                 selected={selectedPlanId === plan.id}
                 onSelect={handleSelectPlan}
                 onAddMilestone={handleOpenAddMilestone}
+                onEdit={handleEditPlan}
               />
             ))}
           </div>
@@ -365,6 +395,7 @@ export default function PlansPage() {
                   key={plan.id}
                   plan={plan}
                   isCompleted={true}
+                  onEdit={handleEditPlan}
                 />
               ))}
             </div>
