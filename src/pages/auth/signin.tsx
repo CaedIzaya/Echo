@@ -18,6 +18,7 @@ export default function SignIn() {
   const [hasRedirected, setHasRedirected] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const shouldForceOnboarding = () => {
     if (typeof window === "undefined") {
@@ -133,7 +134,7 @@ export default function SignIn() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 如果是注册模式，先验证密码
+    // 如果是注册模式，先验证密码和条款同意
     if (!isLogin) {
       const pwdError = validatePassword(formData.password);
       const confirmPwdError = validateConfirmPassword(formData.password, formData.confirmPassword);
@@ -143,6 +144,12 @@ export default function SignIn() {
       
       if (pwdError || confirmPwdError) {
         return; // 验证失败，不提交
+      }
+
+      // 检查是否同意条款
+      if (!agreedToTerms) {
+        alert('请先阅读并同意用户协议和隐私政策');
+        return;
       }
     }
     
@@ -339,9 +346,10 @@ export default function SignIn() {
             <button
               onClick={() => {
                 setIsLogin(false);
-                // 切换时清除错误信息
+                // 切换时清除错误信息和状态
                 setPasswordError("");
                 setConfirmPasswordError("");
+                setAgreedToTerms(false);
                 // 清除确认密码字段
                 setFormData({...formData, confirmPassword: ""});
               }}
@@ -431,6 +439,19 @@ export default function SignIn() {
               )}
             </div>
 
+            {/* 忘记密码链接 - 仅在登录模式显示，位于密码框和登录按钮之间 */}
+            {isLogin && (
+              <div className="text-right -mt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/auth/forgot-password')}
+                  className="text-sm text-teal-600 hover:text-teal-700 transition-colors"
+                >
+                  忘记密码？
+                </button>
+              </div>
+            )}
+
             {!isLogin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -465,9 +486,46 @@ export default function SignIn() {
               </div>
             )}
 
+            {/* 同意条款 - 仅在注册模式显示 */}
+            {!isLogin && (
+              <div className="flex items-start gap-3 p-4 bg-gray-50/50 rounded-xl border border-gray-200">
+                <input
+                  type="checkbox"
+                  id="agreeTerms"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="mt-0.5 w-5 h-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500 focus:ring-2 cursor-pointer"
+                />
+                <label htmlFor="agreeTerms" className="flex-1 text-sm text-gray-700 cursor-pointer">
+                  我已阅读并同意
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open('/legal/terms', '_blank');
+                    }}
+                    className="text-teal-600 hover:text-teal-700 underline mx-1"
+                  >
+                    用户协议
+                  </button>
+                  和
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open('/legal/privacy', '_blank');
+                    }}
+                    className="text-teal-600 hover:text-teal-700 underline mx-1"
+                  >
+                    隐私政策
+                  </button>
+                </label>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (!isLogin && !agreedToTerms)}
               className="group relative w-full rounded-xl bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 px-4 py-3.5 text-white font-semibold hover:from-teal-600 hover:via-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all duration-300 shadow-lg shadow-teal-500/30 hover:shadow-xl hover:shadow-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.01] overflow-hidden"
             >
               <span className="relative z-10 flex items-center justify-center">

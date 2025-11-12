@@ -10,12 +10,14 @@ import BottomNavigation from '../dashboard/BottomNavigation';
 interface Project {
   id: string;
   name: string;
+  focusBranch?: string;
   icon: string;
   dailyGoalMinutes: number;
   milestones: Milestone[];
   isActive: boolean;
   isPrimary?: boolean;
   isCompleted?: boolean;
+  isBlank?: boolean;
 }
 
 interface Milestone {

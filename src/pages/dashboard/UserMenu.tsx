@@ -2,12 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
+import { useRouter } from 'next/router';
 
 interface UserMenuProps {
   userInitial: string;
 }
 
 export default function UserMenu({ userInitial }: UserMenuProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -31,6 +33,11 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
     await signOut({ callbackUrl: '/' });
   };
 
+  const handleProfileClick = () => {
+    setIsOpen(false);
+    router.push('/profile');
+  };
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -43,6 +50,16 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-50">
           <div className="py-1">
+            <button
+              onClick={handleProfileClick}
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-600 transition-colors flex items-center gap-3"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              个人中心
+            </button>
+            <div className="border-t border-gray-100 my-1"></div>
             <button
               onClick={handleSignOut}
               className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3"

@@ -3,11 +3,13 @@ import React from 'react';
 interface Project {
   id: string;
   name: string;
+  focusBranch?: string;
   icon: string;
   dailyGoalMinutes: number;
   milestones: Milestone[];
   isActive: boolean;
   isPrimary?: boolean;
+  isBlank?: boolean;
 }
 
 interface Milestone {

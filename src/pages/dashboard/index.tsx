@@ -7,6 +7,7 @@ import UserMenu from './UserMenu';
 import PrimaryPlanCard from './PrimaryPlanCard';
 import AchievementPanel from './AchievementPanel';
 import QuickSearchGuide from './QuickSearchGuide';
+import SecurityGuideCard from './SecurityGuideCard';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 
@@ -925,6 +926,9 @@ export default function Dashboard() {
       <AchievementNotification />
       
       <div className="p-6 sm:p-8 md:p-10 lg:p-12 pt-24 max-w-7xl mx-auto">
+        {/* 安全引导卡片 */}
+        <SecurityGuideCard />
+        
         {/* 头部 - 更精致的排版 */}
         <div className="flex justify-between items-start mb-10">
           <div>
