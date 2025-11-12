@@ -3,6 +3,8 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { NextApiRequest, NextApiResponse } from "next";
 
+// 注意：此文件在 forgot 子目录中，不需要导入 authOptions
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse

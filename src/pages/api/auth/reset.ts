@@ -1,7 +1,7 @@
 import { db } from "~/server/db";
 import bcrypt from "bcryptjs";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../[...nextauth]";
+import { authOptions } from "./[...nextauth]";
 import { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(
