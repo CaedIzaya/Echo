@@ -8,6 +8,7 @@ import PrimaryPlanCard from './PrimaryPlanCard';
 import AchievementPanel from './AchievementPanel';
 import QuickSearchGuide from './QuickSearchGuide';
 import SecurityGuideCard from './SecurityGuideCard';
+import EchoSpirit from './EchoSpirit';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 
@@ -254,6 +255,7 @@ export default function Dashboard() {
   }, [sessionStatus, userId]);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [spiritState, setSpiritState] = useState<'idle' | 'excited'>('idle'); // 小精灵状态
   
   // 获取今日日期的工具函数
   const getTodayDate = () => new Date().toISOString().split('T')[0];
@@ -500,6 +502,11 @@ export default function Dashboard() {
       minutes, 
       rating
     });
+    
+    // 专注完成时，设置小精灵为excited状态
+    if (completed && minutes > 0) {
+      setSpiritState('excited');
+    }
     
     const today = getTodayDate();
     const lastFocusDate = localStorage.getItem('lastFocusDate');
@@ -931,13 +938,19 @@ export default function Dashboard() {
         
         {/* 头部 - 更精致的排版 */}
         <div className="flex justify-between items-start mb-10">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 tracking-tight">
-              {greeting}，{userName}
-            </h1>
-            <p className="text-gray-600 text-base md:text-lg font-medium">
-              {progress >= 1 ? '恭喜你，我们将铭记今天所夺回的时光' : '准备好夺回今天的时间了吗？'}
-            </p>
+          <div className="flex items-start gap-3 md:gap-4">
+            {/* 光精灵 */}
+            <div className="flex-shrink-0 hidden sm:block">
+              <EchoSpirit state={spiritState === 'excited' ? 'excited' : (progress >= 1 ? 'excited' : 'idle')} />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 tracking-tight">
+                {greeting}，{userName}
+              </h1>
+              <p className="text-gray-600 text-base md:text-lg font-medium">
+                {progress >= 1 ? '恭喜你，我们将铭记今天所夺回的时光' : '准备好夺回今天的时间了吗？'}
+              </p>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">
