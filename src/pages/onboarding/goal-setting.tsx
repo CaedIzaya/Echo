@@ -310,7 +310,13 @@ export default function GoalSetting() {
   };
 
   const handleBack = () => {
-    // 如果是从plans页面来的，返回到focus-selection页面
+    // 如果是编辑计划模式，直接返回到计划页面
+    if (isEditMode && editPlanId) {
+      router.push('/plans');
+      return;
+    }
+    
+    // 如果是从plans页面来的（创建新计划），返回到focus-selection页面
     // 否则使用浏览器返回
     if (allowReturn && focusedInterest) {
       router.push({
