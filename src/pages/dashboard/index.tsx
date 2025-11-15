@@ -642,6 +642,35 @@ export default function Dashboard() {
     if (authKey.startsWith('authenticated_')) {
       console.log('✅ 用户已认证，显示主界面（无API调用）');
       setIsLoading(false);
+      
+      // 延迟一点时间确保页面已经渲染完成
+      setTimeout(() => {
+        // 优先检测专注完成标记（优先级高于登录欢迎文案）
+        const focusCompleted = localStorage.getItem('focusCompleted');
+        if (focusCompleted === 'true') {
+          // 显示专注完成祝贺文案
+          if (spiritDialogRef.current) {
+            spiritDialogRef.current.showCompletionMessage();
+            // 清除标记，避免重复显示
+            localStorage.removeItem('focusCompleted');
+          }
+          return; // 如果显示了祝贺文案，就不再显示欢迎文案
+        }
+        
+        // 检测是否是登录跳转后首次进入主页
+        // 检查今天是否已经显示过欢迎文案
+        const today = getTodayDate();
+        const lastWelcomeDate = localStorage.getItem('lastWelcomeDate');
+        
+        // 如果是今天第一次进入主页（登录跳转），显示欢迎文案
+        if (lastWelcomeDate !== today) {
+          if (spiritDialogRef.current) {
+            spiritDialogRef.current.showWelcomeMessage();
+            // 记录今天已经显示过欢迎文案
+            localStorage.setItem('lastWelcomeDate', today);
+          }
+        }
+      }, 800); // 延迟800ms，确保页面渲染完成
     }
   }, [authKey]);
 
@@ -856,6 +885,37 @@ export default function Dashboard() {
       // HeartTreeManager.addFertilizeOpportunityOnDailyGoalComplete();
     }
   }, [primaryPlan, todayStats.minutes]);
+
+  // 检测专注完成标记（用于处理页面切换回dashboard的情况）
+  // 必须在所有早期返回之前，确保 hooks 数量一致
+  useEffect(() => {
+    const checkFocusCompleted = () => {
+      // 只在页面可见且不在加载状态时检测
+      if (document.visibilityState === 'visible' && !isLoading) {
+        const focusCompleted = localStorage.getItem('focusCompleted');
+        if (focusCompleted === 'true') {
+          // 延迟一点时间显示祝贺文案，确保页面已经渲染完成
+          setTimeout(() => {
+            if (spiritDialogRef.current) {
+              spiritDialogRef.current.showCompletionMessage();
+              // 清除标记，避免重复显示
+              localStorage.removeItem('focusCompleted');
+            }
+          }, 500);
+        }
+      }
+    };
+
+    // 初始检测
+    checkFocusCompleted();
+
+    // 监听页面可见性变化（从其他页面切换回dashboard时）
+    document.addEventListener('visibilitychange', checkFocusCompleted);
+
+    return () => {
+      document.removeEventListener('visibilitychange', checkFocusCompleted);
+    };
+  }, [isLoading]);
 
   // UI 辅助函数 - 红绿灯机制
   const getProgressColor = (progress: number): string => {

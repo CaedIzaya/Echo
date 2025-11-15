@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface EchoSpiritProps {
-  state?: 'idle' | 'excited' | 'focus' | 'happy';
+  state?: 'idle' | 'excited' | 'focus' | 'happy' | 'nod';
   className?: string;
-  onStateChange?: (state: 'idle' | 'excited' | 'focus' | 'happy') => void;
+  onStateChange?: (state: 'idle' | 'excited' | 'focus' | 'happy' | 'nod') => void;
   onClick?: () => void; // 点击回调
   allowFocus?: boolean; // 是否允许focus状态（主页应该设为false）
 }
@@ -92,8 +92,9 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
       }
       
       setCurrentState(prev => {
-        // 随机选择happy或excited（确保不会是focus）
-        const nextState: 'happy' | 'excited' = Math.random() < 0.5 ? 'happy' : 'excited';
+        // 随机选择happy、excited或nod（确保不会是focus）
+        const states: ('happy' | 'excited' | 'nod')[] = ['happy', 'excited', 'nod'];
+        const nextState = states[Math.floor(Math.random() * states.length)];
         
         // 通知状态变化
         if (onStateChange) {
@@ -395,20 +396,40 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
               <ellipse className="eye-high right-high" cx="114" cy="90" rx="2.1" ry="3" fill="#ffffff" opacity="0.95" />
             </g>
           </g>
-          {/* 小手 - happy状态时显示并挥手 */}
+          {/* 小手 - happy和nod状态时显示 */}
           <g className="hand-group">
+            {/* 左手 */}
             <circle 
-              className="hand" 
+              className="hand hand-left" 
               cx="56" 
               cy="140" 
               r="12" 
               fill="url(#gHead)" 
               opacity="0"
             />
-            {/* 小手高光 */}
+            {/* 左手高光 */}
             <ellipse 
-              className="hand-gloss" 
+              className="hand-gloss hand-gloss-left" 
               cx="54" 
+              cy="138" 
+              rx="5" 
+              ry="4" 
+              fill="rgba(255,255,255,0.85)" 
+              opacity="0"
+            />
+            {/* 右手 */}
+            <circle 
+              className="hand hand-right" 
+              cx="144" 
+              cy="140" 
+              r="12" 
+              fill="url(#gHead)" 
+              opacity="0"
+            />
+            {/* 右手高光 */}
+            <ellipse 
+              className="hand-gloss hand-gloss-right" 
+              cx="146" 
               cy="138" 
               rx="5" 
               ry="4" 
@@ -597,6 +618,36 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           }
         }
 
+        /* nod状态 - 头部向右撇并向下点头（球体旋转效果） */
+        @keyframes nodHeadTilt {
+          0%, 100% { 
+            transform: rotate(8deg) rotate(0deg);
+          }
+          50% { 
+            transform: rotate(8deg) rotate(12deg);
+          }
+        }
+
+        /* nod状态 - 双手上下自然摆动 */
+        @keyframes nodHands {
+          0%, 100% { 
+            transform: translateY(0px);
+          }
+          50% { 
+            transform: translateY(-6px);
+          }
+        }
+
+        /* nod状态 - 眼睛跟随头部向下点头（旋转效果） */
+        @keyframes nodBounce {
+          0%, 100% { 
+            transform: rotate(0deg);
+          }
+          50% { 
+            transform: rotate(12deg);
+          }
+        }
+
         /* 头部倾斜动画 - 向左倾斜看 */
         @keyframes headTilt {
           0%, 100% { transform: rotate(0deg); }
@@ -657,6 +708,13 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         /* happy状态也使用completed样式 */
         .echo-spirit-wrap[data-state="happy"] .head-wrap-completed,
         .echo-spirit-wrap[data-state="happy"] .glow-bg-completed {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        
+        /* nod状态也使用completed样式 */
+        .echo-spirit-wrap[data-state="nod"] .head-wrap-completed,
+        .echo-spirit-wrap[data-state="nod"] .glow-bg-completed {
           opacity: 1;
           pointer-events: auto;
         }
@@ -886,26 +944,132 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           transform-origin: center;
         }
 
-        /* happy状态时显示小手并挥手 */
+        /* happy状态时显示左手并挥手 */
         .echo-spirit-wrap[data-state="happy"] .hand-group {
           opacity: 1;
           transition: opacity 0.3s ease-in-out;
         }
 
-        .echo-spirit-wrap[data-state="happy"] .hand {
+        .echo-spirit-wrap[data-state="happy"] .hand-left {
           opacity: 1;
           animation: wave 2s ease-in-out infinite;
           transform-origin: 56px 140px;
         }
 
-        .echo-spirit-wrap[data-state="happy"] .hand-gloss {
+        .echo-spirit-wrap[data-state="happy"] .hand-gloss-left {
           opacity: 1;
           animation: wave 2s ease-in-out infinite;
           transform-origin: 54px 138px;
         }
 
+        .echo-spirit-wrap[data-state="happy"] .hand-right {
+          opacity: 0;
+        }
+
+        .echo-spirit-wrap[data-state="happy"] .hand-gloss-right {
+          opacity: 0;
+        }
+
+        /* nod状态 - 使用completed样式，头部向右撇并上下摆动，双手自然摆动 */
+        .echo-spirit-wrap[data-state="nod"] .glow-bg-completed {
+          opacity: 0.5;
+          animation: glowPulse 2.5s ease-in-out infinite;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .particles-group {
+          opacity: 0.5;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .particle-1 {
+          animation: particleRotate 7s linear infinite, particleTwinkle 1.8s ease-in-out infinite;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .particle-2 {
+          animation: particleRotate 8s linear infinite reverse, particleTwinkle 1.9s ease-in-out infinite;
+          animation-delay: 0.3s;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .particle-3 {
+          animation: particleRotate 9s linear infinite, particleTwinkle 2s ease-in-out infinite;
+          animation-delay: 0.6s;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .particle-4 {
+          animation: particleRotate 7.5s linear infinite reverse, particleTwinkle 1.85s ease-in-out infinite;
+          animation-delay: 0.9s;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .particle-5 {
+          animation: particleRotate 8.5s linear infinite, particleTwinkle 1.95s ease-in-out infinite;
+          animation-delay: 1.2s;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .particle-6 {
+          animation: particleRotate 9.5s linear infinite reverse, particleTwinkle 2.05s ease-in-out infinite;
+          animation-delay: 1.5s;
+        }
+
+        /* nod状态 - 头部向右撇并向下点头（球体旋转效果） */
+        /* transform-origin 设置在头部底部中心，模拟球体向下旋转 */
+        .echo-spirit-wrap[data-state="nod"] .head-wrap-completed {
+          animation: nodHeadTilt 1.2s ease-in-out infinite;
+          transform-origin: 100px 144px; /* 头部底部中心 */
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .head-completed {
+          transform-origin: 100px 144px; /* 头部底部中心 */
+        }
+
+        /* nod状态 - 眼睛跟随头部向下点头（旋转效果） */
+        /* 眼睛和高光都在eyes-group内，会一起旋转 */
+        .echo-spirit-wrap[data-state="nod"] .eyes-group {
+          animation: nodBounce 1.2s ease-in-out infinite;
+          transform-origin: 100px 144px; /* 与头部相同的旋转中心 */
+        }
+        
+        /* nod状态 - 高光跟随眼睛组一起旋转，不需要单独动画 */
+        .echo-spirit-wrap[data-state="nod"] .eye-high {
+          animation: none; /* 移除单独动画，完全跟随eyes-group */
+        }
+
+        /* nod状态时显示双手并上下自然摆动 */
+        .echo-spirit-wrap[data-state="nod"] .hand-group {
+          opacity: 1;
+          transition: opacity 0.3s ease-in-out;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .hand-left,
+        .echo-spirit-wrap[data-state="nod"] .hand-right {
+          opacity: 1;
+          animation: nodHands 1.2s ease-in-out infinite;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .hand-left {
+          transform-origin: 56px 140px;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .hand-right {
+          transform-origin: 144px 140px;
+          animation-delay: 0.15s; /* 右手稍微延迟，形成自然的交替摆动 */
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .hand-gloss-left,
+        .echo-spirit-wrap[data-state="nod"] .hand-gloss-right {
+          opacity: 1;
+          animation: nodHands 1.2s ease-in-out infinite;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .hand-gloss-left {
+          transform-origin: 54px 138px;
+        }
+
+        .echo-spirit-wrap[data-state="nod"] .hand-gloss-right {
+          transform-origin: 146px 138px;
+          animation-delay: 0.15s;
+        }
+
         /* 其他状态时隐藏小手 */
-        .echo-spirit-wrap:not([data-state="happy"]) .hand-group {
+        .echo-spirit-wrap:not([data-state="happy"]):not([data-state="nod"]) .hand-group {
           opacity: 0;
           transition: opacity 0.3s ease-in-out;
         }

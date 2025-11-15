@@ -676,6 +676,11 @@ export default function Focus() {
       localStorage.setItem('focusSessionEnded', 'true');
     }
     
+    // 如果专注完成，设置标记以便dashboard显示祝贺文案
+    if (completed && finalElapsedTime > 0) {
+      localStorage.setItem('focusCompleted', 'true');
+    }
+    
     // 报告专注时长到dashboard（无论是完成还是中断都记录）
     if (finalElapsedTime > 0) {
       const minutes = Math.floor(finalElapsedTime / 60);
