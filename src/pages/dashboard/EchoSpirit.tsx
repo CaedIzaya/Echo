@@ -92,15 +92,8 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
       }
       
       setCurrentState(prev => {
-        let nextState: 'happy' | 'excited';
-        
         // 随机选择happy或excited（确保不会是focus）
-        nextState = Math.random() < 0.5 ? 'happy' : 'excited';
-        
-        // 如果不允许focus状态，确保不会是focus
-        if (!allowFocus && nextState === 'focus') {
-          nextState = 'happy';
-        }
+        const nextState: 'happy' | 'excited' = Math.random() < 0.5 ? 'happy' : 'excited';
         
         // 通知状态变化
         if (onStateChange) {
