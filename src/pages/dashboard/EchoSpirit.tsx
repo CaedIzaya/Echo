@@ -8,9 +8,10 @@ interface EchoSpiritProps {
   onStateChange?: (state: 'idle' | 'excited' | 'focus' | 'happy' | 'nod') => void;
   onClick?: () => void; // 点击回调
   allowFocus?: boolean; // 是否允许focus状态（主页应该设为false）
+  isCompleted?: boolean; // 专注是否完成，决定颜色：false=idle颜色，true=completed颜色
 }
 
-export default function EchoSpirit({ state = 'idle', className = '', onStateChange, onClick, allowFocus = false }: EchoSpiritProps) {
+export default function EchoSpirit({ state = 'idle', className = '', onStateChange, onClick, allowFocus = false, isCompleted = false }: EchoSpiritProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const leftEyeRef = useRef<SVGEllipseElement>(null);
   const rightEyeRef = useRef<SVGEllipseElement>(null);
@@ -31,10 +32,17 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
       return;
     }
     
-    // 如果外部state是excited（专注完成），强制设置为excited
+    // 如果外部state是excited（专注完成），强制设置为excited，并清除用户控制标记
+    // 这样可以确保excited状态不会被用户点击的动画覆盖
     if (state === 'excited') {
+      // 清除可能存在的定时器
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       setCurrentState('excited');
       isUserControlledRef.current = false; // 允许外部控制
+      isAnimatingRef.current = false; // 清除动画标记
       if (onStateChange) onStateChange('excited');
     } else if (!isUserControlledRef.current && state !== 'focus') {
       // 如果用户没有主动控制（没有点击过），则同步外部state
@@ -76,6 +84,16 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         return;
       }
       
+      // 如果当前状态是excited（专注完成），不允许用户点击改变状态
+      // excited状态应该由外部控制，表示专注完成
+      if (currentState === 'excited') {
+        // 只触发onClick回调，但不改变状态
+        if (onClick) {
+          onClick();
+        }
+        return;
+      }
+      
       // 调用外部onClick回调（用于触发文案显示）
       if (onClick) {
         onClick();
@@ -92,8 +110,13 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
       }
       
       setCurrentState(prev => {
-        // 随机选择happy、excited或nod（确保不会是focus）
-        const states: ('happy' | 'excited' | 'nod')[] = ['happy', 'excited', 'nod'];
+        // 如果当前是excited状态，不允许改变
+        if (prev === 'excited') {
+          return prev;
+        }
+        
+        // 随机选择happy或nod（不包含excited，excited应该由外部控制）
+        const states: ('happy' | 'nod')[] = ['happy', 'nod'];
         const nextState = states[Math.floor(Math.random() * states.length)];
         
         // 通知状态变化
@@ -103,13 +126,21 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         
         // 2秒后自动恢复到idle，并重置用户控制标记和动画标记
         timerRef.current = setTimeout(() => {
-          setCurrentState('idle');
-          timerRef.current = null;
-          // 恢复后允许外部state控制和再次交互
-          isUserControlledRef.current = false;
-          isAnimatingRef.current = false;
-          if (onStateChange) {
-            onStateChange('idle');
+          // 如果外部state是excited，不要恢复到idle
+          if (state !== 'excited') {
+            setCurrentState('idle');
+            timerRef.current = null;
+            // 恢复后允许外部state控制和再次交互
+            isUserControlledRef.current = false;
+            isAnimatingRef.current = false;
+            if (onStateChange) {
+              onStateChange('idle');
+            }
+          } else {
+            // 如果外部state是excited，保持excited状态
+            timerRef.current = null;
+            isUserControlledRef.current = false;
+            isAnimatingRef.current = false;
           }
         }, 2000);
         
@@ -164,74 +195,62 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         role="img"
         aria-label="Echo 小精灵"
         data-state={currentState}
+        data-completed={isCompleted ? 'true' : 'false'}
         tabIndex={0}
       >
         <svg className="echo-spirit" viewBox="0 0 200 200" width="200" height="200" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            {/* ① idle状态 - 柔和暖橘×温润黄色×奶油白光 */}
+            {/* ① idle状态 - 新的颜色方案 */}
             <radialGradient id="gHeadIdle" cx="40%" cy="35%" r="70%">
-              <stop offset="0%" stopColor="#FFF5E2" />
-              <stop offset="30%" stopColor="#FFDFAF" />
-              <stop offset="60%" stopColor="#F8D57E" />
-              <stop offset="100%" stopColor="#F6B96E" />
+              <stop offset="0%" stopColor="#FFE7B0" />
+              <stop offset="30%" stopColor="#FFD79A" />
+              <stop offset="60%" stopColor="#FFD79A" />
+              <stop offset="100%" stopColor="#FFC685" />
             </radialGradient>
             <radialGradient id="gHeadInnerIdle" cx="45%" cy="40%" r="50%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.7" />
-              <stop offset="50%" stopColor="#FFF1D6" stopOpacity="0.4" />
+              <stop offset="0%" stopColor="#FFF6E4" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#FFDFAE" stopOpacity="0.5" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </radialGradient>
             
-            {/* ② focus状态 - 蓝绿冷光×柔白脉动 */}
-            <radialGradient id="gHeadFocus" cx="40%" cy="35%" r="70%">
-              <stop offset="0%" stopColor="#D8F5F1" />
-              <stop offset="40%" stopColor="#A1E2DA" />
-              <stop offset="70%" stopColor="#6EC6B0" />
-              <stop offset="100%" stopColor="#4F9D9D" />
-            </radialGradient>
-            <radialGradient id="gHeadInnerFocus" cx="45%" cy="40%" r="50%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
-              <stop offset="50%" stopColor="#D8F5F1" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </radialGradient>
-            
-            {/* ③ completed/excited状态 - 明亮金光×暖粉×柔白星屑 */}
+            {/* ② completed/excited状态 - 与手机端一致的明亮黄色 */}
             <radialGradient id="gHeadCompleted" cx="40%" cy="35%" r="70%">
-              <stop offset="0%" stopColor="#FFF3E0" />
-              <stop offset="30%" stopColor="#FFDCA8" />
-              <stop offset="60%" stopColor="#FFCF73" />
-              <stop offset="100%" stopColor="#FF9E7A" />
+              <stop offset="0%" stopColor="#FFFBE3" />
+              <stop offset="30%" stopColor="#FFE7A0" />
+              <stop offset="60%" stopColor="#FFE7A0" />
+              <stop offset="100%" stopColor="#FFD65C" />
             </radialGradient>
             <radialGradient id="gHeadInnerCompleted" cx="45%" cy="40%" r="50%">
               <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
-              <stop offset="50%" stopColor="#FFF3E0" stopOpacity="0.5" />
+              <stop offset="50%" stopColor="#FFFBE3" stopOpacity="0.5" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </radialGradient>
             
-            {/* 默认渐变（向后兼容） */}
+            {/* 默认渐变（向后兼容，使用新的idle颜色） */}
             <radialGradient id="gHead" cx="40%" cy="35%" r="70%">
-              <stop offset="0%" stopColor="#FFF5E2" />
-              <stop offset="30%" stopColor="#FFDFAF" />
-              <stop offset="60%" stopColor="#F8D57E" />
-              <stop offset="100%" stopColor="#F6B96E" />
+              <stop offset="0%" stopColor="#FFE7B0" />
+              <stop offset="30%" stopColor="#FFD79A" />
+              <stop offset="60%" stopColor="#FFD79A" />
+              <stop offset="100%" stopColor="#FFC685" />
             </radialGradient>
             <radialGradient id="gHeadInner" cx="45%" cy="40%" r="50%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.7" />
-              <stop offset="50%" stopColor="#FFF1D6" stopOpacity="0.4" />
+              <stop offset="0%" stopColor="#FFF6E4" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#FFDFAE" stopOpacity="0.5" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </radialGradient>
             {/* 阴影滤镜 - 根据不同状态 */}
             <filter id="softShadowIdle" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#F6B96E" floodOpacity="0.15" />
+              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#FFC685" floodOpacity="0.25" />
             </filter>
             <filter id="softShadowFocus" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#6EC6B0" floodOpacity="0.2" />
+              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#8FA0FF" floodOpacity="0.2" />
             </filter>
             <filter id="softShadowCompleted" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#FFCF73" floodOpacity="0.25" />
+              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#FFD65C" floodOpacity="0.3" />
             </filter>
-            {/* 默认阴影（向后兼容） */}
+            {/* 默认阴影（向后兼容，使用新的idle颜色） */}
             <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#F6B96E" floodOpacity="0.15" />
+              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#FFC685" floodOpacity="0.25" />
             </filter>
             {/* 麻薯质感的内发光 */}
             <filter id="mochiGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -242,37 +261,29 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
               </feMerge>
             </filter>
             {/* 光晕背景渐变 - 根据不同状态 */}
-            {/* idle状态 - 柔和暖光 */}
+            {/* idle状态 - 新的柔光光晕 */}
             <radialGradient id="glowBgIdle" cx="50%" cy="50%" r="60%">
-              <stop offset="0%" stopColor="#FFF1D6" stopOpacity="0.6" />
-              <stop offset="30%" stopColor="#FFDFAF" stopOpacity="0.4" />
-              <stop offset="60%" stopColor="#F8D57E" stopOpacity="0.25" />
-              <stop offset="85%" stopColor="#F6B96E" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#F6B96E" stopOpacity="0" />
+              <stop offset="0%" stopColor="#FFE8C6" stopOpacity="0.8" />
+              <stop offset="30%" stopColor="#FFC478" stopOpacity="0.35" />
+              <stop offset="60%" stopColor="#FFC478" stopOpacity="0.2" />
+              <stop offset="85%" stopColor="#FFC478" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#FFC478" stopOpacity="0" />
             </radialGradient>
-            {/* focus状态 - 蓝绿冷光 */}
-            <radialGradient id="glowBgFocus" cx="50%" cy="50%" r="60%">
-              <stop offset="0%" stopColor="#D8F5F1" stopOpacity="0.5" />
-              <stop offset="30%" stopColor="#A1E2DA" stopOpacity="0.35" />
-              <stop offset="60%" stopColor="#6EC6B0" stopOpacity="0.2" />
-              <stop offset="85%" stopColor="#4F9D9D" stopOpacity="0.1" />
-              <stop offset="100%" stopColor="#4F9D9D" stopOpacity="0" />
-            </radialGradient>
-            {/* completed状态 - 明亮金光 */}
+            {/* completed状态 - 与手机端一致的明亮光晕 */}
             <radialGradient id="glowBgCompleted" cx="50%" cy="50%" r="60%">
-              <stop offset="0%" stopColor="#FFF3E0" stopOpacity="0.7" />
-              <stop offset="30%" stopColor="#FFDCA8" stopOpacity="0.5" />
-              <stop offset="60%" stopColor="#FFCF73" stopOpacity="0.35" />
-              <stop offset="85%" stopColor="#FF9E7A" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="#FF9E7A" stopOpacity="0" />
+              <stop offset="0%" stopColor="#FFE7A0" stopOpacity="0.9" />
+              <stop offset="30%" stopColor="#FFE7A0" stopOpacity="0.6" />
+              <stop offset="60%" stopColor="#FFD65C" stopOpacity="0.4" />
+              <stop offset="85%" stopColor="#FFD65C" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#FFD65C" stopOpacity="0" />
             </radialGradient>
-            {/* 默认光晕（向后兼容） */}
+            {/* 默认光晕（向后兼容，使用新的idle颜色） */}
             <radialGradient id="glowBg" cx="50%" cy="50%" r="60%">
-              <stop offset="0%" stopColor="#FFF1D6" stopOpacity="0.6" />
-              <stop offset="30%" stopColor="#FFDFAF" stopOpacity="0.4" />
-              <stop offset="60%" stopColor="#F8D57E" stopOpacity="0.25" />
-              <stop offset="85%" stopColor="#F6B96E" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#F6B96E" stopOpacity="0" />
+              <stop offset="0%" stopColor="#FFE8C6" stopOpacity="0.8" />
+              <stop offset="30%" stopColor="#FFC478" stopOpacity="0.35" />
+              <stop offset="60%" stopColor="#FFC478" stopOpacity="0.2" />
+              <stop offset="85%" stopColor="#FFC478" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#FFC478" stopOpacity="0" />
             </radialGradient>
             {/* 强光晕效果 */}
             <filter id="strongGlow" x="-100%" y="-100%" width="300%" height="300%">
@@ -287,34 +298,36 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
               <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
               <stop offset="100%" stopColor="#fff8e1" stopOpacity="0" />
             </radialGradient>
+            {/* 外圈光晕渐变 - 新的柔光光晕效果 */}
+            <radialGradient id="glowIdle" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FFE8C6" stopOpacity="0.6" />
+              <stop offset="50%" stopColor="#FFC478" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#FFC478" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="glowCompleted" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FFE7A0" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#FFD65C" stopOpacity="0" />
+            </radialGradient>
             {/* 眼睛上3/5部分裁剪路径 - happy状态时只显示上3/5部分（让下2/5消失） */}
             <clipPath id="eyeTopHalfClip">
               <rect x="0" y="0" width="200" height="101" />
             </clipPath>
           </defs>
-          {/* 背景光晕层 - 根据状态动态切换 */}
+          {/* 外圈光晕 - 与手机端一致，微微的光晕效果 */}
           <circle 
-            className="glow-background glow-bg-idle" 
+            className="glow-outer glow-outer-idle" 
             cx="100" 
             cy="100" 
-            r="80" 
-            fill="url(#glowBgIdle)" 
+            r="62" 
+            fill="url(#glowIdle)" 
             opacity="0"
           />
           <circle 
-            className="glow-background glow-bg-focus" 
+            className="glow-outer glow-outer-completed" 
             cx="100" 
             cy="100" 
-            r="80" 
-            fill="url(#glowBgFocus)" 
-            opacity="0"
-          />
-          <circle 
-            className="glow-background glow-bg-completed" 
-            cx="100" 
-            cy="100" 
-            r="80" 
-            fill="url(#glowBgCompleted)" 
+            r="62" 
+            fill="url(#glowCompleted)" 
             opacity="0"
           />
           {/* 光粒子效果 - 围绕小精灵旋转 */}
@@ -330,10 +343,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           <g className="head-wrap head-wrap-idle" filter="url(#softShadowIdle)">
             <circle className="head head-idle" cx="100" cy="100" r="44" fill="url(#gHeadIdle)" />
             <circle className="head-inner-glow head-inner-idle" cx="100" cy="100" r="44" fill="url(#gHeadInnerIdle)" />
-          </g>
-          <g className="head-wrap head-wrap-focus" filter="url(#softShadowFocus)">
-            <circle className="head head-focus" cx="100" cy="100" r="44" fill="url(#gHeadFocus)" />
-            <circle className="head-inner-glow head-inner-focus" cx="100" cy="100" r="44" fill="url(#gHeadInnerFocus)" />
           </g>
           <g className="head-wrap head-wrap-completed" filter="url(#softShadowCompleted)">
             <circle className="head head-completed" cx="100" cy="100" r="44" fill="url(#gHeadCompleted)" />
@@ -396,15 +405,24 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
               <ellipse className="eye-high right-high" cx="114" cy="90" rx="2.1" ry="3" fill="#ffffff" opacity="0.95" />
             </g>
           </g>
-          {/* 小手 - happy和nod状态时显示 */}
+          {/* 小手 - happy和nod状态时显示，颜色与身体一致 */}
           <g className="hand-group">
-            {/* 左手 */}
+            {/* 左手 - idle状态 */}
             <circle 
-              className="hand hand-left" 
+              className="hand hand-left hand-left-idle" 
               cx="56" 
               cy="140" 
               r="12" 
-              fill="url(#gHead)" 
+              fill="url(#gHeadIdle)" 
+              opacity="0"
+            />
+            {/* 左手 - completed状态（excited/happy/nod） */}
+            <circle 
+              className="hand hand-left hand-left-completed" 
+              cx="56" 
+              cy="140" 
+              r="12" 
+              fill="url(#gHeadCompleted)" 
               opacity="0"
             />
             {/* 左手高光 */}
@@ -417,13 +435,22 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
               fill="rgba(255,255,255,0.85)" 
               opacity="0"
             />
-            {/* 右手 */}
+            {/* 右手 - idle状态 */}
             <circle 
-              className="hand hand-right" 
+              className="hand hand-right hand-right-idle" 
               cx="144" 
               cy="140" 
               r="12" 
-              fill="url(#gHead)" 
+              fill="url(#gHeadIdle)" 
+              opacity="0"
+            />
+            {/* 右手 - completed状态（excited/happy/nod） */}
+            <circle 
+              className="hand hand-right hand-right-completed" 
+              cx="144" 
+              cy="140" 
+              r="12" 
+              fill="url(#gHeadCompleted)" 
               opacity="0"
             />
             {/* 右手高光 */}
@@ -463,7 +490,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         
         /* 确保头部元素在所有设备上都能正确显示 */
         .head-wrap-idle,
-        .head-wrap-focus,
         .head-wrap-completed {
           position: relative;
           z-index: 1;
@@ -471,7 +497,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         
         /* 确保头部圆形元素可见 */
         .head-wrap-idle circle,
-        .head-wrap-focus circle,
         .head-wrap-completed circle {
           display: block !important;
           visibility: inherit !important;
@@ -484,21 +509,21 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         
         /* 手机端特殊处理 - 确保头部元素显示 */
         @media (max-width: 640px) {
-          .echo-spirit-wrap[data-state="idle"] .head-wrap-idle {
+          /* 专注未完成：所有状态使用idle颜色 */
+          .echo-spirit-wrap[data-completed="false"][data-state="idle"] .head-wrap-idle,
+          .echo-spirit-wrap[data-completed="false"][data-state="excited"] .head-wrap-idle,
+          .echo-spirit-wrap[data-completed="false"][data-state="happy"] .head-wrap-idle,
+          .echo-spirit-wrap[data-completed="false"][data-state="nod"] .head-wrap-idle {
             opacity: 1 !important;
             visibility: visible !important;
             display: block !important;
           }
           
-          .echo-spirit-wrap[data-state="focus"] .head-wrap-focus {
-            opacity: 1 !important;
-            visibility: visible !important;
-            display: block !important;
-          }
-          
-          .echo-spirit-wrap[data-state="excited"] .head-wrap-completed,
-          .echo-spirit-wrap[data-state="happy"] .head-wrap-completed,
-          .echo-spirit-wrap[data-state="nod"] .head-wrap-completed {
+          /* 专注完成后：所有状态使用completed颜色 */
+          .echo-spirit-wrap[data-completed="true"][data-state="idle"] .head-wrap-completed,
+          .echo-spirit-wrap[data-completed="true"][data-state="excited"] .head-wrap-completed,
+          .echo-spirit-wrap[data-completed="true"][data-state="happy"] .head-wrap-completed,
+          .echo-spirit-wrap[data-completed="true"][data-state="nod"] .head-wrap-completed {
             opacity: 1 !important;
             visibility: visible !important;
             display: block !important;
@@ -716,76 +741,54 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           transition: opacity 0.5s ease-in-out;
         }
         
+        /* 外圈光晕基础样式 */
+        .glow-outer {
+          transform-origin: 100px 100px;
+          transition: opacity 0.5s ease-in-out;
+        }
+        
         /* 根据状态显示/隐藏不同的头部和光晕 */
         .head-wrap-idle,
-        .head-wrap-focus,
         .head-wrap-completed {
           opacity: 0 !important;
           pointer-events: none;
           visibility: hidden;
         }
         
-        .glow-bg-idle,
-        .glow-bg-focus,
-        .glow-bg-completed {
+        /* 外圈光晕 - 初始隐藏 */
+        .glow-outer-idle,
+        .glow-outer-completed {
           opacity: 0;
         }
         
-        /* idle状态 - 显示idle样式 */
-        .echo-spirit-wrap[data-state="idle"] .head-wrap-idle,
-        .echo-spirit-wrap[data-state="idle"] .glow-bg-idle {
+        /* 专注未完成：所有状态使用idle颜色 */
+        .echo-spirit-wrap[data-completed="false"][data-state="idle"] .head-wrap-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="idle"] .glow-outer-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="excited"] .head-wrap-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="excited"] .glow-outer-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .head-wrap-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .glow-outer-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .head-wrap-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .glow-outer-idle {
           opacity: 1 !important;
           pointer-events: auto;
           visibility: visible !important;
         }
         
-        /* focus状态 - 显示focus样式 */
-        .echo-spirit-wrap[data-state="focus"] .head-wrap-focus,
-        .echo-spirit-wrap[data-state="focus"] .glow-bg-focus {
+        /* 专注完成后：所有状态使用completed颜色 */
+        .echo-spirit-wrap[data-completed="true"][data-state="idle"] .head-wrap-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="idle"] .glow-outer-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="excited"] .head-wrap-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="excited"] .glow-outer-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .head-wrap-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .glow-outer-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .head-wrap-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .glow-outer-completed {
           opacity: 1 !important;
           pointer-events: auto;
           visibility: visible !important;
         }
         
-        /* excited/completed状态 - 显示completed样式 */
-        .echo-spirit-wrap[data-state="excited"] .head-wrap-completed,
-        .echo-spirit-wrap[data-state="excited"] .glow-bg-completed {
-          opacity: 1 !important;
-          pointer-events: auto;
-          visibility: visible !important;
-        }
-        
-        /* happy状态也使用completed样式 */
-        .echo-spirit-wrap[data-state="happy"] .head-wrap-completed,
-        .echo-spirit-wrap[data-state="happy"] .glow-bg-completed {
-          opacity: 1 !important;
-          pointer-events: auto;
-          visibility: visible !important;
-        }
-        
-        /* nod状态也使用completed样式 */
-        .echo-spirit-wrap[data-state="nod"] .head-wrap-completed,
-        .echo-spirit-wrap[data-state="nod"] .glow-bg-completed {
-          opacity: 1 !important;
-          pointer-events: auto;
-          visibility: visible !important;
-        }
-        
-        /* focus状态呼吸动画 */
-        @keyframes focusBreath {
-          0%, 100% {
-            opacity: 0.9;
-          }
-          50% {
-            opacity: 0.8;
-          }
-        }
-        
-        .echo-spirit-wrap[data-state="focus"] .head-wrap-focus,
-        .echo-spirit-wrap[data-state="focus"] .glow-bg-focus {
-          animation: focusBreath 7s ease-in-out infinite;
-        }
-
         .particles-group {
           transform-origin: 100px 100px;
           transition: opacity 0.5s ease-in-out;
@@ -796,10 +799,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         }
 
         /* idle state - 轻微光效，柔和暖光 */
-        .echo-spirit-wrap[data-state="idle"] .glow-bg-idle {
-          opacity: 0.4;
-          animation: glowPulse 4s ease-in-out infinite;
-        }
 
         .echo-spirit-wrap[data-state="idle"] .particles-group {
           opacity: 0.4;
@@ -874,10 +873,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         }
 
         /* excited/completed state - 庆祝但不浮夸，明亮金光 */
-        .echo-spirit-wrap[data-state="excited"] .glow-bg-completed {
-          opacity: 0.7;
-          animation: glowPulse 2s ease-in-out infinite;
-        }
 
         .echo-spirit-wrap[data-state="excited"] .particles-group {
           opacity: 1;
@@ -937,10 +932,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
 
 
         /* happy state - 使用completed样式，左右轻微晃脑袋，眯眼睛（眼睛下半部分消失），保持q弹，中等光效 */
-        .echo-spirit-wrap[data-state="happy"] .glow-bg-completed {
-          opacity: 0.6;
-          animation: glowPulse 2s ease-in-out infinite;
-        }
 
         .echo-spirit-wrap[data-state="happy"] .particles-group {
           opacity: 0.7;
@@ -996,14 +987,58 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           transform-origin: center;
         }
 
+        /* 手部基础样式 - 所有状态的手部初始隐藏 */
+        .hand-left-idle,
+        .hand-left-completed,
+        .hand-right-idle,
+        .hand-right-completed {
+          opacity: 0;
+        }
+
+        /* 专注未完成：所有状态使用idle颜色的手部 */
+        .echo-spirit-wrap[data-completed="false"][data-state="idle"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="idle"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="excited"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="excited"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-right-idle {
+          opacity: 0; /* idle状态不显示手部，但happy/nod状态会显示 */
+        }
+
+        /* 专注完成后：所有状态使用completed颜色的手部（金色） */
+        .echo-spirit-wrap[data-completed="true"][data-state="idle"] .hand-left-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="idle"] .hand-right-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="excited"] .hand-left-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="excited"] .hand-right-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .hand-left-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .hand-right-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-left-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-right-completed {
+          opacity: 0; /* idle状态不显示手部，但happy/nod状态会显示 */
+        }
+        
+        /* happy和nod状态显示手部（根据completed状态选择颜色） */
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .hand-left-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .hand-right-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-left-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-right-completed {
+          opacity: 1;
+        }
+
         /* happy状态时显示左手并挥手 */
         .echo-spirit-wrap[data-state="happy"] .hand-group {
           opacity: 1;
           transition: opacity 0.3s ease-in-out;
         }
 
-        .echo-spirit-wrap[data-state="happy"] .hand-left {
-          opacity: 1;
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .hand-left-completed {
           animation: wave 2s ease-in-out infinite;
           transform-origin: 56px 140px;
         }
@@ -1014,7 +1049,8 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           transform-origin: 54px 138px;
         }
 
-        .echo-spirit-wrap[data-state="happy"] .hand-right {
+        .echo-spirit-wrap[data-completed="false"][data-state="happy"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="true"][data-state="happy"] .hand-right-completed {
           opacity: 0;
         }
 
@@ -1023,10 +1059,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         }
 
         /* nod状态 - 使用completed样式，头部向右撇并上下摆动，双手自然摆动 */
-        .echo-spirit-wrap[data-state="nod"] .glow-bg-completed {
-          opacity: 0.5;
-          animation: glowPulse 2.5s ease-in-out infinite;
-        }
 
         .echo-spirit-wrap[data-state="nod"] .particles-group {
           opacity: 0.5;
@@ -1090,17 +1122,21 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           transition: opacity 0.3s ease-in-out;
         }
 
-        .echo-spirit-wrap[data-state="nod"] .hand-left,
-        .echo-spirit-wrap[data-state="nod"] .hand-right {
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-left-completed,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-right-completed {
           opacity: 1;
           animation: nodHands 1.2s ease-in-out infinite;
         }
 
-        .echo-spirit-wrap[data-state="nod"] .hand-left {
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-left-idle,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-left-completed {
           transform-origin: 56px 140px;
         }
 
-        .echo-spirit-wrap[data-state="nod"] .hand-right {
+        .echo-spirit-wrap[data-completed="false"][data-state="nod"] .hand-right-idle,
+        .echo-spirit-wrap[data-completed="true"][data-state="nod"] .hand-right-completed {
           transform-origin: 144px 140px;
           animation-delay: 0.15s; /* 右手稍微延迟，形成自然的交替摆动 */
         }
@@ -1150,11 +1186,11 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
 
         /* 🔥 SVG 渐变 fallback 修复：手机端不支持某些 filter/gradient 时强制纯色显示 */
         .head-idle {
-          fill: url(#gHeadIdle), #FFDFAF !important;
+          fill: url(#gHeadIdle), #FFDFAE !important;
         }
         
         .head-inner-idle {
-          fill: url(#gHeadInnerIdle), rgba(255, 255, 255, 0.7) !important;
+          fill: url(#gHeadInnerIdle), #FFF6E4 !important;
         }
       `}</style>
     </>

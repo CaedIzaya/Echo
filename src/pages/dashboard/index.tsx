@@ -1019,6 +1019,7 @@ export default function Dashboard() {
               <EchoSpirit 
                 state="idle"
                 allowFocus={false}
+                isCompleted={progress >= 1}
                 onStateChange={(newState) => {
                   // 确保主页不会设置focus状态
                   if (newState === 'focus') {
@@ -1293,6 +1294,16 @@ export default function Dashboard() {
         <div className="fixed bottom-28 right-6 z-10 sm:hidden">
           <EchoSpiritMobile 
             state={currentSpiritState}
+            allowFocus={false}
+            isCompleted={progress >= 1}
+            onStateChange={(newState) => {
+              // 确保主页不会设置focus状态
+              if (newState === 'focus') {
+                setCurrentSpiritState('idle');
+              } else {
+                setCurrentSpiritState(newState);
+              }
+            }}
             onClick={() => {
               // 用户点击小精灵时，触发文案显示
               if (spiritDialogRef.current) {
