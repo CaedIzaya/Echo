@@ -9,6 +9,7 @@ import AchievementPanel from './AchievementPanel';
 import QuickSearchGuide from './QuickSearchGuide';
 import SecurityGuideCard from './SecurityGuideCard';
 import EchoSpirit from './EchoSpirit';
+import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
@@ -256,8 +257,8 @@ export default function Dashboard() {
   }, [sessionStatus, userId]);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy'>('idle'); // 小精灵状态
-  const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy'>('idle'); // 用于对话框的状态
+  const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 小精灵状态
+  const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 用于对话框的状态
   const spiritDialogRef = useRef<SpiritDialogRef>(null); // 对话框ref
   
   // 获取今日日期的工具函数
@@ -1006,14 +1007,14 @@ export default function Dashboard() {
         }}
       />
       
-      <div className="p-6 sm:p-8 md:p-10 lg:p-12 pt-24 max-w-7xl mx-auto">
+      <div className="p-6 sm:p-8 md:p-10 lg:p-12 pt-12 sm:pt-24 max-w-7xl mx-auto">
         {/* 安全引导卡片 */}
         <SecurityGuideCard />
         
         {/* 头部 - 更精致的排版 */}
         <div className="flex justify-between items-start mb-10">
           <div className="flex items-start gap-3 md:gap-4">
-            {/* 光精灵 */}
+            {/* 光精灵 - 桌面端显示 */}
             <div className="flex-shrink-0 hidden sm:block">
               <EchoSpirit 
                 state="idle"
@@ -1288,19 +1289,17 @@ export default function Dashboard() {
           `}</style>
         </div>
 
-        {/* 固定位置 - 开始专注按钮 - 更精致 */}
-        <div className="fixed bottom-28 right-6 md:right-8 z-10">
-          <button
-            onClick={handleStartFocus}
-            className="group relative bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-white py-5 px-8 md:px-10 rounded-2xl font-bold text-base md:text-lg hover:from-teal-600 hover:via-teal-600 hover:to-cyan-600 transition-all duration-300 shadow-xl shadow-teal-500/30 hover:shadow-2xl hover:shadow-teal-500/40 flex items-center gap-3 transform hover:scale-105 overflow-hidden"
-          >
-            <svg className="w-6 h-6 transform group-hover:rotate-90 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="relative z-10">开始专注</span>
-            {/* 按钮光效 */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-          </button>
+        {/* 手机端 - EchoSpiritMobile 替换开始专注按钮位置 */}
+        <div className="fixed bottom-28 right-6 z-10 sm:hidden">
+          <EchoSpiritMobile 
+            state={currentSpiritState}
+            onClick={() => {
+              // 用户点击小精灵时，触发文案显示
+              if (spiritDialogRef.current) {
+                spiritDialogRef.current.showMessage();
+              }
+            }}
+          />
         </div>
 
         {/* 最近成就 - 可展开（默认展开） */}

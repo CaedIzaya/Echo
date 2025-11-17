@@ -457,6 +457,52 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           width: 100%;
           height: 100%;
           display: block;
+          position: relative;
+          z-index: 1;
+        }
+        
+        /* 确保头部元素在所有设备上都能正确显示 */
+        .head-wrap-idle,
+        .head-wrap-focus,
+        .head-wrap-completed {
+          position: relative;
+          z-index: 1;
+        }
+        
+        /* 确保头部圆形元素可见 */
+        .head-wrap-idle circle,
+        .head-wrap-focus circle,
+        .head-wrap-completed circle {
+          display: block !important;
+          visibility: inherit !important;
+        }
+        
+        .eyes-group {
+          position: relative;
+          z-index: 2;
+        }
+        
+        /* 手机端特殊处理 - 确保头部元素显示 */
+        @media (max-width: 640px) {
+          .echo-spirit-wrap[data-state="idle"] .head-wrap-idle {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: block !important;
+          }
+          
+          .echo-spirit-wrap[data-state="focus"] .head-wrap-focus {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: block !important;
+          }
+          
+          .echo-spirit-wrap[data-state="excited"] .head-wrap-completed,
+          .echo-spirit-wrap[data-state="happy"] .head-wrap-completed,
+          .echo-spirit-wrap[data-state="nod"] .head-wrap-completed {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: block !important;
+          }
         }
 
         /* Base animations */
@@ -674,8 +720,9 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         .head-wrap-idle,
         .head-wrap-focus,
         .head-wrap-completed {
-          opacity: 0;
+          opacity: 0 !important;
           pointer-events: none;
+          visibility: hidden;
         }
         
         .glow-bg-idle,
@@ -687,36 +734,41 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         /* idle状态 - 显示idle样式 */
         .echo-spirit-wrap[data-state="idle"] .head-wrap-idle,
         .echo-spirit-wrap[data-state="idle"] .glow-bg-idle {
-          opacity: 1;
+          opacity: 1 !important;
           pointer-events: auto;
+          visibility: visible !important;
         }
         
         /* focus状态 - 显示focus样式 */
         .echo-spirit-wrap[data-state="focus"] .head-wrap-focus,
         .echo-spirit-wrap[data-state="focus"] .glow-bg-focus {
-          opacity: 1;
+          opacity: 1 !important;
           pointer-events: auto;
+          visibility: visible !important;
         }
         
         /* excited/completed状态 - 显示completed样式 */
         .echo-spirit-wrap[data-state="excited"] .head-wrap-completed,
         .echo-spirit-wrap[data-state="excited"] .glow-bg-completed {
-          opacity: 1;
+          opacity: 1 !important;
           pointer-events: auto;
+          visibility: visible !important;
         }
         
         /* happy状态也使用completed样式 */
         .echo-spirit-wrap[data-state="happy"] .head-wrap-completed,
         .echo-spirit-wrap[data-state="happy"] .glow-bg-completed {
-          opacity: 1;
+          opacity: 1 !important;
           pointer-events: auto;
+          visibility: visible !important;
         }
         
         /* nod状态也使用completed样式 */
         .echo-spirit-wrap[data-state="nod"] .head-wrap-completed,
         .echo-spirit-wrap[data-state="nod"] .glow-bg-completed {
-          opacity: 1;
+          opacity: 1 !important;
           pointer-events: auto;
+          visibility: visible !important;
         }
         
         /* focus状态呼吸动画 */
@@ -1086,6 +1138,23 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
             width: 120px;
             height: 120px;
           }
+        }
+
+        /* 🔥 终极修复：确保 idle 状态下头部永远显示（手机兼容） */
+        .echo-spirit-wrap[data-state="idle"] .head-wrap-idle,
+        .echo-spirit-wrap[data-state="idle"] .head-wrap-idle * {
+          opacity: 1 !important;
+          visibility: visible !important;
+          display: block !important;
+        }
+
+        /* 🔥 SVG 渐变 fallback 修复：手机端不支持某些 filter/gradient 时强制纯色显示 */
+        .head-idle {
+          fill: url(#gHeadIdle), #FFDFAF !important;
+        }
+        
+        .head-inner-idle {
+          fill: url(#gHeadInnerIdle), rgba(255, 255, 255, 0.7) !important;
         }
       `}</style>
     </>

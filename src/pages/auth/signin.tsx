@@ -312,10 +312,8 @@ export default function SignIn() {
         <div className="text-center mb-10 animate-fade-in-up">
           <div className="inline-flex items-center justify-center w-16 h-16 mb-6 relative group">
             <div className="absolute inset-0 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-2xl blur-lg opacity-50 group-hover:opacity-70 transition-opacity"></div>
-            <div className="relative bg-gradient-to-br from-teal-500 via-teal-400 to-cyan-500 rounded-2xl p-3 shadow-xl shadow-teal-500/30 transform group-hover:scale-105 transition-transform">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
+            <div className="relative bg-gradient-to-br from-teal-500 via-teal-400 to-cyan-500 rounded-2xl p-2 shadow-xl shadow-teal-500/30 transform group-hover:scale-105 transition-transform overflow-hidden">
+              <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
             </div>
           </div>
           <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2 tracking-tight">Echo</h1>
