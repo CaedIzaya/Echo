@@ -52,7 +52,7 @@ export default function BottomNavigation({ active }: BottomNavigationProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-gray-100 px-4 py-3 shadow-lg shadow-gray-100">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-gray-100 px-4 py-3 shadow-lg shadow-gray-100 z-[9999]">
       <div className="flex justify-around items-center max-w-4xl mx-auto">
         {navItems.map((item) => (
           <button

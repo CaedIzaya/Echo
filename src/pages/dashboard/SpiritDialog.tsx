@@ -184,7 +184,8 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const periodicTimerRef = useRef<NodeJS.Timeout | null>(null); // 定时触发文案的定时器
   const lastPeriodicTimeRef = useRef<number>(0); // 记录上次定时触发的时间
 
-  // 显示文案的函数
+  // 显示文案的函数（用户交互触发，5秒后自动隐藏）
+  // 注意：这是用户点击小精灵后触发的对话框，保持5秒持续时间
   const showMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
@@ -206,14 +207,15 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       onStateChange(spiritState);
     }
 
-    // 5秒后自动隐藏文案
+    // 5秒后自动隐藏文案（交互后的对话框，保持5秒）
     timerRef.current = setTimeout(() => {
       setIsVisible(false);
+      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
       timerRef.current = null;
     }, 5000);
   }, [onStateChange, spiritState]);
 
-  // 显示欢迎文案的函数
+  // 显示欢迎文案的函数（非交互触发，8秒后自动隐藏）
   const showWelcomeMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
@@ -235,14 +237,16 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       onStateChange(spiritState);
     }
 
-    // 5秒后自动隐藏文案
+    // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
     timerRef.current = setTimeout(() => {
+      console.log('⏰ 欢迎文案8秒定时器触发，隐藏对话框');
       setIsVisible(false);
+      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
       timerRef.current = null;
-    }, 5000);
+    }, 8000);
   }, [onStateChange, spiritState]);
 
-  // 显示专注完成祝贺文案的函数
+  // 显示专注完成祝贺文案的函数（非交互触发，8秒后自动隐藏）
   const showCompletionMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
@@ -264,14 +268,16 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       onStateChange(spiritState);
     }
 
-    // 5秒后自动隐藏文案
+    // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
     timerRef.current = setTimeout(() => {
+      console.log('⏰ 完成祝贺文案8秒定时器触发，隐藏对话框');
       setIsVisible(false);
+      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
       timerRef.current = null;
-    }, 5000);
+    }, 8000);
   }, [onStateChange, spiritState]);
 
-  // 显示定时触发的陪伴文案
+  // 显示定时触发的陪伴文案（非交互触发，8秒后自动隐藏）
   const showPeriodicMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
@@ -296,11 +302,13 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       onStateChange(spiritState);
     }
 
-    // 5秒后自动隐藏文案
+    // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
     timerRef.current = setTimeout(() => {
+      console.log('⏰ 定时陪伴文案8秒定时器触发，隐藏对话框');
       setIsVisible(false);
+      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
       timerRef.current = null;
-    }, 5000);
+    }, 8000);
   }, [onStateChange, spiritState]);
 
   // 通过ref暴露方法
@@ -363,6 +371,9 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
         clearInterval(periodicTimerRef.current);
         periodicTimerRef.current = null;
       }
+      // 组件卸载时也清空消息和隐藏状态
+      setIsVisible(false);
+      setCurrentMessage('');
     };
   }, []);
 
@@ -401,34 +412,69 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const dialogStyle = getDialogStyle();
 
   return (
-    <div className="fixed top-44 left-52 sm:left-56 md:left-60 lg:left-64 xl:left-72 z-50 pointer-events-none max-w-xs sm:max-w-sm md:max-w-md">
-      <div
-        className={`
-          ${dialogStyle.bg}
-          ${dialogStyle.border}
-          rounded-2xl px-5 py-3.5 shadow-2xl border-2
-          backdrop-blur-sm
-          w-full
-          animate-fade-in-up
-          transition-all duration-300
-          relative
-        `}
-      >
-        {/* 对话框小箭头 - 指向小精灵（左上角） */}
-        <div className="absolute -left-3 top-2 w-0 h-0">
-          <div
-            className={`w-6 h-6 bg-gradient-to-br ${dialogStyle.arrowBg} border-l-2 border-t-2 ${dialogStyle.border} rotate-45`}
-          />
+    <>
+      {/* PC端对话框 - 位于今日节奏卡片底部下方 */}
+      <div className="hidden sm:block fixed top-[440px] left-12 md:left-16 lg:left-20 xl:left-12 z-50 pointer-events-none max-w-xs sm:max-w-sm md:max-w-md">
+        <div
+          className={`
+            ${dialogStyle.bg}
+            ${dialogStyle.border}
+            rounded-2xl px-5 py-3.5 shadow-2xl border-2
+            backdrop-blur-sm
+            w-full
+            animate-fade-in-up
+            transition-all duration-300
+            relative
+          `}
+        >
+          {/* 对话框小箭头 - 指向小精灵（上方） */}
+          <div className="absolute left-12 -top-3 w-0 h-0">
+            <div
+              className={`w-6 h-6 bg-gradient-to-br ${dialogStyle.arrowBg} border-l-2 border-t-2 ${dialogStyle.border} rotate-45`}
+            />
+          </div>
+
+          {/* 文案内容 - 支持换行 */}
+          <p className="text-sm md:text-base text-gray-800 font-medium leading-relaxed relative z-10 whitespace-pre-line">
+            {currentMessage}
+          </p>
+
+          {/* 装饰性光点 */}
+          <div className="absolute top-2 right-2 w-2 h-2 bg-white/60 rounded-full animate-pulse" />
+          <div className="absolute bottom-2 left-2 w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
         </div>
+      </div>
 
-        {/* 文案内容 - 支持换行 */}
-        <p className="text-sm md:text-base text-gray-800 font-medium leading-relaxed relative z-10 whitespace-pre-line">
-          {currentMessage}
-        </p>
+      {/* 手机端对话框 - 位于小精灵脑袋之上 */}
+      <div className="sm:hidden fixed bottom-44 right-6 z-50 pointer-events-none max-w-[280px]">
+        <div
+          className={`
+            ${dialogStyle.bg}
+            ${dialogStyle.border}
+            rounded-2xl px-4 py-3 shadow-2xl border-2
+            backdrop-blur-sm
+            w-full
+            animate-fade-in-up
+            transition-all duration-300
+            relative
+          `}
+        >
+          {/* 对话框小箭头 - 指向小精灵（底部中心） */}
+          <div className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 w-0 h-0">
+            <div
+              className={`w-6 h-6 bg-gradient-to-br ${dialogStyle.arrowBg} border-r-2 border-b-2 ${dialogStyle.border} rotate-45`}
+            />
+          </div>
 
-        {/* 装饰性光点 */}
-        <div className="absolute top-2 right-2 w-2 h-2 bg-white/60 rounded-full animate-pulse" />
-        <div className="absolute bottom-2 left-2 w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
+          {/* 文案内容 - 支持换行 */}
+          <p className="text-sm text-gray-800 font-medium leading-relaxed relative z-10 whitespace-pre-line">
+            {currentMessage}
+          </p>
+
+          {/* 装饰性光点 */}
+          <div className="absolute top-2 right-2 w-2 h-2 bg-white/60 rounded-full animate-pulse" />
+          <div className="absolute bottom-2 left-2 w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
+        </div>
       </div>
 
       <style jsx>{`
@@ -446,7 +492,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
           animation: fade-in-up 0.4s ease-out;
         }
       `}</style>
-    </div>
+    </>
   );
 });
 

@@ -3,10 +3,87 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 
+const FOCUS_QUOTES = [
+  { text: 'Attention is the rarest and purest form of generosity.', author: 'Simone Weil' },
+  { text: 'Silence is not the absence of something but the presence of everything.', author: 'Gordon Hempton' },
+  { text: 'The art of being wise is the art of knowing what to overlook.', author: 'William James' },
+  { text: 'You become what you give your attention to.', author: 'Epictetus' },
+  { text: 'Distraction is the destroyer of depth.', author: 'Digital Minimalism' },
+];
+
+const LOADING_STEPS = [
+  { id: 1, message: 'Disconnecting from the noise...', duration: 1600 },
+  { id: 2, message: 'Filtering stray algorithms...', duration: 1200 },
+  { id: 3, message: 'Syncing with your intention...', duration: 1500 },
+  { id: 4, message: 'Reclaiming your focus...', duration: 1000 },
+  { id: 5, message: 'Echo is almost ready.', duration: 800 },
+];
+
+const EchoLoader = () => {
+  const rings = [0, 1, 2, 3];
+  return (
+    <div className="relative flex items-center justify-center w-64 h-64">
+      <div className="relative z-10 flex items-center justify-center w-16 h-16 rounded-full border border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_30px_rgba(16,185,129,0.25)] backdrop-blur-md">
+        <div className="w-8 h-8 rounded-full border border-emerald-400/70 border-dashed animate-spin-slow" />
+      </div>
+      {rings.map((ring) => (
+        <span
+          key={ring}
+          className="absolute rounded-full border border-emerald-400/30 animate-echo-ring"
+          style={{ animationDelay: `${ring * 0.8}s` }}
+        />
+      ))}
+      <div className="absolute inset-0 rounded-full blur-3xl bg-emerald-500/20" />
+    </div>
+  );
+};
+
+const QuoteRotator = ({ quotes }: { quotes: typeof FOCUS_QUOTES }) => {
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    let fadeTimeout: NodeJS.Timeout | null = null;
+    const interval = setInterval(() => {
+      setVisible(false);
+      fadeTimeout = setTimeout(() => {
+        setQuoteIndex((prev) => (prev + 1) % quotes.length);
+        setVisible(true);
+      }, 400);
+    }, 3600);
+
+    return () => {
+      clearInterval(interval);
+      if (fadeTimeout) {
+        clearTimeout(fadeTimeout);
+      }
+    };
+  }, [quotes.length]);
+
+  const currentQuote = quotes[quoteIndex];
+
+  return (
+    <div
+      className={`text-center transition-opacity duration-500 ease-in-out ${
+        visible ? 'opacity-100' : 'opacity-0'
+      }`}
+    >
+      <p className="text-lg md:text-xl text-emerald-100/90 font-light italic leading-relaxed">
+        “{currentQuote.text}”
+      </p>
+      <p className="mt-4 text-xs tracking-[0.35em] uppercase text-zinc-500 font-medium">
+        — {currentQuote.author}
+      </p>
+    </div>
+  );
+};
+
 export default function Home() {
   const router = useRouter();
   const [authStatus, setAuthStatus] = useState('检查中...');
   const [loading, setLoading] = useState(true);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const isTransitioning = loading || authStatus.startsWith('已登录');
 
   const shouldForceOnboarding = () => {
     if (typeof window === 'undefined') {
@@ -28,6 +105,32 @@ export default function Home() {
   useEffect(() => {
     checkAuthAndRedirect();
   }, []);
+
+  useEffect(() => {
+    if (!isTransitioning) {
+      setCurrentStepIndex(0);
+      return;
+    }
+
+    const timers: NodeJS.Timeout[] = [];
+
+    const runStep = (index: number) => {
+      if (index >= LOADING_STEPS.length) {
+        return;
+      }
+      const timer = setTimeout(() => {
+        setCurrentStepIndex(index + 1);
+        runStep(index + 1);
+      }, LOADING_STEPS[index].duration);
+      timers.push(timer);
+    };
+
+    runStep(0);
+
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+    };
+  }, [isTransitioning]);
 
   const checkAuthAndRedirect = async () => {
     try {
@@ -81,28 +184,70 @@ export default function Home() {
     }
   };
 
-  // 如果正在加载，显示加载状态
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">数字静默</h1>
-          <p className="text-gray-600 mb-4">正在检查登录状态...</p>
-        </div>
-      </div>
-    );
-  }
+  const loadingMessage =
+    currentStepIndex < LOADING_STEPS.length
+      ? LOADING_STEPS[currentStepIndex].message
+      : 'Connected. Preparing Echo...';
 
-  // 如果已登录，显示加载状态（即将跳转）
-  if (authStatus.startsWith('已登录')) {
+  if (isTransitioning) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">数字静默</h1>
-          <p className="text-gray-600 mb-4">正在跳转...</p>
+      <div className="min-h-screen bg-zinc-950 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.12),_transparent_60%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(12,74,110,0.35),transparent)] opacity-60" />
+        <div className="absolute inset-y-0 left-0 w-1/3 bg-emerald-500/10 blur-3xl opacity-40" />
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-16">
+          <div className="max-w-3xl w-full flex flex-col gap-14 items-center">
+            <div className="space-y-6 text-center">
+              <p className="text-xs tracking-[0.45em] uppercase text-emerald-300/70">
+                Echo Focus
+              </p>
+              <h1 className="text-4xl md:text-5xl font-light tracking-tight">
+                Reclaiming your attention...
+              </h1>
+            </div>
+
+            <div className="flex flex-col items-center gap-8 w-full">
+              <EchoLoader />
+              <p className="text-xs font-mono tracking-[0.4em] uppercase text-emerald-200/80 h-4 flex items-center">
+                {loadingMessage}
+              </p>
+            </div>
+
+            <QuoteRotator quotes={FOCUS_QUOTES} />
+          </div>
         </div>
+
+        <style jsx>{`
+          @keyframes echo-ring {
+            0% {
+              transform: scale(0.5);
+              opacity: 0.6;
+            }
+            70% {
+              opacity: 0.2;
+            }
+            100% {
+              transform: scale(2.6);
+              opacity: 0;
+            }
+          }
+          .animate-echo-ring {
+            width: 4rem;
+            height: 4rem;
+            animation: echo-ring 3.6s ease-out infinite;
+          }
+          .animate-spin-slow {
+            animation: spin 6s linear infinite;
+          }
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
       </div>
     );
   }
