@@ -30,11 +30,6 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
   }, [isOpen]);
 
   const handleSignOut = async () => {
-    // 设置退出登录标志，防止首页误判
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('justSignedOut', 'true');
-    }
-    
     // 清除所有本地存储
     try {
       sessionStorage.clear();
@@ -43,9 +38,10 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
       console.error('清除存储失败:', e);
     }
     
-    // 退出登录并重定向到首页
+    // 使用 URL 参数传递退出登录状态，避免被缓存问题影响
+    // 先调用 signOut 清除服务器端 session
     await signOut({ 
-      callbackUrl: '/',
+      callbackUrl: '/?signedOut=true',
       redirect: true 
     });
   };

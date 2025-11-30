@@ -590,7 +590,8 @@ export default function Home() {
 
   useEffect(() => {
     checkAuthAndRedirect();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.signedOut]);
 
   useEffect(() => {
     if (!isTransitioning) {
@@ -620,15 +621,56 @@ export default function Home() {
 
   const checkAuthAndRedirect = async () => {
     try {
-      // 检查是否是退出登录后的重定向
-      const justSignedOut = typeof window !== 'undefined' && sessionStorage.getItem('justSignedOut') === 'true';
+      // 检查是否是退出登录后的重定向（通过 URL 参数）
+      const isSignedOut = router.query.signedOut === 'true';
       
-      if (justSignedOut) {
-        // 清除退出登录标志
-        sessionStorage.removeItem('justSignedOut');
-        // 退出登录后，直接显示欢迎页面，不检查 session（避免缓存问题）
+      if (isSignedOut) {
+        // 清除 URL 参数，避免刷新后再次触发（使用 replace 不会触发页面重新加载）
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', '/');
+        }
+        
+        // 强制清除可能的缓存，重新获取 session
+        const response = await fetch('/api/auth/session', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+        });
+        const session = await response.json();
+        
+        console.log("首页：退出登录后检查 session:", session);
+        
+        // 如果 session 仍然存在（可能是缓存），等待一下再检查
+        if (session?.user) {
+          console.log("首页：退出登录后仍检测到 session，等待清除...");
+          // 等待服务器清除 session
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // 再次检查 session
+          const retryResponse = await fetch('/api/auth/session', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          });
+          const retrySession = await retryResponse.json();
+          
+          if (retrySession?.user) {
+            console.log("首页：重试后仍有 session，可能是真的登录了");
+            setAuthStatus(`已登录: ${retrySession.user.email}`);
+            handleAuthenticatedUser(retrySession);
+            return;
+          }
+        }
+        
+        // 确认用户已退出登录，显示欢迎页面
         setAuthStatus('未登录');
-        console.log("首页：退出登录后，直接显示欢迎界面");
+        console.log("首页：确认用户已退出登录，显示欢迎界面");
         setLoading(false);
         return;
       }
@@ -636,6 +678,9 @@ export default function Home() {
       console.log("首页：开始检查认证状态...");
       const response = await fetch('/api/auth/session', {
         cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
       const session = await response.json();
       
