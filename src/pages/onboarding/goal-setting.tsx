@@ -334,10 +334,10 @@ export default function GoalSetting() {
 
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">正在验证登录状态...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
+          <p className="mt-4 text-teal-600">正在验证登录状态...</p>
         </div>
       </div>
     );
@@ -349,10 +349,10 @@ export default function GoalSetting() {
 
   if (!focusedInterest) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
+          <p className="mt-4 text-teal-600">加载中...</p>
         </div>
       </div>
     );
@@ -364,22 +364,22 @@ export default function GoalSetting() {
         <title>设定目标 - 数字静默</title>
       </Head>
       
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 sm:p-8">
-        <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-8 w-full max-w-2xl mx-2 sm:mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#def7ff] to-[#e3ecff] flex items-center justify-center p-4 sm:p-8">
+        <div className="bg-white/90 rounded-3xl shadow-2xl shadow-emerald-100/50 border border-white/60 backdrop-blur-xl p-4 sm:p-8 w-full max-w-2xl mx-2 sm:mx-auto">
           {/* 头部 */}
           <div className="text-center mb-8">
             <div className="flex justify-center items-center mb-4">
               <span className="text-4xl mr-3">{focusedInterest.icon}</span>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              <h1 className="text-2xl sm:text-3xl font-bold text-teal-900">
                 {isEditMode ? '编辑计划' : '绘制你的蓝图'}
               </h1>
             </div>
-            <p className="text-gray-600 text-sm sm:text-base">
+            <p className="text-teal-700 text-sm sm:text-base">
               {isEditMode 
                 ? '修改你的计划设置和目标'
                 : (
                     <>
-                      为你的 <span className="font-semibold text-blue-600">{focusedInterest.name}</span> 之旅设定清晰的目标
+                      为你的 <span className="font-semibold text-teal-600">{focusedInterest.name}</span> 之旅设定清晰的目标
                     </>
                   )}
             </p>
@@ -389,32 +389,32 @@ export default function GoalSetting() {
           <div className="space-y-6 mb-8">
             {/* 项目名称 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-teal-900 mb-2">
                 项目名称
               </label>
               <input
                 type="text"
                 value={formData.projectName}
                 onChange={(e) => handleInputChange('projectName', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
                 placeholder="为你的项目起个名字"
               />
             </div>
 
             {/* 专注分支 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-teal-900 mb-2">
                 专注分支
-                <span className="text-gray-500 text-xs ml-2">（你希望专注的具体方向）</span>
+                <span className="text-teal-600/80 text-xs ml-2">（你希望专注的具体方向）</span>
               </label>
               <input
                 type="text"
                 value={formData.focusBranch}
                 onChange={(e) => handleInputChange('focusBranch', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
                 placeholder="例如：水彩风景画、React前端开发、吉他弹唱"
               />
-              <button className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors">
+              <button className="mt-2 text-teal-500 hover:text-teal-600 text-sm font-medium transition-colors">
                 🔍 寻找灵感？
               </button>
             </div>
@@ -422,13 +422,13 @@ export default function GoalSetting() {
             {/* 第一个里程碑 - 只在新建模式下显示 */}
             {!isEditMode && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-teal-900 mb-2 flex items-center gap-2">
                   第一个里程碑
-                  <span className="text-gray-500 text-xs">（可达成的小目标）</span>
+                  <span className="text-teal-600/80 text-xs">（可达成的小目标）</span>
                   {/* 提示图标 */}
                   <div className="group relative">
-                    <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center cursor-help">
-                      <span className="text-blue-600 text-xs font-bold">!</span>
+                    <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center cursor-help">
+                      <span className="text-teal-600 text-xs font-bold">!</span>
                     </div>
                     {/* Tooltip */}
                     <div className="absolute left-0 bottom-full mb-2 w-48 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
@@ -441,11 +441,11 @@ export default function GoalSetting() {
                   type="text"
                   value={formData.firstMilestone}
                   onChange={(e) => handleInputChange('firstMilestone', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
                   placeholder="例如：完成第一幅画、搭建个人博客首页、学会弹奏《小星星》"
                   required
                 />
-                <button className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors">
+                <button className="mt-2 text-teal-500 hover:text-teal-600 text-sm font-medium transition-colors">
                   🔍 寻找灵感？
                 </button>
               </div>
@@ -453,9 +453,9 @@ export default function GoalSetting() {
 
             {/* 每日最小剂量 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-teal-900 mb-2">
                 每日专注时间
-                <span className="text-gray-500 text-xs ml-2">（建议从小的开始）</span>
+                <span className="text-teal-600/80 text-xs ml-2">（建议从小的开始）</span>
               </label>
               <div className="flex space-x-4">
                 {[15, 30, 45, 60].map((time) => (
@@ -465,8 +465,8 @@ export default function GoalSetting() {
                     onClick={() => handleInputChange('dailyMinTime', time)}
                     className={`flex-1 py-3 rounded-lg border-2 transition ${
                       formData.dailyMinTime === time
-                        ? 'bg-blue-100 border-blue-500 text-blue-700 font-medium'
-                        : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                        ? 'bg-emerald-100 border-teal-500 text-teal-700 font-medium'
+                        : 'bg-white/80 border-emerald-100 text-teal-700/70 hover:border-teal-200'
                     }`}
                   >
                     {time}分钟
@@ -477,15 +477,15 @@ export default function GoalSetting() {
 
             {/* 期望达成日 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                期望达成日 <span className="text-gray-500 text-xs">（可选）</span>
+              <label className="block text-sm font-medium text-teal-900 mb-2">
+                期望达成日 <span className="text-teal-600/80 text-xs">（可选）</span>
               </label>
               <input
                 type="date"
                 value={formData.targetDate || ''}
                 onChange={(e) => handleInputChange('targetDate', e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
               />
             </div>
           </div>
@@ -494,7 +494,7 @@ export default function GoalSetting() {
           <div className="flex justify-between items-center">
             <button
               onClick={handleBack}
-              className="flex items-center text-gray-500 hover:text-gray-700 font-medium transition-colors text-sm sm:text-base"
+              className="flex items-center text-teal-500 hover:text-teal-600 font-medium transition-colors text-sm sm:text-base"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -508,8 +508,8 @@ export default function GoalSetting() {
               className={`
                 px-6 py-3 sm:px-8 sm:py-3 text-sm sm:text-base rounded-full font-medium transition-all flex items-center
                 ${formData.projectName && (isEditMode || formData.firstMilestone)
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg transform hover:scale-105'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-200/60 hover:shadow-teal-300/80 hover:-translate-y-0.5'
+                  : 'bg-emerald-50 text-emerald-200 cursor-not-allowed'
                 }
               `}
             >
@@ -523,9 +523,9 @@ export default function GoalSetting() {
           {/* 进度指示器 */}
           <div className="mt-8 flex justify-center">
             <div className="flex space-x-2">
-              <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-              <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-              <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
+              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
+              <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
             </div>
           </div>
         </div>

@@ -141,10 +141,10 @@ export default function FocusSelection() {
 
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">正在验证登录状态...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
+          <p className="mt-4 text-teal-600">正在验证登录状态...</p>
         </div>
       </div>
     );
@@ -153,10 +153,10 @@ export default function FocusSelection() {
   // 如果还没有加载兴趣数据，显示加载状态
   if (!isAuthorized || selectedInterests.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
+          <p className="mt-4 text-teal-600">加载中...</p>
         </div>
       </div>
     );
@@ -168,14 +168,14 @@ export default function FocusSelection() {
         <title>选择首要兴趣 - 数字静默</title>
       </Head>
       
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-5 sm:px-12 lg:px-20 py-6 sm:py-16">
-        <div className="bg-white/95 rounded-[28px] shadow-[0_35px_85px_-45px_rgba(15,23,42,0.45)] p-6 sm:p-9 w-full max-w-2xl mx-auto border border-slate-200">
+      <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#def7ff] to-[#e3ecff] flex items-center justify-center px-5 sm:px-12 lg:px-20 py-6 sm:py-16">
+        <div className="bg-white/90 rounded-[28px] shadow-[0_35px_85px_-45px_rgba(15,23,42,0.45)] p-6 sm:p-9 w-full max-w-2xl mx-auto border border-white/60 backdrop-blur-xl">
           {/* 头部 */}
           <div className="text-center mb-12">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-teal-900 mb-4">
               聚焦你的热爱
             </h1>
-            <p className="text-gray-600 text-base sm:text-lg max-w-md mx-auto">
+            <p className="text-teal-700 text-base sm:text-lg max-w-md mx-auto">
               先选择一个你最想开始的，其他的我们帮你记着
             </p>
           </div>
@@ -184,31 +184,31 @@ export default function FocusSelection() {
           {primaryInterest && (
             <div className="relative mb-12 px-2">
               <div className="relative w-full max-w-xl mx-auto">
-                <div className="absolute -inset-4 sm:-inset-5 -z-10 rounded-[32px] bg-gradient-to-r from-emerald-200 via-teal-200 to-blue-200 opacity-55 blur-lg pointer-events-none"></div>
+                <div className="absolute -inset-4 sm:-inset-5 -z-10 rounded-[32px] bg-gradient-to-r from-emerald-200 via-teal-100 to-sky-200 opacity-60 blur-lg pointer-events-none"></div>
                 <div className="absolute -inset-[2px] -z-[5] rounded-[28px] bg-gradient-to-br from-white via-slate-50 to-slate-100 shadow-[0_30px_70px_-45px_rgba(15,23,42,0.5)] pointer-events-none"></div>
                 <button
                   onClick={() => handleSelectFocus(primaryInterest)}
                   className={`
                     relative w-full flex flex-col sm:flex-row items-start sm:items-center gap-6 
-                    p-7 sm:p-9 rounded-[24px] border-2 border-emerald-300/90 outline outline-1 outline-white/80 bg-white text-left
+                    p-7 sm:p-9 rounded-[24px] border-2 border-emerald-300/70 outline outline-1 outline-white/80 bg-white text-left
                     shadow-[0_28px_90px_-50px_rgba(15,23,42,0.55)] transition-transform duration-300 transform -translate-y-1 hover:-translate-y-3
                   `}
                 >
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white text-4xl shadow-lg">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white text-4xl shadow-lg">
                     {primaryInterest.icon}
                   </div>
                   <div className="flex-1">
-                    <div className="inline-flex items-center rounded-full bg-blue-100 px-4 py-1 text-sm font-medium text-blue-700 mb-4">
+                    <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-1 text-sm font-medium text-teal-700 mb-4">
                       当前首要计划
                     </div>
-                    <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-3">
+                    <h2 className="text-2xl sm:text-3xl font-semibold text-teal-900 mb-3">
                       {primaryInterest.name}
                     </h2>
-                    <p className="text-gray-600 text-base sm:text-lg leading-relaxed">
+                    <p className="text-teal-700 text-base sm:text-lg leading-relaxed">
                       这是你目前聚焦的核心方向，我们会围绕它为你定制更深度的目标与引导。
                     </p>
                   </div>
-                  <div className="hidden sm:block text-sm font-medium text-blue-600">
+                  <div className="hidden sm:block text-sm font-medium text-teal-600">
                     点击切换其他计划
                   </div>
                 </button>
@@ -229,14 +229,14 @@ export default function FocusSelection() {
                     border-2 transition-all duration-300 transform bg-white/98
                     hover:-translate-y-1.5 hover:shadow-lg hover:border-slate-300 active:scale-95
                     ${focusedInterest?.id === interest.id 
-                      ? `${interest.color} border-current ring-2 ring-offset-2 ring-current scale-100`
-                      : 'border-slate-200 text-gray-600 shadow-[0_16px_38px_-32px_rgba(15,23,42,0.32)]'
+                      ? `${interest.color} border-transparent ring-2 ring-offset-2 ring-teal-200 text-teal-800 scale-100`
+                      : 'border-slate-200 text-teal-700/70 shadow-[0_16px_38px_-32px_rgba(15,23,42,0.32)]'
                     }
                   `}
                 >
                   <span className="text-3xl mb-3">{interest.icon}</span>
-                  <span className="text-lg font-medium mb-2">{interest.name}</span>
-                  <span className="text-sm text-gray-500 text-center">
+                  <span className="text-xl sm:text-2xl font-semibold mb-2 text-teal-900">{interest.name}</span>
+                  <span className="text-sm text-teal-600 text-center">
                     {focusedInterest?.id === interest.id ? '点击回到主计划' : '点击设为主计划'}
                   </span>
                 </button>
@@ -249,7 +249,7 @@ export default function FocusSelection() {
           <div className="flex justify-between items-center">
             <button
               onClick={handleBack}
-              className="flex items-center text-gray-500 hover:text-gray-700 font-medium transition-colors text-sm sm:text-base"
+              className="flex items-center text-teal-500 hover:text-teal-600 font-medium transition-colors text-sm sm:text-base"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -263,8 +263,8 @@ export default function FocusSelection() {
               className={`
                 px-4 py-2 sm:px-8 sm:py-3 text-sm sm:text-base rounded-full font-medium transition-all flex items-center
                 ${focusedInterest
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg transform hover:scale-105'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-200/60 hover:shadow-teal-300/80 hover:-translate-y-0.5'
+                  : 'bg-emerald-50 text-emerald-200 cursor-not-allowed'
                 }
               `}
             >
@@ -278,9 +278,9 @@ export default function FocusSelection() {
           {/* 进度指示器 */}
           <div className="mt-8 flex justify-center">
             <div className="flex space-x-2">
-              <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-              <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-              <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
+              <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
             </div>
           </div>
         </div>

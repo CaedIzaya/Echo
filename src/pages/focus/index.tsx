@@ -146,10 +146,11 @@ export default function Focus() {
   useEffect(() => {
     const loadPlans = (shouldResetSelection: boolean = false) => {
       console.log('🔄 重新加载计划数据...', { shouldResetSelection });
-      // 加载可用计划
-      const plans = JSON.parse(localStorage.getItem('userPlans') || '[]');
-      setAvailablePlans(plans);
-      const primary = plans.find((p:any) => p.isPrimary);
+      // 加载可用计划 - 过滤掉已完成的计划
+      const allPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
+      const activePlans = allPlans.filter((p: any) => !p.isCompleted);
+      setAvailablePlans(activePlans);
+      const primary = activePlans.find((p:any) => p.isPrimary);
       
       // 只有在初始加载或shouldResetSelection为true时才重置计划选择
       if (shouldResetSelection || isInitialLoadRef.current) {
@@ -859,15 +860,30 @@ export default function Focus() {
   // 准备状态UI
   if (state === 'preparing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 to-cyan-100 pb-20">
-        <div className="flex items-center justify-center min-h-screen p-4">
-          <div className="max-w-md w-full bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 border border-white/20">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">准备专注</h1>
+      <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#e0f7ff] to-[#e1ebff] pb-20 relative overflow-hidden">
+        {/* 背景装饰 */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-teal-300/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-cyan-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </div>
+        
+        <div className="flex items-center justify-center min-h-screen p-4 relative z-10">
+          <div className="max-w-md w-full bg-white/90 backdrop-blur-2xl rounded-[2rem] shadow-2xl shadow-teal-200/50 p-8 border border-white/40 animate-fade-in">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+                准备专注
+              </h1>
+              <p className="text-teal-600/70 text-sm">为你的热爱投入时间</p>
+            </div>
             
             {/* 计划选择 */}
-            <div className="bg-white/70 rounded-2xl p-4 border border-gray-100 mb-4">
-              <label className="block text-sm text-gray-600 mb-2">选择计划</label>
-              <select value={selectedPlanId} onChange={handlePlanChange} className="w-full px-3 py-2 border rounded-xl bg-white">
+            <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/80 rounded-2xl p-4 border border-emerald-100/60 mb-4 backdrop-blur-sm">
+              <label className="block text-xs uppercase tracking-wider text-teal-600 font-semibold mb-2">选择计划</label>
+              <select 
+                value={selectedPlanId} 
+                onChange={handlePlanChange} 
+                className="w-full px-4 py-3 rounded-xl bg-white/90 border border-emerald-200/60 text-teal-900 font-medium focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition-all"
+              >
                 {availablePlans.map(p => (
                   <option key={p.id} value={p.id}>{p.isPrimary ? '🌟 ' : ''}{p.name}</option>
                 ))}
@@ -877,40 +893,42 @@ export default function Focus() {
             
             {/* 计划名称 */}
             <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-xs uppercase tracking-wider text-teal-600 font-semibold mb-2">
                 本次计划名称
               </label>
               <input
                 type="text"
                 value={sessionName}
                 onChange={(e) => setSessionName(e.target.value)}
-                className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                placeholder="计划名称"
+                className="w-full rounded-xl border-2 border-emerald-200/60 bg-white/80 backdrop-blur-sm px-4 py-3 text-teal-900 placeholder:text-teal-400/50 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300/50 transition-all"
+                placeholder="为这次专注起个名字..."
               />
             </div>
             
             {/* 小目标选择 */}
             <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-xs uppercase tracking-wider text-teal-600 font-semibold mb-3">
                 {selectedPlanId === 'free' ? '设置小目标（可选）' : '选择小目标（可选）'}
               </label>
-              <div className="space-y-2 max-h-48 overflow-y-auto mb-2">
+              <div className="space-y-2 max-h-48 overflow-y-auto mb-2 custom-scrollbar">
                 {allGoals.map((goal) => (
                   <button
                     key={goal.id}
                     onClick={() => setSelectedGoal(goal.id)}
-                    className={`w-full text-left rounded-xl p-3 transition-all ${
+                    className={`w-full text-left rounded-xl p-3 transition-all duration-300 transform ${
                       selectedGoal === goal.id
-                        ? 'bg-teal-500 text-white shadow-md'
-                        : 'bg-gray-50 hover:bg-gray-100'
+                        ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-300/50 scale-[1.02]'
+                        : 'bg-white/60 hover:bg-emerald-50/80 border border-emerald-100/60 text-teal-800 hover:scale-[1.01]'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{goal.title}</span>
                       {selectedGoal === goal.id && (
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
+                        <div className="w-5 h-5 rounded-full bg-white/30 flex items-center justify-center">
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
                       )}
                     </div>
                   </button>
@@ -921,7 +939,7 @@ export default function Focus() {
               {!showAddGoal && (
                 <button
                   onClick={() => setShowAddGoal(true)}
-                  className="w-full rounded-xl bg-gray-100 hover:bg-gray-200 p-3 flex items-center justify-center gap-2 text-gray-600 transition-all"
+                  className="w-full rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200/60 p-3 flex items-center justify-center gap-2 text-teal-600 transition-all duration-300 transform hover:scale-[1.01]"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -934,17 +952,18 @@ export default function Focus() {
               
               {/* 添加目标输入框 */}
               {showAddGoal && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 animate-fade-in">
                   <input
                     type="text"
                     value={newGoalTitle}
                     onChange={(e) => setNewGoalTitle(e.target.value)}
                     placeholder="输入小目标..."
-                    className="flex-1 rounded-xl border-2 border-gray-200 px-4 py-2 focus:border-teal-500 focus:outline-none"
+                    className="flex-1 rounded-xl border-2 border-emerald-200/60 bg-white/80 backdrop-blur-sm px-4 py-2.5 text-teal-900 placeholder:text-teal-400/50 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300/50 transition-all"
+                    autoFocus
                   />
                   <button
                     onClick={handleAddGoal}
-                    className="rounded-xl bg-teal-500 text-white px-4 py-2 hover:bg-teal-600 transition-all"
+                    className="rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-4 py-2.5 hover:shadow-lg shadow-teal-300/50 transition-all transform hover:scale-105 font-medium"
                   >
                     添加
                   </button>
@@ -953,7 +972,7 @@ export default function Focus() {
                       setShowAddGoal(false);
                       setNewGoalTitle('');
                     }}
-                    className="rounded-xl bg-gray-100 text-gray-700 px-4 py-2 hover:bg-gray-200 transition-all"
+                    className="rounded-xl bg-white/80 border border-emerald-200/60 text-teal-600 px-4 py-2.5 hover:bg-emerald-50 transition-all font-medium"
                   >
                     取消
                   </button>
@@ -963,23 +982,25 @@ export default function Focus() {
             
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                <label className="block text-xs uppercase tracking-wider text-teal-600 font-semibold mb-3">
                   设置专注时长（分钟）
                 </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="180"
-                  value={customDuration}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    if (value >= 5 && value <= 180) {
-                      setCustomDuration(value);
-                      setPlannedMinutes(value);
-                    }
-                  }}
-                  className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-2xl text-center font-bold text-teal-600 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="5"
+                    max="180"
+                    value={customDuration}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      if (value >= 5 && value <= 180) {
+                        setCustomDuration(value);
+                        setPlannedMinutes(value);
+                      }
+                    }}
+                    className="w-full rounded-xl border-2 border-emerald-200/60 bg-white/80 backdrop-blur-sm px-4 py-4 text-3xl text-center font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300/50 transition-all"
+                  />
+                </div>
                 <div className="flex gap-2 mt-3">
                   {[15, 25, 30, 45, 60].map((mins) => (
                     <button
@@ -988,10 +1009,10 @@ export default function Focus() {
                         setCustomDuration(mins);
                         setPlannedMinutes(mins);
                       }}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 transform ${
                         customDuration === mins
-                          ? 'bg-teal-500 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-300/50 scale-105'
+                          : 'bg-white/60 border border-emerald-200/60 text-teal-700 hover:bg-emerald-50/80 hover:scale-102'
                       }`}
                     >
                       {mins}min
@@ -1002,14 +1023,51 @@ export default function Focus() {
 
               <button
                 onClick={startFocus}
-                className="w-full rounded-xl bg-teal-500 px-4 py-4 text-white font-semibold text-lg hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all duration-200 shadow-lg shadow-teal-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                className="w-full rounded-xl bg-gradient-to-r from-teal-500 via-teal-600 to-cyan-500 px-4 py-4 text-white font-semibold text-lg hover:shadow-2xl shadow-teal-300/60 hover:shadow-teal-400/80 focus:outline-none focus:ring-4 focus:ring-teal-300/50 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden group"
               >
-                开始专注
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <span>开始专注</span>
+                  <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </button>
             </div>
           </div>
         </div>
         <BottomNavigation active="focus" />
+        
+        {/* 动画样式 */}
+        <style jsx>{`
+          @keyframes fade-in {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-fade-in {
+            animation: fade-in 0.5s ease-out;
+          }
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(20, 184, 166, 0.1);
+            border-radius: 10px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(20, 184, 166, 0.3);
+            border-radius: 10px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(20, 184, 166, 0.5);
+          }
+        `}</style>
       </div>
     );
   }
@@ -1017,12 +1075,28 @@ export default function Focus() {
   // 3秒倒计时UI
   if (state === 'starting') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-9xl font-bold text-white mb-4 animate-bounce">
-            {countdown > 0 ? countdown : '🎯'}
+      <div className="min-h-screen bg-gradient-to-br from-teal-500 via-teal-600 to-cyan-600 flex items-center justify-center relative overflow-hidden">
+        {/* 动态背景装饰 */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        </div>
+        
+        <div className="text-center relative z-10">
+          <div className="relative inline-block">
+            {countdown > 0 && (
+              <>
+                <div className={`text-9xl font-bold text-white mb-4 transition-all duration-300 animate-bounce scale-110`}>
+                  {countdown}
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-32 h-32 border-4 border-white/30 rounded-full animate-ping"></div>
+                </div>
+              </>
+            )}
           </div>
-          <p className="text-2xl text-white/90">准备就绪</p>
+          <p className="text-2xl text-white/90 font-medium animate-fade-in">准备就绪</p>
+          <p className="text-white/70 text-sm mt-2">深呼吸，让心静下来</p>
         </div>
       </div>
     );

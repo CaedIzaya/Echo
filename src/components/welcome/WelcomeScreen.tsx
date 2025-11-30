@@ -176,11 +176,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onBegin, onSignIn }) => {
 
           <div className="space-y-6 sm:space-y-8">
             <div className="space-y-4">
-              <h1 className="text-3xl font-semibold tracking-wide text-emerald-100 sm:text-4xl md:text-5xl">
-                你的注意力，是你最后的财富
+              <h1 className="text-3xl font-semibold tracking-wide text-emerald-100 sm:text-4xl md:text-5xl leading-tight">
+                <span className="block">不为清单增加任务</span>
+                <span className="block">只为热爱投入时间</span>
               </h1>
               <p className="mx-auto max-w-xl text-base leading-relaxed text-blue-100/80 sm:text-lg">
-                投资它，找回真正的自己。我们帮你从被动消费，转向主动创造。
+                <span className="block">你拥有夺回注意力与意识主权的力量。</span>
+                <span className="block">成长来自光，也来自你敢看见自己的影。</span>
               </p>
             </div>
 

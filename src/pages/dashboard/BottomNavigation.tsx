@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 
 interface BottomNavigationProps {
-  active: 'home' | 'focus' | 'plans' | 'heart-tree'; // heart-tree 暂时屏蔽但保留类型定义
+  active: 'home' | 'focus' | 'plans';
 }
 
 export default function BottomNavigation({ active }: BottomNavigationProps) {

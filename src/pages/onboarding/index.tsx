@@ -15,22 +15,22 @@ interface Interest {
 // 精选的3x4兴趣网格
 const INTERESTS: Interest[] = [
   // 第一行 - 创造表达
-  { id: '1', name: '游戏', icon: '🎮', color: 'bg-purple-100 border-purple-300 text-purple-700' },
-  { id: '2', name: '阅读', icon: '📚', color: 'bg-blue-100 border-blue-300 text-blue-700' },
-  { id: '3', name: '绘画', icon: '🎨', color: 'bg-pink-100 border-pink-300 text-pink-700' },
-  { id: '4', name: '音乐', icon: '🎵', color: 'bg-yellow-100 border-yellow-300 text-yellow-700' },
+  { id: '1', name: '游戏', icon: '🎮', color: 'bg-gradient-to-br from-emerald-50 to-cyan-50 border-emerald-200 text-teal-700' },
+  { id: '2', name: '阅读', icon: '📚', color: 'bg-gradient-to-br from-teal-50 to-sky-50 border-teal-200 text-teal-700' },
+  { id: '3', name: '绘画', icon: '🎨', color: 'bg-gradient-to-br from-emerald-50 via-white to-teal-100 border-teal-200 text-teal-700' },
+  { id: '4', name: '音乐', icon: '🎵', color: 'bg-gradient-to-br from-cyan-50 to-emerald-50 border-cyan-200 text-teal-700' },
   
   // 第二行 - 技能成长  
-  { id: '5', name: '编程', icon: '💻', color: 'bg-indigo-100 border-indigo-300 text-indigo-700' },
-  { id: '6', name: '语言', icon: '🗣️', color: 'bg-green-100 border-green-300 text-green-700' },
-  { id: '7', name: '健身', icon: '💪', color: 'bg-red-100 border-red-300 text-red-700' },
-  { id: '8', name: '厨艺', icon: '🍳', color: 'bg-orange-100 border-orange-300 text-orange-700' },
+  { id: '5', name: '编程', icon: '💻', color: 'bg-gradient-to-br from-teal-50 to-emerald-100 border-teal-200 text-teal-700' },
+  { id: '6', name: '语言', icon: '🗣️', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
+  { id: '7', name: '健身', icon: '💪', color: 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200 text-teal-700' },
+  { id: '8', name: '厨艺', icon: '🍳', color: 'bg-gradient-to-br from-sky-50 to-emerald-100 border-sky-200 text-teal-700' },
   
   // 第三行 - 生活探索
-  { id: '9', name: '手工', icon: '🧵', color: 'bg-teal-100 border-teal-300 text-teal-700' },
-  { id: '10', name: '学科', icon: '🎓', color: 'bg-blue-100 border-blue-300 text-blue-700' },
-  { id: '11', name: '观影', icon: '🎬', color: 'bg-rose-100 border-rose-300 text-rose-700' },
-  { id: '12', name: '写作', icon: '✍️', color: 'bg-cyan-100 border-cyan-300 text-cyan-700' }
+  { id: '9', name: '手工', icon: '🧵', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
+  { id: '10', name: '学科', icon: '🎓', color: 'bg-gradient-to-br from-teal-50 to-sky-100 border-teal-200 text-teal-700' },
+  { id: '11', name: '观影', icon: '🎬', color: 'bg-gradient-to-br from-cyan-50 to-emerald-100 border-cyan-200 text-teal-700' },
+  { id: '12', name: '写作', icon: '✍️', color: 'bg-gradient-to-br from-emerald-50 via-white to-cyan-100 border-emerald-200 text-teal-700' }
 ];
 
 export default function OnboardingPage() {
@@ -125,10 +125,10 @@ export default function OnboardingPage() {
 
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">正在验证登录状态...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
+          <p className="mt-4 text-teal-600">正在验证登录状态...</p>
         </div>
       </div>
     );
@@ -139,14 +139,14 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-4xl">
+    <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#e0f7ff] to-[#e1ebff] flex items-center justify-center p-4">
+      <div className="bg-white/90 rounded-3xl shadow-2xl shadow-emerald-100/50 border border-white/70 backdrop-blur-xl p-8 w-full max-w-4xl">
         {/* 头部 */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl font-bold text-teal-900 mb-4">
             发现你的热爱
           </h1>
-          <p className="text-gray-600 text-lg max-w-md mx-auto">
+          <p className="text-teal-700 text-lg max-w-md mx-auto">
             选择让你心动的领域，我们将帮你开启一段专注的旅程
           </p>
         </div>
@@ -158,7 +158,7 @@ export default function OnboardingPage() {
         <div className="flex justify-between items-center mt-12">
           <button
             onClick={handleSkip}
-            className="text-gray-500 hover:text-gray-700 font-medium transition-colors"
+            className="text-teal-500 hover:text-teal-600 font-medium transition-colors"
           >
             稍后再说
           </button>
@@ -169,8 +169,8 @@ export default function OnboardingPage() {
             className={`
               px-4 py-2 sm:px-8 sm:py-3 text-sm sm:text-base rounded-full font-medium transition-all
               ${selectedInterests.length > 0
-                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg transform hover:scale-105'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-200/60 hover:shadow-teal-300/80 hover:-translate-y-0.5'
+                : 'bg-emerald-50 text-emerald-200 cursor-not-allowed'
               }
             `}
           >

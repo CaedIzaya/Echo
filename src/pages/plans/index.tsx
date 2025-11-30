@@ -412,6 +412,7 @@ export default function PlansPage() {
           onSetPrimary={handleSetPrimary}
           onDelete={handleDeletePlan}
           onComplete={handleCompletePlan}
+          onCancel={handleExitManagement}
         />
       )}
 

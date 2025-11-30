@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import ProgressRing from './ProgressRing';
@@ -13,6 +13,23 @@ import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
+import {
+  FlowMetrics,
+  FlowUpdateContext,
+  FlowIndexResult,
+  updateDailyBehaviorRecord,
+  calculateWeeklyBehaviorScore,
+  ensureFlowMetricsShape,
+  applyTempFlowDecay,
+  applyImpressionCooling,
+  calculateSessionQuality,
+  computeFlowIndex,
+  MIN_IMPRESSION,
+  MAX_IMPRESSION,
+  MIN_TEMP_FLOW,
+  MAX_TEMP_FLOW,
+  clamp
+} from '~/lib/flowEngine';
 
 interface Project {
   id: string;
@@ -48,35 +65,26 @@ interface DashboardStats {
   completedGoals: number;
 }
 
-interface FlowMetrics {
-  // 专注时长相关
-  totalFocusMinutes: number;
-  averageSessionLength: number;
-  longestSession: number;
+const getPositiveBehaviorBoost = (normalizedScore: number) => {
+  if (normalizedScore >= 0.85) return 1.35;
+  if (normalizedScore >= 0.7) return 1.2;
+  if (normalizedScore >= 0.55) return 1.1;
+  if (normalizedScore >= 0.4) return 1.0;
+  if (normalizedScore >= 0.25) return 0.85;
+  return 0.7;
+};
 
-  // 专注频率相关
-  sessionCount: number;
-  consistencyScore: number;
+const getNegativeBehaviorBoost = (normalizedScore: number) => {
+  if (normalizedScore >= 0.5) return 1;
+  if (normalizedScore >= 0.3) return 1.15;
+  return 1.35;
+};
 
-  // 专注质量相关
-  averageRating: number;
-  completionRate: number;
-  interruptionRate: number;
+const getBehaviorFatiguePenalty = (normalizedScore: number) => {
+  if (normalizedScore >= 0.2) return 0;
+  return (0.2 - normalizedScore) * 12;
+};
 
-  // 持续成长相关
-  currentStreak: number;
-  improvementTrend: number;
-}
-
-interface FlowIndexResult {
-  score: number;
-  level: string;
-  breakdown: {
-    quality: number;
-    duration: number;
-    consistency: number;
-  };
-}
 
 // 成就展开组件（默认展开）- 显示真实成就数据
 function AchievementsSection() {
@@ -514,37 +522,104 @@ export default function Dashboard() {
   };
 
   // 更新心流指标
-  const updateFlowMetrics = (sessionMinutes: number, rating?: number) => {
-    const flowData = localStorage.getItem('flowMetrics');
-    let metrics: FlowMetrics = flowData ? JSON.parse(flowData) : {
-      totalFocusMinutes: 0,
-      averageSessionLength: 0,
-      longestSession: 0,
-      sessionCount: 0,
-      consistencyScore: 0.5,
-      averageRating: 2.0,
-      completionRate: 0.7,
-      interruptionRate: 0.2,
-      currentStreak: 0,
-      improvementTrend: 0
-    };
+  const updateFlowMetrics = (
+    sessionMinutes: number,
+    rating: number = 2,
+    context: FlowUpdateContext = {}
+  ) => {
+    if (typeof window === 'undefined') return;
 
-    // 更新基本指标
+    const flowData = localStorage.getItem('flowMetrics');
+    const now = Date.now();
+    const metrics = ensureFlowMetricsShape(flowData ? JSON.parse(flowData) : undefined);
+
+    applyTempFlowDecay(metrics, now);
+    applyImpressionCooling(metrics, now);
+
+    const weeklyBehavior = calculateWeeklyBehaviorScore();
+    const positiveBehaviorBoost = getPositiveBehaviorBoost(weeklyBehavior.normalizedScore);
+    const negativeBehaviorBoost = getNegativeBehaviorBoost(weeklyBehavior.normalizedScore);
+
+    const safeRating = typeof rating === 'number' ? rating : 2;
+    const completedSession = context.completedSession !== false;
+    const interrupted = context.interrupted ?? !completedSession;
+    const sessionQuality = calculateSessionQuality({
+      sessionMinutes,
+      rating: safeRating,
+      dailyGoalMinutes: context.dailyGoalMinutes,
+      completedDailyGoal: context.completedDailyGoal
+    });
+
+    if (sessionQuality >= 0.75) {
+      metrics.recentQualityStreak += 1;
+    } else if (sessionQuality < 0.5) {
+      metrics.recentQualityStreak = 0;
+    }
+
+    const streakFactor = clamp((context.streakDays || 0) / 14, 0, 1);
+    const baseGain =
+      sessionQuality >= 0.85 ? 1.1 :
+      sessionQuality >= 0.7 ? 0.8 :
+      sessionQuality >= 0.5 ? 0.45 :
+      0.2;
+    const impressionPenalty =
+      interrupted ? 0.8 :
+      sessionQuality < 0.3 ? 0.3 :
+      0;
+
+    metrics.impressionScore = clamp(
+      metrics.impressionScore +
+        baseGain +
+        streakFactor * 0.5 +
+        (context.completedDailyGoal ? 0.4 : 0) -
+        impressionPenalty,
+      MIN_IMPRESSION,
+      MAX_IMPRESSION
+    );
+
+    let tempDelta = sessionQuality * 18 * positiveBehaviorBoost;
+    if (context.completedDailyGoal) tempDelta += 6 * positiveBehaviorBoost;
+    if (!completedSession) tempDelta -= 6 * negativeBehaviorBoost;
+    if (interrupted) tempDelta -= 8 * negativeBehaviorBoost;
+    tempDelta += Math.min(metrics.recentQualityStreak * 1.5, 8) * positiveBehaviorBoost;
+    if (sessionQuality < 0.45) {
+      tempDelta -= (0.45 - sessionQuality) * 15 * negativeBehaviorBoost;
+    }
+    if (weeklyBehavior.normalizedScore < 0.35 && sessionQuality < 0.55) {
+      tempDelta -= (0.35 - weeklyBehavior.normalizedScore) * 10;
+    }
+
+    metrics.tempFlowScore = clamp(
+      metrics.tempFlowScore + tempDelta,
+      MIN_TEMP_FLOW,
+      MAX_TEMP_FLOW
+    );
+
+    const fatiguePenalty = getBehaviorFatiguePenalty(weeklyBehavior.normalizedScore);
+    if (fatiguePenalty > 0) {
+      metrics.tempFlowScore = clamp(
+        metrics.tempFlowScore - fatiguePenalty,
+        MIN_TEMP_FLOW,
+        MAX_TEMP_FLOW
+      );
+    }
+
+    // 更新基本累计指标
     metrics.totalFocusMinutes += sessionMinutes;
     metrics.sessionCount += 1;
     metrics.longestSession = Math.max(metrics.longestSession, sessionMinutes);
-    metrics.averageSessionLength = metrics.totalFocusMinutes / metrics.sessionCount;
-    
-    // 更新评分
-    if (rating) {
-      metrics.averageRating = ((metrics.averageRating * (metrics.sessionCount - 1)) + rating) / metrics.sessionCount;
-    }
+    metrics.averageSessionLength = metrics.totalFocusMinutes / Math.max(metrics.sessionCount, 1);
 
-    // 计算一致性（基于最近7天的专注频率）
-    const recentSessions = metrics.sessionCount;
-    metrics.consistencyScore = Math.min(recentSessions / 14, 1); // 假设每天2次为满分
+    metrics.averageRating = ((metrics.averageRating * (metrics.sessionCount - 1)) + safeRating) / metrics.sessionCount;
+    metrics.completionRate = ((metrics.completionRate * (metrics.sessionCount - 1)) + (completedSession ? 1 : 0)) / metrics.sessionCount;
+    metrics.interruptionRate = ((metrics.interruptionRate * (metrics.sessionCount - 1)) + (interrupted ? 1 : 0)) / metrics.sessionCount;
+    metrics.consistencyScore = Math.min(metrics.sessionCount / 14, 1);
+    metrics.improvementTrend = metrics.improvementTrend * 0.7 + (sessionQuality - 0.6) * 0.3;
+    metrics.currentStreak = context.streakDays ?? metrics.currentStreak;
 
-    // 保存更新后的指标
+    metrics.lastSessionAt = new Date(now).toISOString();
+    metrics.lastDecayAt = metrics.lastSessionAt;
+
     localStorage.setItem('flowMetrics', JSON.stringify(metrics));
   };
 
@@ -632,13 +707,26 @@ export default function Dashboard() {
       total: { totalMinutes: newTotalMinutes }
     });
 
-    // 更新心流指标（仅完成时更新质量相关指标）
-    if (completed && rating) {
-      updateFlowMetrics(minutes, rating);
-    } else {
-      // 中断时只更新时长统计
-      updateFlowMetrics(minutes);
-    }
+    // 更新行为得分（用于临时心流倍率）
+  const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
+  const completedDailyGoal = dailyGoalMinutes > 0 ? newTodayMinutes >= dailyGoalMinutes : false;
+  const exceededDailyGoal = dailyGoalMinutes > 0 ? newTodayMinutes >= dailyGoalMinutes * 1.2 : false;
+
+    updateDailyBehaviorRecord(today, {
+      present: true,
+      focused: true,
+      metGoal: completedDailyGoal,
+      overGoal: exceededDailyGoal
+    });
+
+    // 更新心流指标（包含周表现倍率）
+    updateFlowMetrics(minutes, rating ?? 2, {
+      completedSession: completed,
+      interrupted: !completed,
+    dailyGoalMinutes,
+      completedDailyGoal,
+      streakDays: stats.streakDays
+    });
 
     // 更新等级经验值
     updateUserExp(minutes, rating, completed);
@@ -723,7 +811,7 @@ export default function Dashboard() {
       const flowData = localStorage.getItem('flowMetrics');
       if (flowData) {
         try {
-          const metrics: FlowMetrics = JSON.parse(flowData);
+          const metrics: FlowMetrics = ensureFlowMetricsShape(JSON.parse(flowData));
           if (metrics.totalFocusMinutes && metrics.totalFocusMinutes > 0) {
             recoveredMinutes += metrics.totalFocusMinutes;
             console.log('📦 从 flowMetrics 恢复数据:', metrics.totalFocusMinutes, '分钟');
@@ -876,12 +964,11 @@ export default function Dashboard() {
   // 1. 将UI区块中的 "hidden" 类移除
   // 2. 立刻即可使用当前实时计算的心流指数
   // ============================================
-  const flowIndex = useMemo(() => {
-    // 安全检查：确保只在客户端执行
+  const flowIndex = useMemo<FlowIndexResult>(() => {
     if (typeof window === 'undefined') {
       return {
         score: 0,
-        level: '初识心流',
+        level: '萌芽',
         breakdown: {
           quality: 0,
           duration: 0,
@@ -891,84 +978,20 @@ export default function Dashboard() {
     }
 
     const flowData = localStorage.getItem('flowMetrics');
-    const metrics: FlowMetrics = flowData 
-      ? JSON.parse(flowData)
-      : {
-          totalFocusMinutes: weeklyStats.totalMinutes,
-          averageSessionLength: 30,
-          longestSession: 60,
-          sessionCount: Math.floor(weeklyStats.totalMinutes / 30),
-          consistencyScore: 0.5,
-          averageRating: 2.0,
-          completionRate: 0.7,
-          interruptionRate: 0.2,
-          currentStreak: stats.streakDays,
-          improvementTrend: 0.1
-        };
+    const metrics = ensureFlowMetricsShape(flowData ? JSON.parse(flowData) : undefined);
+    const now = Date.now();
+    let mutated = false;
+    if (applyTempFlowDecay(metrics, now)) mutated = true;
+    if (applyImpressionCooling(metrics, now)) mutated = true;
 
-    const normalize = (value: number, min: number, max: number): number => {
-      return Math.min(Math.max((value - min) / (max - min), 0), 1);
-    };
+    const weeklyBehavior = calculateWeeklyBehaviorScore();
 
-    const WEIGHTS = {
-      averageRating: 0.15,
-      completionRate: 0.15,
-      interruptionRate: 0.10,
-      averageSessionLength: 0.20,
-      longestSession: 0.10,
-      sessionCount: 0.10,
-      consistencyScore: 0.10,
-      currentStreak: 0.05,
-      improvementTrend: 0.05
-    };
+    if (mutated) {
+      localStorage.setItem('flowMetrics', JSON.stringify(metrics));
+    }
 
-    const normalized = {
-      averageSessionLength: normalize(metrics.averageSessionLength, 15, 120),
-      sessionCount: normalize(metrics.sessionCount, 0, 20),
-      consistencyScore: Math.max(0, Math.min(metrics.consistencyScore, 1)),
-      averageRating: normalize(metrics.averageRating, 1, 3),
-      completionRate: Math.max(0, Math.min(metrics.completionRate, 1)),
-      interruptionRate: 1 - normalize(metrics.interruptionRate, 0, 0.5),
-      currentStreak: normalize(metrics.currentStreak, 0, 14),
-      improvementTrend: normalize(metrics.improvementTrend + 0.5, 0, 1),
-      longestSession: normalize(metrics.longestSession, 30, 180)
-    };
-
-    const qualityScore = 
-      normalized.averageRating * WEIGHTS.averageRating +
-      normalized.completionRate * WEIGHTS.completionRate +
-      normalized.interruptionRate * WEIGHTS.interruptionRate;
-
-    const durationScore = 
-      normalized.averageSessionLength * WEIGHTS.averageSessionLength +
-      normalized.longestSession * WEIGHTS.longestSession;
-
-    const consistencyScore = 
-      normalized.sessionCount * WEIGHTS.sessionCount +
-      normalized.consistencyScore * WEIGHTS.consistencyScore +
-      normalized.currentStreak * WEIGHTS.currentStreak +
-      normalized.improvementTrend * WEIGHTS.improvementTrend;
-
-    const totalScore = (qualityScore + durationScore + consistencyScore) * 100;
-
-    const getFlowLevel = (score: number): string => {
-      if (score >= 85) return '大师心流';
-      if (score >= 70) return '稳定心流';
-      if (score >= 55) return '成长心流';
-      if (score >= 40) return '探索心流';
-      return '初识心流';
-    };
-
-    return {
-      score: Math.round(totalScore),
-      level: getFlowLevel(totalScore),
-      breakdown: {
-        quality: Math.round(qualityScore * 100),
-        duration: Math.round(durationScore * 100),
-        consistency: Math.round(consistencyScore * 100)
-      }
-    };
-  }, [weeklyStats.totalMinutes, stats.streakDays]);
+    return computeFlowIndex(metrics, weeklyBehavior);
+  }, [stats.streakDays, todayStats.minutes, weeklyStats.totalMinutes, totalFocusMinutes]);
 
   // 初始化成就管理器
   useEffect(() => {
@@ -1271,6 +1294,54 @@ export default function Dashboard() {
     );
   };
 
+  const FlowCard = () => (
+    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs uppercase tracking-[0.4em] text-white/80">心流指数</p>
+        <span className="text-2xl">🌀</span>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-baseline gap-2">
+          <p className="text-4xl font-bold">{flowIndex.score}</p>
+          <p className="text-sm text-white/80">/ 100</p>
+        </div>
+        <p className="text-sm font-medium text-white/90">{flowIndex.level}</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-white/80">
+            <span>质量</span>
+            <span>{flowIndex.breakdown.quality}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white/80 rounded-full transition-all duration-500"
+              style={{ width: `${flowIndex.breakdown.quality}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs text-white/80">
+            <span>时长</span>
+            <span>{flowIndex.breakdown.duration}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white/80 rounded-full transition-all duration-500"
+              style={{ width: `${flowIndex.breakdown.duration}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs text-white/80">
+            <span>一致性</span>
+            <span>{flowIndex.breakdown.consistency}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white/80 rounded-full transition-all duration-500"
+              style={{ width: `${flowIndex.breakdown.consistency}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderPlanDetails = () => {
     if (!primaryPlan) {
       return (
@@ -1298,7 +1369,7 @@ export default function Dashboard() {
       <>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-zinc-400">当前计划</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-teal-500">当前计划</p>
             <h3 className="text-2xl font-semibold text-zinc-900 mt-1">{primaryPlan.name}</h3>
           </div>
           <span className="text-xs text-zinc-400">{planProgressPercent}%</span>
@@ -1404,6 +1475,8 @@ export default function Dashboard() {
         onStateChange={(newState) => {
           setCurrentSpiritState(newState);
         }}
+        mobileContainerClassName="sm:hidden fixed pointer-events-none w-[220px] max-w-[220px] z-50"
+        mobileContainerStyle={{ bottom: '15.5rem', right: '-1.6rem' }}
       />
 
       {/* 新版布局 */}
@@ -1485,157 +1558,17 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-
-            {/* 心流指数卡片 */}
-            <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl p-6 shadow-lg shadow-purple-500/30">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs uppercase tracking-[0.4em] text-white/80">心流指数</p>
-                <span className="text-2xl">🌀</span>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-4xl font-bold text-white">{flowIndex.score}</p>
-                  <p className="text-sm text-white/80">/ 100</p>
-                </div>
-                <p className="text-sm font-medium text-white/90">{flowIndex.level}</p>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span>质量</span>
-                    <span>{flowIndex.breakdown.quality}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-white/60 rounded-full transition-all duration-500"
-                      style={{ width: `${flowIndex.breakdown.quality}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span>时长</span>
-                    <span>{flowIndex.breakdown.duration}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-white/60 rounded-full transition-all duration-500"
-                      style={{ width: `${flowIndex.breakdown.duration}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span>一致性</span>
-                    <span>{flowIndex.breakdown.consistency}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-white/60 rounded-full transition-all duration-500"
-                      style={{ width: `${flowIndex.breakdown.consistency}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
+            <div className="hidden xl:block">
+              <FlowCard />
             </div>
           </div>
 
-          <div className="space-y-6">
-            {/* 四个数据卡片 - 艺术性布局 */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-              {userLevel && (
-                <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-[2rem] p-8 md:p-9 text-white shadow-2xl shadow-indigo-500/40 flex flex-col justify-between aspect-square hover:scale-[1.02] transition-all duration-300 hover:shadow-indigo-500/60">
-                  <div className="flex items-start justify-between">
-                    <p className="text-xs uppercase tracking-[0.4em] text-white/70 font-medium">当前等级</p>
-                    <span className="text-3xl animate-pulse">⭐</span>
-                  </div>
-                  <div className="flex-1 flex items-center justify-center">
-                    <p className="text-4xl md:text-5xl font-bold">LV.{userLevel.currentLevel}</p>
-                  </div>
-                  <div className="space-y-3">
-                    <p className="text-sm text-white/80 leading-tight">{userLevel.title}</p>
-                    <div className="w-full h-2 bg-white/20 rounded-full">
-                      <div
-                        className="h-full rounded-full bg-white transition-all duration-700 ease-out"
-                        style={{ width: `${userLevel.progress}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-white/70 font-medium">
-                      {userLevel.currentExp} / {userLevel.nextLevelExp} EXP
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-zinc-200/50 flex flex-col justify-between aspect-square hover:scale-[1.02] transition-all duration-300 hover:shadow-zinc-300/70 hover:border-emerald-200/60">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-zinc-400 font-medium">连续专注</p>
-                </div>
-                <div className="flex-1 flex items-center justify-start">
-                  <div>
-                    <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-none">{stats.streakDays}</p>
-                    <p className="text-sm text-zinc-500 mt-2">天</p>
-                  </div>
-                </div>
-                <div className="h-1 w-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"></div>
-              </div>
-              <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-zinc-200/50 flex flex-col justify-between aspect-square hover:scale-[1.02] transition-all duration-300 hover:shadow-zinc-300/70 hover:border-emerald-200/60 relative">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-zinc-400 font-medium">本周专注</p>
-                  <button
-                    onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
-                    data-tooltip-trigger
-                    className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <span className="text-xs font-bold text-zinc-600">!</span>
-                  </button>
-                </div>
-                {showWeeklyInfo && (
-                  <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                    <p className="text-xs text-zinc-600 leading-relaxed">
-                      每周一 00:00 会根据你的时区自动刷新本周专注时长，重新开始计算。
-                    </p>
-                    <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
-                  </div>
-                )}
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-tight">
-                      {weeklyHours}h{weeklyMinutesRemainder}m
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-400 text-center">每周一 00:00 自动刷新</p>
-              </div>
-              <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-zinc-200/50 flex flex-col justify-between aspect-square hover:scale-[1.02] transition-all duration-300 hover:shadow-zinc-300/70 hover:border-emerald-200/60 relative">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-zinc-400 font-medium">累计专注</p>
-                  <button
-                    onClick={() => setShowTotalInfo(!showTotalInfo)}
-                    data-tooltip-trigger
-                    className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <span className="text-xs font-bold text-zinc-600">!</span>
-                  </button>
-                </div>
-                {showTotalInfo && (
-                  <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                    <p className="text-xs text-zinc-600 leading-relaxed">
-                      累计专注时长记录了你从加入 Echo 以来的所有专注时间，这是一个永久的记录，不会重置。
-                    </p>
-                    <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
-                  </div>
-                )}
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-tight">
-                      {totalFocusHours}h{totalFocusMinutesRemainder}m
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-400 text-center">从加入 Echo 以来的所有时长</p>
-              </div>
-            </div>
-
-            <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40">
+          <div className="flex flex-col gap-6">
+            <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40 order-1 xl:order-2">
               <div className="flex flex-col xl:flex-row gap-8">
                 <div className="flex flex-col items-center justify-center">
                   <FocusDial size={200} />
-                  <p className="mt-4 text-xs uppercase tracking-[0.35em] text-zinc-400">完成进度</p>
+                  <p className="mt-4 text-xs uppercase tracking-[0.35em] text-teal-500">完成进度</p>
                 </div>
                 <div className="flex-1 space-y-4">
                   {renderPlanDetails()}
@@ -1643,8 +1576,114 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 最近成就 */}
-            <AchievementsSection />
+            <div className="order-2 xl:order-1 grid gap-5 xl:grid-cols-4">
+              {userLevel && (
+                <div className="bg-gradient-to-br from-[#fff7da] via-[#f3c575] to-[#d88b3b] rounded-[2rem] p-8 md:p-9 text-[#4f2a07] shadow-2xl shadow-amber-200/60 flex flex-col justify-between aspect-square md:aspect-auto hover:scale-[1.02] transition-all duration-300 hover:shadow-amber-300/80">
+                  <div className="flex items-start justify-between">
+                    <p className="text-xs uppercase tracking-[0.4em] text-[#4f2a07]/70 font-medium">当前等级</p>
+                    <span className="text-3xl animate-pulse">⭐</span>
+                  </div>
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-4xl md:text-5xl font-bold">LV.{userLevel.currentLevel}</p>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-sm text-[#4f2a07]/80 leading-tight">{userLevel.title}</p>
+                    <div className="w-full h-2 bg-white/60 rounded-full">
+                      <div
+                        className="h-full rounded-full bg-white transition-all duration-700 ease-out"
+                        style={{ width: `${userLevel.progress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-[#4f2a07]/80 font-medium">
+                      {userLevel.currentExp} / {userLevel.nextLevelExp} EXP
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div
+                className={`grid grid-cols-1 md:grid-cols-3 gap-5 ${userLevel ? 'xl:col-span-3' : 'xl:col-span-4'}`}
+              >
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3">
+                <div className="flex items-start justify-between">
+                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">连续专注</p>
+                  </div>
+                  <div className="flex-1 flex items-center">
+                    <div>
+                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-none">{stats.streakDays}</p>
+                      <p className="text-sm text-zinc-500 mt-2">天</p>
+                    </div>
+                  </div>
+                  <div className="h-1 w-12 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full"></div>
+                </div>
+
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative">
+                  <div className="flex items-start justify-between">
+                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
+                    <button
+                      onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
+                      data-tooltip-trigger
+                      className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-zinc-600">!</span>
+                    </button>
+                  </div>
+                  {showWeeklyInfo && (
+                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        每周一 00:00 会根据你的时区自动刷新本周专注时长，重新开始计算。
+                      </p>
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+                    </div>
+                  )}
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-tight">
+                        {weeklyHours}h{weeklyMinutesRemainder}m
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-400 text-center">每周一 00:00 自动刷新</p>
+                </div>
+
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative">
+                  <div className="flex items-start justify-between">
+                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">累计专注</p>
+                    <button
+                      onClick={() => setShowTotalInfo(!showTotalInfo)}
+                      data-tooltip-trigger
+                      className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-zinc-600">!</span>
+                    </button>
+                  </div>
+                  {showTotalInfo && (
+                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        累计专注时长记录了你从加入 Echo 以来的所有专注时间，这是一个永久的记录，不会重置。
+                      </p>
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+                    </div>
+                  )}
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-tight">
+                        {totalFocusHours}h{totalFocusMinutesRemainder}m
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-400 text-center">从加入 Echo 以来的所有时长</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="xl:hidden order-3">
+              <FlowCard />
+            </div>
+
+            <div className="order-4 xl:order-3">
+              <AchievementsSection />
+            </div>
           </div>
         </section>
       </main>

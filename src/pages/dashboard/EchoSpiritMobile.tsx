@@ -209,12 +209,12 @@ export default function EchoSpiritMobile({
         {/* 眼睛组 - 用于动画 */}
         <g className="eyes-group">
           {/* 眼睛（偏上，大间距） */}
-          <ellipse className="left-eye" cx="48" cy="48" rx="6" ry="10" fill="#3A2F2F" />
-          <ellipse className="right-eye" cx="72" cy="48" rx="6" ry="10" fill="#3A2F2F" />
+          <ellipse className="left-eye" cx="48" cy="50" rx="6" ry="10" fill="#3A2F2F" />
+          <ellipse className="right-eye" cx="72" cy="50" rx="6" ry="10" fill="#3A2F2F" />
           
           {/* 高光 - 固定居于眼睛内部上方 */}
-          <circle className="eye-high left-high" cx="48" cy="44" r="2" fill="white" opacity="0.7" />
-          <circle className="eye-high right-high" cx="72" cy="44" r="2" fill="white" opacity="0.7" />
+          <circle className="eye-high left-high" cx="48" cy="46.5" r="2" fill="white" opacity="0.7" />
+          <circle className="eye-high right-high" cx="72" cy="46.5" r="2" fill="white" opacity="0.7" />
         </g>
         
         {/* 小手组 - happy和nod状态时显示 */}

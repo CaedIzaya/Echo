@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallback, CSSProperties } from 'react';
 
 // 文案数据
 const spiritMessages = {
@@ -154,6 +154,8 @@ const periodicMessages = [
 interface SpiritDialogProps {
   spiritState: 'idle' | 'excited' | 'focus' | 'happy';
   onStateChange?: (state: 'idle' | 'excited' | 'focus' | 'happy') => void;
+  mobileContainerClassName?: string;
+  mobileContainerStyle?: CSSProperties;
 }
 
 export interface SpiritDialogRef {
@@ -175,7 +177,7 @@ const getRandomMessage = (type?: 'cute' | 'chuunibyou' | 'philosophical') => {
 };
 
 const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
-  ({ spiritState, onStateChange }, ref) => {
+  ({ spiritState, onStateChange, mobileContainerClassName, mobileContainerStyle }, ref) => {
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [isVisible, setIsVisible] = useState(false);
   const [messageType, setMessageType] = useState<'cute' | 'chuunibyou' | 'philosophical'>('cute');
@@ -445,8 +447,11 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
         </div>
       </div>
 
-      {/* 手机端对话框 - 位于小精灵脑袋之上 */}
-      <div className="sm:hidden fixed bottom-44 right-6 z-50 pointer-events-none max-w-[280px]">
+      {/* 手机端对话框 - 可自定义锚点 */}
+      <div
+        className={mobileContainerClassName ?? 'sm:hidden fixed bottom-44 right-6 z-50 pointer-events-none max-w-[280px]'}
+        style={mobileContainerStyle}
+      >
         <div
           className={`
             ${dialogStyle.bg}

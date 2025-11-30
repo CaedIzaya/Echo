@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import ProgressRing from './dashboard/ProgressRing';
 
 const FOCUS_QUOTES = [
   { text: 'Attention is the rarest and purest form of generosity.', author: 'Simone Weil' },
@@ -17,6 +18,39 @@ const LOADING_STEPS = [
   { id: 3, message: 'Syncing with your intention...', duration: 1500 },
   { id: 4, message: 'Reclaiming your focus...', duration: 1000 },
   { id: 5, message: 'Echo is almost ready.', duration: 800 },
+];
+
+const LANDING_FEATURES = [
+  {
+    title: '真我发掘',
+    description: '找到自己真正热爱的事物，并有计划地投入时间',
+    icon: '🎯',
+    accent: 'from-emerald-50 via-white to-teal-50/60 border-emerald-100/70',
+  },
+  {
+    title: '专注计时',
+    description: '允许你划水，但是专注的时候，全力以赴',
+    icon: '⏱️',
+    accent: 'from-cyan-50 via-white to-sky-50/60 border-cyan-100/70',
+  },
+  {
+    title: '陪伴守护',
+    description: '与光精灵和心树一起，见证每一刻成长的确幸',
+    icon: '😃',
+    accent: 'from-teal-50 via-white to-emerald-50/60 border-teal-100/70',
+  },
+] as const;
+
+const HERO_STATS = [
+  { label: '本周心流', value: '12h 40m' },
+  { label: '最长专注', value: '95 min' },
+  { label: '当前连胜', value: '7 days' },
+];
+
+const HERO_PLAN_TASKS = [
+  { title: '晨间写作', detail: '完成 500 字手稿', done: true },
+  { title: '章节复盘', detail: '记录 3 条灵感', done: false },
+  { title: '夜读沉浸', detail: '专注 25 分钟', done: false },
 ];
 
 const EchoLoader = () => {
@@ -77,6 +111,458 @@ const QuoteRotator = ({ quotes }: { quotes: typeof FOCUS_QUOTES }) => {
     </div>
   );
 };
+
+const LandingNavbar = ({
+  onPrimaryAction,
+  onSecondaryAction,
+}: {
+  onPrimaryAction: () => void;
+  onSecondaryAction: () => void;
+}) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 24);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+    document.body.style.overflow = '';
+  }, [isMenuOpen]);
+
+  return (
+    <nav
+      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
+        isScrolled ? 'bg-white/80 backdrop-blur-lg shadow-sm py-4' : 'bg-transparent py-6'
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-2xl p-2 shadow-lg shadow-cyan-500/40">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 12c3-4 7-4 10 0s7 4 10 0"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <circle cx="6" cy="12" r="1.6" fill="currentColor" />
+              <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Echo</p>
+            <p className="text-xl font-bold text-slate-900">数字静默</p>
+          </div>
+        </div>
+
+        <div className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-600">
+          <a href="#features" className="hover:text-teal-600 transition-colors">
+            功能
+          </a>
+          <a href="#mission" className="hover:text-teal-600 transition-colors">
+            理念
+          </a>
+          <button
+            onClick={onSecondaryAction}
+            className="px-5 py-2 rounded-full text-teal-600 font-semibold hover:bg-teal-50 transition-colors"
+          >
+            登录
+          </button>
+          <button
+            onClick={onPrimaryAction}
+            className="px-6 py-2 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold transition-all shadow-lg hover:shadow-emerald-400/40"
+          >
+            免费注册
+          </button>
+        </div>
+
+        <button
+          className="md:hidden text-slate-600"
+          aria-label="切换菜单"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            {isMenuOpen ? (
+              <path
+                d="M6 6l12 12M6 18L18 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            ) : (
+              <>
+                <path d="M4 7h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M4 12h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </>
+            )}
+          </svg>
+        </button>
+      </div>
+
+      {isMenuOpen && (
+        <div className="md:hidden bg-white shadow-lg border-t border-slate-100 mx-4 mt-4 rounded-2xl p-5 space-y-4">
+          <a href="#features" className="block text-base font-medium text-slate-700">
+            功能
+          </a>
+          <a href="#mission" className="block text-base font-medium text-slate-700">
+            理念
+          </a>
+          <button
+            onClick={onSecondaryAction}
+            className="w-full py-3 rounded-xl bg-teal-50 text-teal-600 font-semibold"
+          >
+            登录
+          </button>
+          <button
+            onClick={onPrimaryAction}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold shadow-md"
+          >
+            免费注册
+          </button>
+        </div>
+      )}
+    </nav>
+  );
+};
+
+const LandingHero = ({
+  onPrimaryAction,
+  onSecondaryAction,
+}: {
+  onPrimaryAction: () => void;
+  onSecondaryAction: () => void;
+}) => {
+  return (
+    <section className="relative min-h-screen pt-32 md:pt-48 pb-20 overflow-hidden" id="mission">
+      <div className="absolute top-20 right-0 -z-10 w-[720px] h-[720px] bg-gradient-to-br from-emerald-100/70 via-cyan-100/60 to-sky-100/40 rounded-full blur-3xl opacity-70 translate-x-1/3" />
+      <div className="absolute bottom-0 left-0 -z-10 w-[520px] h-[520px] bg-gradient-to-br from-cyan-100/70 via-teal-100/60 to-emerald-100/40 rounded-full blur-3xl opacity-70 -translate-x-1/4" />
+
+      <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+        <div className="space-y-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 border border-teal-100 shadow-sm">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500" />
+            </span>
+            <span className="text-sm font-medium text-teal-700">Echo · 数字静默</span>
+          </div>
+
+          <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
+          在算法之外，
+            <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400">
+            重遇自我
+            </span>
+          </h1>
+
+          <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
+            <p>你拥有夺回注意力与意识主权的力量。</p>
+            <p>成长来自光，也来自你敢看见自己的影。</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <button
+              onClick={onPrimaryAction}
+              className="group inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-400 rounded-full shadow-[0_20px_45px_-25px_rgba(14,165,233,0.7)] hover:shadow-[0_30px_60px_-30px_rgba(14,165,233,0.9)] transition-all hover:-translate-y-1"
+            >
+              开始使用
+              <svg
+                className="w-5 h-5 transition-transform group-hover:translate-x-1"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+          <div className="relative hidden md:flex items-center justify-center">
+              <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-emerald-50 p-6 z-10 transform rotate-2 hover:rotate-0 transition-transform duration-500">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">今日计划</h3>
+                <p className="text-sm text-slate-500">按节奏投入热爱的事</p>
+              </div>
+              <div className="px-3 py-1 bg-teal-50 text-teal-500 text-xs font-semibold rounded-full">
+                正在进行
+              </div>
+            </div>
+
+                <div className="flex items-center gap-6">
+                  <div className="relative w-36 h-36 flex items-center justify-center">
+                    <ProgressRing progress={0.72} color="#0ea5e9" size={144} strokeWidth={12} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-slate-900">72%</span>
+                  <span className="text-xs text-slate-500">今日完成度</span>
+                </div>
+              </div>
+              <div className="flex-1 grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-100">
+                  <p className="text-xs text-emerald-500">已投入</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">54 分钟</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-cyan-50 to-white border border-cyan-100">
+                  <p className="text-xs text-cyan-500">今日目标</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">75 分钟</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-50 to-white border border-sky-100">
+                  <p className="text-xs text-sky-500">剩余</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">21 分钟</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-teal-50 to-white border border-teal-100">
+                  <p className="text-xs text-teal-500">连续专注</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">3 天</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {HERO_PLAN_TASKS.map((task) => (
+                <div
+                  key={task.title}
+                  className={`flex items-center gap-3 p-3 rounded-2xl border ${
+                    task.done ? 'border-emerald-100 bg-emerald-50/60' : 'border-cyan-50 bg-white'
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${
+                      task.done ? 'bg-emerald-500 shadow-[0_8px_15px_-10px_rgba(16,185,129,0.6)]' : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {task.done ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <span className="block w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold ${task.done ? 'text-slate-900 line-through decoration-emerald-500' : 'text-slate-800'}`}>
+                      {task.title}
+                    </p>
+                    <p className="text-xs text-slate-500">{task.detail}</p>
+                  </div>
+                  {task.done && (
+                    <span className="text-xs text-emerald-600 font-semibold px-2 py-1 rounded-full bg-emerald-100">已完成</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className="absolute -right-6 top-10 bg-gradient-to-br from-emerald-400 to-cyan-400 text-white p-4 rounded-2xl shadow-xl border border-emerald-100/30 animate-bounce"
+            style={{ animationDuration: '3s' }}
+          >
+            <span className="text-2xl">⏱️</span>
+            <span className="ml-2 font-mono font-bold">25:00</span>
+          </div>
+
+          <div
+            className="absolute -left-8 bottom-16 bg-white/95 p-4 rounded-2xl shadow-xl border border-teal-50 animate-pulse"
+            style={{ animationDuration: '4s' }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="text-sm font-medium text-teal-700">深度专注模式</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-16 max-w-3xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {HERO_STATS.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-2xl border border-teal-50 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/30 backdrop-blur-md p-5 text-center shadow-lg shadow-emerald-100/40"
+          >
+            <p className="text-xs uppercase tracking-[0.3em] text-teal-500">{item.label}</p>
+            <p className="text-2xl font-semibold text-slate-900 mt-3">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const FeatureGrid = () => (
+  <section id="features" className="py-24 bg-white">
+    <div className="max-w-7xl mx-auto px-6">
+      <div className="text-center max-w-3xl mx-auto mb-16">
+        <span className="text-teal-600 font-semibold tracking-wider uppercase text-sm bg-teal-50 px-4 py-1 rounded-full">
+          核心功能
+        </span>
+        <h2 className="mt-6 text-4xl font-bold text-slate-900">夺回你宝贵的注意力</h2>
+        <p className="mt-4 text-lg text-slate-500">
+          Echo 是你的注意力伙伴，它是你在嘈杂数字世界里的静谧避难所。
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        {LANDING_FEATURES.map((feature) => (
+          <div
+            key={feature.title}
+            className={`group relative p-8 rounded-[2rem] border ${feature.accent} shadow-lg hover:shadow-emerald-100/80 transition-all duration-500 hover:-translate-y-2 bg-gradient-to-br`}
+          >
+            <div className="text-5xl mb-4 transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+              {feature.icon}
+            </div>
+            <h3 className="font-bold text-slate-900 mb-3 text-xl">{feature.title}</h3>
+            <p className="text-slate-600 leading-relaxed">{feature.description}</p>
+            <div className="absolute bottom-4 left-8 right-8 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+const LandingCTA = ({ onPrimaryAction }: { onPrimaryAction: () => void }) => (
+  <section className="py-24 relative overflow-hidden bg-gradient-to-br from-[#022b2f] via-[#044345] to-[#056060]">
+    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
+    <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500 rounded-full blur-[140px] opacity-30" />
+    <div className="absolute bottom-0 right-0 w-96 h-96 bg-cyan-400 rounded-full blur-[200px] opacity-30" />
+
+    <div className="relative max-w-4xl mx-auto px-6 text-center text-white">
+      <h2 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight">
+        准备好开始这段
+        <br />
+        <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-emerald-200 to-cyan-100">
+          专注之旅了吗？
+        </span>
+      </h2>
+      <p className="text-xl text-emerald-100/80 mb-10">
+        在无序的噪音里选择 Echo，选择倾听内心的声音。免费注册，即刻开启。
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <input
+          type="email"
+          placeholder="输入你的邮箱地址..."
+          className="w-full sm:w-80 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder-emerald-200 focus:outline-none focus:ring-2 focus:ring-teal-300 backdrop-blur-sm transition-all"
+        />
+        <button
+          onClick={onPrimaryAction}
+          className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 text-slate-900 font-bold rounded-full hover:shadow-[0_25px_50px_-25px_rgba(16,185,129,0.8)] transition-all transform hover:-translate-y-1"
+        >
+          即刻开始
+        </button>
+      </div>
+      <p className="mt-6 text-sm text-emerald-100/60"></p>
+    </div>
+  </section>
+);
+
+const LandingFooter = () => (
+  <footer className="bg-slate-50 border-t border-slate-200 pt-16 pb-8">
+    <div className="max-w-7xl mx-auto px-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text白 p-2 rounded-xl">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" opacity="0.6" />
+                <path
+                  d="M4 12c3-4 7-4 10 0s7 4 10 0"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <span className="text-xl font-bold text-slate-900">Echo</span>
+          </div>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            我们致力于帮你找回被碎片化信息夺走的专注力，重新建立深度思考的能力。
+          </p>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-slate-900 mb-3">产品</h4>
+          <ul className="space-y-2 text-sm text-slate-600">
+            <li>
+              <a href="#" className="hover:text-teal-600 transition-colors">
+                功能介绍
+              </a>
+            </li>
+            <li>
+              <a href="#" className="hover:text-teal-600 transition-colors">
+                更新日志
+              </a>
+            </li>
+            <li>
+              <a href="#" className="hover:text-teal-600 transition-colors">
+                定价方案
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-slate-900 mb-3">资源</h4>
+          <ul className="space-y-2 text-sm text-slate-600">
+            <li>
+              <a href="#" className="hover:text-teal-600 transition-colors">
+                专注力指南
+              </a>
+            </li>
+            <li>
+              <a href="#" className="hover:text-teal-600 transition-colors">
+                社区博客
+              </a>
+            </li>
+            <li>
+              <a href="#" className="hover:text-teal-600 transition-colors">
+                帮助中心
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-slate-900 mb-3">关注我们</h4>
+          <div className="flex gap-4">
+            {['T', 'G', 'I'].map((icon) => (
+              <a
+                key={icon}
+                href="#"
+                className="h-10 w-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:border-teal-400 hover:text-teal-600 transition-all"
+              >
+                {icon}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-6 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-slate-400">
+        <p>© {new Date().getFullYear()} Echo App. All rights reserved.</p>
+        <div className="flex gap-6">
+          <a href="#" className="hover:text-slate-600">
+            隐私政策
+          </a>
+          <a href="#" className="hover:text-slate-600">
+            服务条款
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+);
 
 export default function Home() {
   const router = useRouter();
@@ -191,270 +677,60 @@ export default function Home() {
 
   if (isTransitioning) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.12),_transparent_60%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(12,74,110,0.35),transparent)] opacity-60" />
-        <div className="absolute inset-y-0 left-0 w-1/3 bg-emerald-500/10 blur-3xl opacity-40" />
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-16">
-          <div className="max-w-3xl w-full flex flex-col gap-14 items-center">
-            <div className="space-y-6 text-center">
-              <p className="text-xs tracking-[0.45em] uppercase text-emerald-300/70">
-                Echo Focus
-              </p>
-              <h1 className="text-4xl md:text-5xl font-light tracking-tight">
-                Reclaiming your attention...
-              </h1>
-            </div>
-
-            <div className="flex flex-col items-center gap-8 w-full">
-              <EchoLoader />
-              <p className="text-xs font-mono tracking-[0.4em] uppercase text-emerald-200/80 h-4 flex items-center">
-                {loadingMessage}
-              </p>
-            </div>
-
-            <QuoteRotator quotes={FOCUS_QUOTES} />
+      <div className="min-h-screen bg-gradient-to-br from-teal-600 via-cyan-600 to-sky-500 text-white flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.12),transparent_60%)]" />
+        <div className="relative z-10 flex flex-col items-center gap-10 px-6 text-center">
+          <p className="text-xs tracking-[0.4em] uppercase text-white/70">Echo Focus</p>
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">专注准备中...</h1>
+          <div className="flex items-end justify-center gap-3 h-10">
+            {[0, 1, 2].map((dot) => (
+              <span
+                key={dot}
+                className="w-4 h-4 rounded-full bg-white/90 animate-dot-bounce"
+                style={{ animationDelay: `${dot * 0.2}s` }}
+              />
+            ))}
           </div>
+          <p className="text-sm font-mono tracking-[0.3em] uppercase text-white/70">
+            {loadingMessage}
+          </p>
         </div>
 
         <style jsx>{`
-          @keyframes echo-ring {
-            0% {
-              transform: scale(0.5);
-              opacity: 0.6;
-            }
-            70% {
-              opacity: 0.2;
-            }
+          @keyframes dot-bounce {
+            0%,
+            60%,
             100% {
-              transform: scale(2.6);
-              opacity: 0;
+              transform: translateY(0);
+            }
+            30% {
+              transform: translateY(-10px);
             }
           }
-          .animate-echo-ring {
-            width: 4rem;
-            height: 4rem;
-            animation: echo-ring 3.6s ease-out infinite;
-          }
-          .animate-spin-slow {
-            animation: spin 6s linear infinite;
-          }
-          @keyframes spin {
-            from {
-              transform: rotate(0deg);
-            }
-            to {
-              transform: rotate(360deg);
-            }
+          .animate-dot-bounce {
+            animation: dot-bounce 1.2s ease-in-out infinite;
           }
         `}</style>
       </div>
     );
   }
 
+  const handlePrimaryAction = () => router.push('/auth/signin');
+  const handleSecondaryAction = () => router.push('/auth/signin');
+
   // 未登录时显示欢迎界面
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-teal-50/40 via-cyan-50/30 to-blue-50/40 px-4">
-      {/* 波浪流线背景 */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* 多层波浪SVG - 使用重复模式创建流动感 */}
-        <svg className="absolute bottom-0 left-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="waveGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#5eead4" stopOpacity="0.18" />
-              <stop offset="50%" stopColor="#2dd4bf" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.18" />
-            </linearGradient>
-            <linearGradient id="waveGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.15" />
-              <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.15" />
-            </linearGradient>
-            <linearGradient id="waveGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.12" />
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.12" />
-            </linearGradient>
-          </defs>
-          
-          {/* 第一层波浪 - 流动动画 */}
-          <g className="animate-wave-1">
-            <path
-              d="M-200,450 Q100,400 400,450 T1000,450 T1600,450 L1600,800 L-200,800 Z"
-              fill="url(#waveGradient1)"
-            />
-          </g>
-          
-          {/* 第二层波浪 - 不同速度 */}
-          <g className="animate-wave-2">
-            <path
-              d="M-200,550 Q100,500 400,550 T1000,550 T1600,550 L1600,800 L-200,800 Z"
-              fill="url(#waveGradient2)"
-            />
-          </g>
-          
-          {/* 第三层波浪 - 最慢 */}
-          <g className="animate-wave-3">
-            <path
-              d="M-200,650 Q100,600 400,650 T1000,650 T1600,650 L1600,800 L-200,800 Z"
-              fill="url(#waveGradient3)"
-            />
-          </g>
-        </svg>
-        
-        {/* 顶部流动光效 */}
-        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-teal-100/25 via-cyan-100/18 to-transparent"></div>
-      </div>
-
-      {/* 网格背景 - 更淡 */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px] opacity-30"></div>
-
-      <div className="relative z-10 text-center max-w-5xl w-full">
-        {/* Logo 和品牌区域 - 更精致的设计 */}
-        <div className="mb-20 animate-fade-in-up">
-          <div className="inline-flex items-center justify-center w-24 h-24 mb-10 relative group">
-            {/* 多层光晕效果 - 创造深度 */}
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-400/40 to-cyan-500/40 rounded-3xl blur-2xl opacity-70 group-hover:opacity-90 transition-opacity duration-500"></div>
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-300/30 to-cyan-400/30 rounded-3xl blur-xl opacity-50 group-hover:opacity-70 transition-opacity duration-500"></div>
-            {/* Logo容器 - 更精致的渐变和阴影 */}
-            <div className="relative bg-gradient-to-br from-teal-500 via-teal-400 to-cyan-500 rounded-3xl p-3 shadow-[0_20px_60px_-15px_rgba(20,184,166,0.4)] transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
-              <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150 drop-shadow-lg" />
-            </div>
-          </div>
-          {/* 标题 - 更大更精致 */}
-          <h1 className="text-8xl md:text-9xl font-extrabold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-6 tracking-[-0.02em] leading-none">
-            Echo
-          </h1>
-          {/* 副标题装饰 */}
-          <div className="inline-flex items-center gap-3 text-gray-400 text-sm font-medium">
-            <div className="h-px w-12 bg-gradient-to-r from-transparent to-gray-300"></div>
-            <span>数字静默</span>
-            <div className="h-px w-12 bg-gradient-to-l from-transparent to-gray-300"></div>
-          </div>
-        </div>
-
-        {/* 主内容卡片 - 更精致的玻璃态效果 */}
-        <div className="relative bg-white/50 backdrop-blur-3xl rounded-[2rem] p-12 md:p-16 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] border border-white/60 mb-10 animate-fade-in-up overflow-hidden" style={{ animationDelay: '0.1s' }}>
-          {/* 卡片内部光效 - 顶部高光 */}
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent"></div>
-          {/* 卡片内部光效 - 底部阴影 */}
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gray-200/30 to-transparent"></div>
-          {/* 装饰性光点 */}
-          <div className="absolute top-8 right-8 w-2 h-2 bg-teal-400/30 rounded-full blur-sm"></div>
-          <div className="absolute bottom-12 left-12 w-1.5 h-1.5 bg-cyan-400/30 rounded-full blur-sm"></div>
-          
-          <div className="mb-16 space-y-8 max-w-3xl mx-auto">
-            {/* 文案 - 更有层次感 */}
-            <div className="space-y-6">
-              <p className="text-gray-800 leading-relaxed text-xl md:text-2xl font-light tracking-wide">
-                我们不为你的待办清单增加又一个任务。
-              </p>
-              <p className="text-gray-800 leading-relaxed text-xl md:text-2xl font-light tracking-wide">
-                我们为你被算法切碎的时间，提供一个完整的意义。
-              </p>
-              <p className="text-gray-800 leading-relaxed text-xl md:text-2xl font-light tracking-wide">
-                这里没有截止日期的焦虑，只有对热爱的纯粹投资。
-              </p>
-            </div>
-            
-            {/* 欢迎语 - 更精致的设计 */}
-            <div className="pt-8 border-t border-gray-200/50">
-              <p className="text-teal-600 font-semibold text-2xl md:text-3xl tracking-tight">
-                欢迎来到，<span className="font-bold">Echo</span>
-              </p>
-            </div>
-          </div>
-          
-          {/* 功能特点 - 更精致的卡片设计 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-            <div className="group relative p-8 bg-gradient-to-br from-teal-50/60 via-white/40 to-teal-50/40 rounded-2xl border border-teal-100/60 hover:border-teal-200/80 transition-all duration-500 hover:shadow-xl hover:shadow-teal-500/10 hover:-translate-y-2 overflow-hidden">
-              {/* 卡片内部光效 */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative">
-                <div className="text-5xl mb-4 transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500">🎯</div>
-                <h3 className="font-bold text-gray-900 mb-3 text-xl tracking-tight">目标管理</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">设定清晰的目标和里程碑，让每一步都有方向</p>
-              </div>
-            </div>
-            <div className="group relative p-8 bg-gradient-to-br from-cyan-50/60 via-white/40 to-cyan-50/40 rounded-2xl border border-cyan-100/60 hover:border-cyan-200/80 transition-all duration-500 hover:shadow-xl hover:shadow-cyan-500/10 hover:-translate-y-2 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative">
-                <div className="text-5xl mb-4 transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500">⏱️</div>
-                <h3 className="font-bold text-gray-900 mb-3 text-xl tracking-tight">专注计时</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">记录每一次专注时光，见证时间的价值</p>
-              </div>
-            </div>
-            <div className="group relative p-8 bg-gradient-to-br from-blue-50/60 via-white/40 to-blue-50/40 rounded-2xl border border-blue-100/60 hover:border-blue-200/80 transition-all duration-500 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-2 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative">
-                <div className="text-5xl mb-4 transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500">📊</div>
-                <h3 className="font-bold text-gray-900 mb-3 text-xl tracking-tight">数据追踪</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">可视化你的成长轨迹，发现专注的力量</p>
-              </div>
-            </div>
-          </div>
-
-          {/* CTA按钮 - 更精致的设计 */}
-          <div className="space-y-5">
-            <button
-              onClick={() => router.push('/auth/signin')}
-              className="group relative w-full px-10 py-6 bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-white font-bold text-lg rounded-2xl hover:from-teal-600 hover:via-teal-600 hover:to-cyan-600 transition-all duration-500 shadow-[0_10px_40px_-10px_rgba(20,184,166,0.4)] hover:shadow-[0_20px_60px_-15px_rgba(20,184,166,0.5)] transform hover:scale-[1.02] overflow-hidden"
-            >
-              <span className="relative z-10 flex items-center justify-center gap-3">
-                开始使用
-                <svg className="w-6 h-6 transform group-hover:translate-x-2 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </span>
-              {/* 多层按钮光效 */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            </button>
-            <p className="text-sm text-gray-500 font-medium">
-              免费注册，立即开始你的专注之旅
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* CSS动画 */}
-      <style jsx>{`
-        @keyframes fade-in-up {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fade-in-up {
-          animation: fade-in-up 0.6s ease-out forwards;
-        }
-        
-        @keyframes wave-flow {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(200px);
-          }
-        }
-        
-        .animate-wave-1 {
-          animation: wave-flow 15s linear infinite;
-        }
-        
-        .animate-wave-2 {
-          animation: wave-flow 20s linear infinite;
-          animation-direction: reverse;
-        }
-        
-        .animate-wave-3 {
-          animation: wave-flow 25s linear infinite;
-        }
-      `}</style>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <LandingNavbar onPrimaryAction={handlePrimaryAction} onSecondaryAction={handleSecondaryAction} />
+      <main>
+        <LandingHero
+          onPrimaryAction={handlePrimaryAction}
+          onSecondaryAction={handleSecondaryAction}
+        />
+        <FeatureGrid />
+        <LandingCTA onPrimaryAction={handlePrimaryAction} />
+      </main>
+      <LandingFooter />
     </div>
   );
 }

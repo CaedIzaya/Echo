@@ -19,8 +19,15 @@ const nextConfig = {
       '~': path.resolve(__dirname, './src'),
       '@': path.resolve(__dirname, './src'),
     };
+    // 确保 framer-motion 被正确解析
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+    };
     return config;
   },
+  
+  // 转译包配置
+  transpilePackages: ['framer-motion'],
   
   // 图片优化配置
   images: {
