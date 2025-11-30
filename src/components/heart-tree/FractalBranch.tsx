@@ -156,6 +156,7 @@ export const FractalBranch: React.FC<FractalBranchProps> = ({
               windIntensity={windIntensity}
               palette={palette}
               showFruits={showFruits}
+              trunkGradientId={trunkGradientId}
             />
           ))
         )}
