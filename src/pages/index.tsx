@@ -620,8 +620,23 @@ export default function Home() {
 
   const checkAuthAndRedirect = async () => {
     try {
+      // 检查是否是退出登录后的重定向
+      const justSignedOut = typeof window !== 'undefined' && sessionStorage.getItem('justSignedOut') === 'true';
+      
+      if (justSignedOut) {
+        // 清除退出登录标志
+        sessionStorage.removeItem('justSignedOut');
+        // 退出登录后，直接显示欢迎页面，不检查 session（避免缓存问题）
+        setAuthStatus('未登录');
+        console.log("首页：退出登录后，直接显示欢迎界面");
+        setLoading(false);
+        return;
+      }
+      
       console.log("首页：开始检查认证状态...");
-      const response = await fetch('/api/auth/session');
+      const response = await fetch('/api/auth/session', {
+        cache: 'no-store',
+      });
       const session = await response.json();
       
       console.log("首页：获取到的 session:", session);
@@ -629,30 +644,7 @@ export default function Home() {
       if (session?.user) {
         setAuthStatus(`已登录: ${session.user.email}`);
         console.log("首页：用户已登录，检查 onboarding 状态:", session.user.hasCompletedOnboarding);
-        
-        // 短暂延迟让用户看到状态
-        setTimeout(() => {
-          const forceOnboarding = shouldForceOnboarding();
-          console.log('首页：是否需要强制引导流程:', forceOnboarding);
-
-          if (forceOnboarding) {
-            router.push('/onboarding');
-            return;
-          }
-
-          if (session.user.hasCompletedOnboarding) {
-            router.push('/dashboard');
-            return;
-          }
-
-          markOnboardingCompleteSilently()
-            .catch(() => {
-              // 已记录日志，忽略错误
-            })
-            .finally(() => {
-              router.push('/dashboard');
-            });
-        }, 1000);
+        handleAuthenticatedUser(session);
       } else {
         setAuthStatus('未登录');
         console.log("首页：用户未登录，显示欢迎界面");
@@ -666,8 +658,34 @@ export default function Home() {
       // 出错时显示欢迎界面
       setLoading(false);
     } finally {
-      setLoading(false);
+      // 注意：这里不再统一设置 loading，因为不同分支有自己的处理
     }
+  };
+
+  const handleAuthenticatedUser = (session: any) => {
+    // 短暂延迟让用户看到状态
+    setTimeout(() => {
+      const forceOnboarding = shouldForceOnboarding();
+      console.log('首页：是否需要强制引导流程:', forceOnboarding);
+
+      if (forceOnboarding) {
+        router.push('/onboarding');
+        return;
+      }
+
+      if (session.user.hasCompletedOnboarding) {
+        router.push('/dashboard');
+        return;
+      }
+
+      markOnboardingCompleteSilently()
+        .catch(() => {
+          // 已记录日志，忽略错误
+        })
+        .finally(() => {
+          router.push('/dashboard');
+        });
+    }, 1000);
   };
 
   const loadingMessage =

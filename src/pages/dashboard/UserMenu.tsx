@@ -30,7 +30,24 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
   }, [isOpen]);
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' });
+    // 设置退出登录标志，防止首页误判
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('justSignedOut', 'true');
+    }
+    
+    // 清除所有本地存储
+    try {
+      sessionStorage.clear();
+      localStorage.clear();
+    } catch (e) {
+      console.error('清除存储失败:', e);
+    }
+    
+    // 退出登录并重定向到首页
+    await signOut({ 
+      callbackUrl: '/',
+      redirect: true 
+    });
   };
 
   const handleProfileClick = () => {
