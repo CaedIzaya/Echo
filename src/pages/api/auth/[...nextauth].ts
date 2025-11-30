@@ -93,10 +93,15 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  // Cookie 配置：NextAuth 在生产环境会自动添加 __Secure- 前缀
+  // 这里显式配置确保 Cookie 在 Vercel 上正确工作
+  useSecureCookies: process.env.NODE_ENV === 'production',
   pages: {
     signIn: '/auth/signin',
   },
+  debug: process.env.NODE_ENV === 'development',
 };
 
 export default NextAuth(authOptions);

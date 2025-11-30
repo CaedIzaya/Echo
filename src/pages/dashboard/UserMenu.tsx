@@ -30,20 +30,40 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
   }, [isOpen]);
 
   const handleSignOut = async () => {
-    // 清除所有本地存储
     try {
+      // 清除所有本地存储
       sessionStorage.clear();
       localStorage.clear();
-    } catch (e) {
-      console.error('清除存储失败:', e);
+      
+      // 手动清除所有可能的 NextAuth Cookie（包括生产环境的 __Secure- 前缀）
+      const cookiesToDelete = [
+        'next-auth.session-token',
+        'next-auth.csrf-token',
+        '__Secure-next-auth.session-token',
+        '__Secure-next-auth.csrf-token',
+      ];
+      
+      cookiesToDelete.forEach(cookieName => {
+        // 清除当前域名的 Cookie
+        document.cookie = `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+        // 如果设置了 Secure，也需要清除
+        document.cookie = `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure`;
+      });
+      
+      // 调用 NextAuth 的 signOut 清除服务器端 session
+      // 使用 redirect: false 避免自动跳转，我们手动控制跳转
+      await signOut({ 
+        callbackUrl: '/?signedOut=true',
+        redirect: false 
+      });
+      
+      // 手动跳转，确保 URL 参数被传递
+      window.location.href = '/?signedOut=true';
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      // 即使出错也跳转到首页
+      window.location.href = '/?signedOut=true';
     }
-    
-    // 使用 URL 参数传递退出登录状态，避免被缓存问题影响
-    // 先调用 signOut 清除服务器端 session
-    await signOut({ 
-      callbackUrl: '/?signedOut=true',
-      redirect: true 
-    });
   };
 
   const handleProfileClick = () => {
