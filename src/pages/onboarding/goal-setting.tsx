@@ -213,6 +213,10 @@ export default function GoalSetting() {
         // 创建模式：添加新计划
         const activePlans = existingPlans.filter((p: any) => p.isActive && !p.isCompleted);
         
+        // 检查是否是第一次创建计划（首次成就）- 在添加之前检查
+        const nonBlankPlansBefore = existingPlans.filter((p: any) => !p.isBlank);
+        const isFirstPlan = nonBlankPlansBefore.length === 0;
+        
         // 如果是第一个计划，设为主要
         if (activePlans.length === 0) {
           newPlan.isPrimary = true;
@@ -225,10 +229,8 @@ export default function GoalSetting() {
         // 添加新计划
         existingPlans.push(newPlan);
         
-        // 检查是否是第一次创建计划（首次成就）
-        const existingPlansCount = existingPlans.filter((p: any) => !p.isBlank).length;
-        if (existingPlansCount === 1) {
-          // 第一次创建计划，标记到 localStorage
+        // 如果是第一次创建计划，标记到 localStorage
+        if (isFirstPlan) {
           localStorage.setItem('firstPlanCreated', 'true');
         }
       }

@@ -48,16 +48,20 @@ export class AchievementManager {
   checkFlowIndexAchievements(score: number): Achievement[] {
     const newAchievements: Achievement[] = [];
 
+    // 按从高到低的顺序检查，确保达到高级别时也能解锁低级别成就
     if (score >= 85 && !this.achievedAchievements.has('flow_master')) {
       const achievement = this.unlockAchievement('flow_master');
       if (achievement) newAchievements.push(achievement);
-    } else if (score >= 70 && !this.achievedAchievements.has('flow_stable')) {
+    }
+    if (score >= 70 && !this.achievedAchievements.has('flow_stable')) {
       const achievement = this.unlockAchievement('flow_stable');
       if (achievement) newAchievements.push(achievement);
-    } else if (score >= 55 && !this.achievedAchievements.has('flow_growing')) {
+    }
+    if (score >= 55 && !this.achievedAchievements.has('flow_growing')) {
       const achievement = this.unlockAchievement('flow_growing');
       if (achievement) newAchievements.push(achievement);
-    } else if (score >= 40 && !this.achievedAchievements.has('flow_beginner')) {
+    }
+    if (score >= 40 && !this.achievedAchievements.has('flow_beginner')) {
       const achievement = this.unlockAchievement('flow_beginner');
       if (achievement) newAchievements.push(achievement);
     }

@@ -270,6 +270,10 @@ export default function PlansPage() {
       order: maxOrder + 1
     };
 
+    // 检查是否是第一次创建小目标（首次成就）- 在添加之前检查
+    const allMilestonesBefore = plans.flatMap((p: Project) => p.milestones || []);
+    const isFirstMilestone = allMilestonesBefore.length === 0;
+
     const updatedPlans = plans.map(plan => 
       plan.id === milestoneTargetPlanId
         ? { ...plan, milestones: [...plan.milestones, newMilestone] }
@@ -280,10 +284,8 @@ export default function PlansPage() {
     // 同步到localStorage
     localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
 
-    // 检查是否是第一次创建小目标（首次成就）
-    const allMilestones = updatedPlans.flatMap((p: Project) => p.milestones || []);
-    if (allMilestones.length === 1) {
-      // 第一次创建小目标，标记到 localStorage
+    // 如果是第一次创建小目标，标记到 localStorage
+    if (isFirstMilestone) {
       localStorage.setItem('firstMilestoneCreated', 'true');
     }
 

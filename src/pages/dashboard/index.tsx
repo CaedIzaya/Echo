@@ -737,6 +737,12 @@ export default function Dashboard() {
     // 更新等级经验值
     updateUserExp(minutes, rating, completed);
     
+    // 检查首次专注成就（在第一次完成专注时立即触发）
+    if (completed && currentTotalMinutes === 0 && newTotalMinutes > 0) {
+      // 第一次完成专注，标记到 localStorage
+      localStorage.setItem('firstFocusCompleted', 'true');
+    }
+    
     // 心树功能暂时屏蔽
     // 增加浇水机会（每次专注完成）
     // if (completed && typeof window !== 'undefined') {
@@ -1018,10 +1024,21 @@ export default function Dashboard() {
     // 完成小目标成就
     const milestoneAchievements = manager.checkMilestoneAchievements(stats.completedGoals);
     
-    // 第一次完成专注成就
-    const firstFocusAchievement = todayStats.minutes > 0 
+    // 第一次完成专注成就 - 检查标记或总专注时长
+    const firstFocusCompleted = localStorage.getItem('firstFocusCompleted') === 'true';
+    const flowData = localStorage.getItem('flowMetrics');
+    const metrics = flowData ? JSON.parse(flowData) : null;
+    const sessionCount = metrics?.sessionCount || 0;
+    const hasAnyFocus = firstFocusCompleted || totalFocusMinutes > 0 || sessionCount > 0;
+    
+    const firstFocusAchievement = hasAnyFocus 
       ? manager.checkFirstTimeAchievements('focus')
       : [];
+    
+    // 如果成就已解锁，清除标记（避免重复检查）
+    if (firstFocusAchievement.length > 0) {
+      localStorage.removeItem('firstFocusCompleted');
+    }
     
     // 检查其他首次成就（通过 localStorage 标记）
     const firstPlanCreated = localStorage.getItem('firstPlanCreated') === 'true';
