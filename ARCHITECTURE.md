@@ -89,7 +89,20 @@
 - 通过 `onStateChange` 回调通知状态变化
 - 通过 `onClick` 回调触发文案显示
 
-### 5. SpiritDialog 对话框组件 (`/src/pages/dashboard/SpiritDialog.tsx`)
+### 5. UserMenu 用户菜单组件 (`/src/pages/dashboard/UserMenu.tsx`)
+
+用户菜单组件，提供：
+- 用户头像显示
+- 个人中心入口
+- 退出登录功能
+
+**登出功能：**
+- 只清除认证相关的 sessionStorage 和 Cookie
+- **保留所有核心数据**（总专注时长、历史数据、成就等）
+- 清除服务器端 session
+- 跳转到首页并传递 `signedOut=true` 参数
+
+### 6. SpiritDialog 对话框组件 (`/src/pages/dashboard/SpiritDialog.tsx`)
 
 小精灵文案对话框组件，功能：
 - **文案库**: 45条文案，分为三类
@@ -195,6 +208,68 @@ Array<{
   improvementTrend: number;
 }
 ```
+
+#### `totalFocusMinutes`
+存储总专注时长（累计，从使用至今）：
+```typescript
+string  // 数字字符串，单位为分钟
+```
+
+#### `userExp`
+存储用户经验值：
+```typescript
+string  // 数字字符串
+```
+
+#### `achievedAchievements`
+存储已解锁的成就ID列表：
+```typescript
+string[]  // 成就ID数组
+```
+
+#### `unviewedAchievements`
+存储未查看的成就列表：
+```typescript
+Array<{
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+}>
+```
+
+### 数据持久性
+
+**重要：登出时数据保留策略**
+
+应用采用**数据持久化**策略，确保用户的核心数据在登出后仍然保留：
+
+#### 登出时保留的数据（localStorage）
+以下核心数据在用户登出时**不会被清除**，确保用户重新登录后数据完整：
+
+- **总专注时长**: `totalFocusMinutes` - 累计专注时长（永久记录）
+- **历史数据**: `todayStats` - 所有历史日期的专注记录
+- **本周数据**: `weeklyStats` - 本周累计专注时长
+- **统计数据**: `dashboardStats` - 昨日时长、连续天数、完成目标数
+- **心流指标**: `flowMetrics` - 完整的心流指标数据
+- **用户计划**: `userPlans` - 所有计划和里程碑
+- **经验值**: `userExp` - 用户等级和经验值
+- **成就数据**: `achievedAchievements`, `unviewedAchievements` - 已解锁和未查看的成就
+- **数据恢复标记**: `dataRecovered` - 数据恢复状态标记
+- **日期标记**: `lastFocusDate`, `lastWelcomeDate` - 最后专注日期和欢迎日期
+- **UI状态**: `focusCompleted` - 专注完成标记（可选清除）
+- **安全相关**: `hasSecurityQuestions`, `securityGuideDismissed`, `loginCount`, `nextSecurityReminder` - 安全提示相关数据
+
+#### 登出时清除的数据
+- **sessionStorage**: 所有会话存储数据（认证相关）
+- **认证 Cookie**: NextAuth 相关的所有 Cookie
+- **服务器端 Session**: 通过 NextAuth 的 `signOut` 清除
+
+#### 实现位置
+登出逻辑位于 `/src/pages/dashboard/UserMenu.tsx` 的 `handleSignOut` 函数中。
+
+**设计理念**: 用户的专注数据是宝贵的成长记录，不应该因为登出而丢失。只有认证相关的临时数据会被清除，确保安全性的同时保护用户数据。
 
 ## 页面路由
 
@@ -436,3 +511,5 @@ const showMessage = useCallback(() => {
 3. **24小时过期**: 专注会话超过24小时会自动清理
 4. **CD机制**: 文案对话框有5秒CD，避免频繁显示
 5. **编辑模式**: 编辑计划时返回按钮会直接返回到计划页面
+6. **数据持久性**: 登出时只清除认证相关数据，所有核心数据（总专注时长、历史记录、成就等）都会保留，确保用户重新登录后数据完整
+7. **数据恢复**: Dashboard 组件挂载时会自动从 `flowMetrics` 和 `todayStats` 恢复总专注时长数据（如果 `totalFocusMinutes` 为0）
