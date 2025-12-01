@@ -144,6 +144,13 @@ export default function PlansPage() {
     // 同步到localStorage
     localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
     
+    // 检查是否是第一次完成计划（首次成就）
+    const completedPlansCount = updatedPlans.filter((p: Project) => p.isCompleted).length;
+    if (completedPlansCount === 1) {
+      // 第一次完成计划，标记到 localStorage
+      localStorage.setItem('firstPlanCompleted', 'true');
+    }
+    
     setCompletionPlan(selectedPlan);
     setShowCompletionDialog(true);
     setSelectedPlanId(null);
@@ -272,6 +279,13 @@ export default function PlansPage() {
     setPlans(updatedPlans);
     // 同步到localStorage
     localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+
+    // 检查是否是第一次创建小目标（首次成就）
+    const allMilestones = updatedPlans.flatMap((p: Project) => p.milestones || []);
+    if (allMilestones.length === 1) {
+      // 第一次创建小目标，标记到 localStorage
+      localStorage.setItem('firstMilestoneCreated', 'true');
+    }
 
     setShowAddMilestone(false);
     setMilestoneTargetPlanId(null);

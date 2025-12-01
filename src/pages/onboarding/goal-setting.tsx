@@ -224,6 +224,13 @@ export default function GoalSetting() {
         
         // 添加新计划
         existingPlans.push(newPlan);
+        
+        // 检查是否是第一次创建计划（首次成就）
+        const existingPlansCount = existingPlans.filter((p: any) => !p.isBlank).length;
+        if (existingPlansCount === 1) {
+          // 第一次创建计划，标记到 localStorage
+          localStorage.setItem('firstPlanCreated', 'true');
+        }
       }
       
       // 为新用户首次创建时，为其他选择的兴趣创建空白计划卡片

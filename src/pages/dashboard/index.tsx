@@ -468,6 +468,9 @@ export default function Dashboard() {
       return updatedPlan;
     });
 
+    // 更新完成的小目标计数（触发成就检查）
+    incrementCompletedGoals(1);
+
     setConfirmMilestoneId(null);
   };
 
@@ -519,6 +522,9 @@ export default function Dashboard() {
 
       return updatedPlan;
     });
+
+    // 更新完成的小目标计数（触发成就检查）
+    incrementCompletedGoals(milestoneIds.length);
   };
 
   // 更新心流指标
@@ -1001,8 +1007,8 @@ export default function Dashboard() {
     // 检查当前状态的成就
     const flowAchievements = manager.checkFlowIndexAchievements(flowIndex.score);
     
-    // 计算周时长成就（金小时）- 使用本周累计
-    const totalHours = Math.floor(weeklyStats.totalMinutes / 60);
+    // 计算总时长成就（累计专注时长）- 使用总专注时长
+    const totalHours = Math.floor(totalFocusMinutes / 60);
     const timeAchievements = manager.checkTotalTimeAchievements(totalHours);
     
     // 计算今日时长成就
@@ -1017,12 +1023,41 @@ export default function Dashboard() {
       ? manager.checkFirstTimeAchievements('focus')
       : [];
     
+    // 检查其他首次成就（通过 localStorage 标记）
+    const firstPlanCreated = localStorage.getItem('firstPlanCreated') === 'true';
+    const firstMilestoneCreated = localStorage.getItem('firstMilestoneCreated') === 'true';
+    const firstPlanCompleted = localStorage.getItem('firstPlanCompleted') === 'true';
+    
+    const firstPlanCreatedAchievement = firstPlanCreated 
+      ? manager.checkFirstTimeAchievements('plan_created')
+      : [];
+    const firstMilestoneCreatedAchievement = firstMilestoneCreated 
+      ? manager.checkFirstTimeAchievements('milestone_created')
+      : [];
+    const firstPlanCompletedAchievement = firstPlanCompleted 
+      ? manager.checkFirstTimeAchievements('plan_completed')
+      : [];
+    
+    // 如果成就已解锁，清除标记（避免重复检查）
+    if (firstPlanCreatedAchievement.length > 0) {
+      localStorage.removeItem('firstPlanCreated');
+    }
+    if (firstMilestoneCreatedAchievement.length > 0) {
+      localStorage.removeItem('firstMilestoneCreated');
+    }
+    if (firstPlanCompletedAchievement.length > 0) {
+      localStorage.removeItem('firstPlanCompleted');
+    }
+    
     const allNew = [
       ...flowAchievements, 
       ...timeAchievements, 
       ...dailyAchievements, 
       ...milestoneAchievements,
-      ...firstFocusAchievement
+      ...firstFocusAchievement,
+      ...firstPlanCreatedAchievement,
+      ...firstMilestoneCreatedAchievement,
+      ...firstPlanCompletedAchievement
     ];
     
     if (allNew.length > 0) {
@@ -1061,7 +1096,7 @@ export default function Dashboard() {
       // 3秒后自动清空，以便再次触发
       setTimeout(() => setNewAchievements([]), 3000);
     }
-  }, [flowIndex.score, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
+  }, [flowIndex.score, totalFocusMinutes, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
   
   // 从localStorage恢复未查看成就
   useEffect(() => {
