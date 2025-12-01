@@ -630,7 +630,7 @@ export default function Dashboard() {
   };
 
   // 专注完成后更新统计数据（由focus页面调用）
-  const handleFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true) => {
+  const handleFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
     const status = completed ? '✅ 完成' : '⚠️ 中断';
     console.log('📈 Dashboard收到专注报告', { 
       status,
@@ -734,8 +734,8 @@ export default function Dashboard() {
       streakDays: stats.streakDays
     });
 
-    // 更新等级经验值
-    updateUserExp(minutes, rating, completed);
+    // 更新等级经验值（传递 plannedMinutes 用于判断经验值类型）
+    updateUserExp(minutes, rating, completed, plannedMinutes);
     
     // 检查首次专注成就（在第一次完成专注时立即触发）
     if (completed && currentTotalMinutes === 0 && newTotalMinutes > 0) {
@@ -753,12 +753,38 @@ export default function Dashboard() {
     console.log('✅ 统计数据已更新完成');
   };
 
-  // 更新用户经验值
-  const updateUserExp = (minutes: number, rating?: number, completed: boolean = true) => {
+  // 更新用户经验值（优化后的经验值系统）
+  const updateUserExp = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
     const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
     
-    // 计算此次专注获得的经验值
-    const sessionExp = LevelManager.calculateSessionExp(minutes, rating, stats.streakDays);
+    let sessionExp = 0;
+    
+    if (completed && minutes > 0) {
+      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
+      const todayMinutes = todayStats.minutes;
+      
+      // 判断经验值类型
+      if (dailyGoalMinutes > 0 && todayMinutes >= dailyGoalMinutes) {
+        // 完成主要计划设置最小专注时长：高经验值
+        sessionExp = LevelManager.calculatePrimaryGoalExp(minutes, dailyGoalMinutes, stats.streakDays);
+        console.log('📈 经验值类型：完成主要计划目标（高）', { minutes, dailyGoalMinutes, streakDays: stats.streakDays, exp: sessionExp });
+      } else if (plannedMinutes && minutes >= plannedMinutes) {
+        // 完成自己设定的专注时长（但未达到主要计划最小时长）：中经验值
+        sessionExp = LevelManager.calculateCustomGoalExp(minutes, plannedMinutes, stats.streakDays);
+        console.log('📈 经验值类型：完成设定目标（中）', { minutes, plannedMinutes, streakDays: stats.streakDays, exp: sessionExp });
+      } else {
+        // 每日完成专注（未完成设定目标）：低经验值
+        sessionExp = LevelManager.calculateDailyFocusExp(minutes);
+        console.log('📈 经验值类型：完成专注（低）', { minutes, exp: sessionExp });
+      }
+      
+      // 质量加成（保留）
+      if (rating === 3) {
+        sessionExp = Math.floor(sessionExp * 1.5); // 3星 = 额外50%
+      } else if (rating === 2) {
+        sessionExp = Math.floor(sessionExp * 1.1); // 2星 = 额外10%
+      }
+    }
     
     const newTotalExp = currentExp + sessionExp;
     const oldLevel = LevelManager.calculateLevel(currentExp);
@@ -783,13 +809,17 @@ export default function Dashboard() {
     console.log('📈 经验值更新', { 
       gained: sessionExp, 
       total: newTotalExp, 
-      level: newLevel.currentLevel 
+      level: newLevel.currentLevel,
+      streakDays: stats.streakDays,
+      streakBonus: `${((LevelManager.getStreakBonusMultiplier(stats.streakDays) - 1) * 100).toFixed(0)}%`
     });
   };
 
   // 暴露给 focus 页使用的函数
   if (typeof window !== 'undefined') {
-    (window as any).reportFocusSessionComplete = handleFocusSessionComplete;
+    (window as any).reportFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
+      handleFocusSessionComplete(minutes, rating, completed, plannedMinutes);
+    };
   }
 
   // ============================================
@@ -943,9 +973,22 @@ export default function Dashboard() {
           return; // 播完祝贺信息后就不再显示欢迎信息
         }
         
+        // 检查每日登录经验值奖励（每天只奖励一次）
+        const today = getTodayDate();
+        const lastLoginDate = localStorage.getItem('lastLoginDate');
+        if (lastLoginDate !== today) {
+          // 今日首次登录，给予经验值奖励
+          const loginExp = LevelManager.calculateDailyLoginExp();
+          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+          const newExp = currentExp + loginExp;
+          localStorage.setItem('userExp', newExp.toString());
+          localStorage.setItem('lastLoginDate', today);
+          console.log('📈 每日登录经验值奖励', { exp: loginExp, total: newExp });
+          setUserLevel(LevelManager.calculateLevel(newExp));
+        }
+        
         // 如果没有专注完成，再检查是否需要首次欢迎
         // 通过 localStorage 判断欢迎信息是否已显示
-        const today = getTodayDate();
         const lastWelcomeDate = localStorage.getItem('lastWelcomeDate');
         
         // 如果是当天第一次进入主页，则播放欢迎信息
@@ -1601,6 +1644,19 @@ export default function Dashboard() {
                         }
                       }}
                       onClick={() => {
+                        // 小精灵互动经验值奖励（每天只奖励一次）
+                        const today = getTodayDate();
+                        const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
+                        if (lastSpiritInteractionDate !== today) {
+                          const spiritExp = LevelManager.calculateSpiritInteractionExp();
+                          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+                          const newExp = currentExp + spiritExp;
+                          localStorage.setItem('userExp', newExp.toString());
+                          localStorage.setItem('lastSpiritInteractionDate', today);
+                          console.log('📈 小精灵互动经验值奖励', { exp: spiritExp, total: newExp });
+                          setUserLevel(LevelManager.calculateLevel(newExp));
+                        }
+                        
                         if (spiritDialogRef.current) {
                           spiritDialogRef.current.showMessage();
                         }
@@ -1753,6 +1809,19 @@ export default function Dashboard() {
             }
           }}
           onClick={() => {
+            // 小精灵互动经验值奖励（每天只奖励一次）
+            const today = getTodayDate();
+            const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
+            if (lastSpiritInteractionDate !== today) {
+              const spiritExp = LevelManager.calculateSpiritInteractionExp();
+              const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+              const newExp = currentExp + spiritExp;
+              localStorage.setItem('userExp', newExp.toString());
+              localStorage.setItem('lastSpiritInteractionDate', today);
+              console.log('📈 小精灵互动经验值奖励', { exp: spiritExp, total: newExp });
+              setUserLevel(LevelManager.calculateLevel(newExp));
+            }
+            
             if (spiritDialogRef.current) {
               spiritDialogRef.current.showMessage();
             }

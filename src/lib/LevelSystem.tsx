@@ -134,7 +134,74 @@ export class LevelManager {
     };
   }
 
-  // 计算专注会话的经验值
+  // 获取连续打卡加成倍率（1-7天，分别增加 1%,3%,5%,6%,7%,8%,10%）
+  static getStreakBonusMultiplier(streakDays: number): number {
+    const bonuses: Record<number, number> = {
+      1: 1.01,  // 1天：+1%
+      2: 1.03,  // 2天：+3%
+      3: 1.05,  // 3天：+5%
+      4: 1.06,  // 4天：+6%
+      5: 1.07,  // 5天：+7%
+      6: 1.08,  // 6天：+8%
+      7: 1.10   // 7天：+10%
+    };
+    
+    // 如果超过7天，使用7天的加成
+    const effectiveStreak = Math.min(streakDays, 7);
+    return bonuses[effectiveStreak] || 1.0;
+  }
+
+  // 计算每日出勤登录经验值（极低）
+  static calculateDailyLoginExp(): number {
+    return 1; // 每日登录：1 EXP
+  }
+
+  // 计算小精灵互动经验值（极低）
+  static calculateSpiritInteractionExp(): number {
+    return 1; // 每日与小精灵互动：1 EXP
+  }
+
+  // 计算每日完成专注经验值（低）
+  static calculateDailyFocusExp(sessionMinutes: number): number {
+    // 基础经验值：专注分钟数 * 0.5（低）
+    return Math.floor(sessionMinutes * 0.5);
+  }
+
+  // 计算完成设定专注时长经验值（中）- 未达到主要计划最小时长
+  static calculateCustomGoalExp(sessionMinutes: number, plannedMinutes: number, streakDays: number = 0): number {
+    // 基础经验值：专注分钟数 * 1（中）
+    let exp = sessionMinutes;
+    
+    // 如果完成了设定的时长，给予额外奖励
+    if (sessionMinutes >= plannedMinutes) {
+      exp = Math.floor(exp * 1.2); // 完成设定目标：额外20%
+    }
+    
+    // 应用连续打卡加成
+    const streakMultiplier = this.getStreakBonusMultiplier(streakDays);
+    exp = Math.floor(exp * streakMultiplier);
+    
+    return exp;
+  }
+
+  // 计算完成主要计划最小专注时长经验值（高）
+  static calculatePrimaryGoalExp(sessionMinutes: number, dailyGoalMinutes: number, streakDays: number = 0): number {
+    // 基础经验值：专注分钟数 * 2（高）
+    let exp = sessionMinutes * 2;
+    
+    // 如果达到或超过主要计划最小时长，给予额外奖励
+    if (sessionMinutes >= dailyGoalMinutes) {
+      exp = Math.floor(exp * 1.5); // 完成主要计划目标：额外50%
+    }
+    
+    // 应用连续打卡加成
+    const streakMultiplier = this.getStreakBonusMultiplier(streakDays);
+    exp = Math.floor(exp * streakMultiplier);
+    
+    return exp;
+  }
+
+  // 计算专注会话的经验值（保留旧方法以兼容，但推荐使用新方法）
   static calculateSessionExp(sessionMinutes: number, rating?: number, streakDays: number = 0): number {
     let exp = sessionMinutes; // 1分钟 = 1 EXP
     
@@ -145,9 +212,9 @@ export class LevelManager {
       exp = Math.floor(exp * 1.1); // 2星 = 额外10%
     }
     
-    // 连续天数加成（最多7天）
-    const streakBonus = Math.min(streakDays, 7) * 10;
-    exp += streakBonus;
+    // 应用连续打卡加成（新系统）
+    const streakMultiplier = this.getStreakBonusMultiplier(streakDays);
+    exp = Math.floor(exp * streakMultiplier);
     
     return exp;
   }

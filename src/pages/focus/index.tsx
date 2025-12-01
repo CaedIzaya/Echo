@@ -54,6 +54,58 @@ export default function Focus() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionRef = useRef<FocusSession | null>(null);
   const isInitialLoadRef = useRef(true);
+  const hasPlayedGoalSoundRef = useRef(false); // 标记是否已播放目标达成提示音
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  // 播放温柔的成就提示音
+  const playGoalAchievementSound = () => {
+    try {
+      // 创建 AudioContext（如果不存在）
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const audioContext = audioContextRef.current;
+
+      // 如果 AudioContext 被暂停，恢复它（浏览器要求用户交互后才能播放音频）
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {
+          console.warn('AudioContext 恢复失败，可能需要用户交互');
+        });
+      }
+
+      // 创建一个温柔的上行音阶（C-D-E-F-G），带有成就感和成功的感觉
+      // 使用更低的频率，声音更温柔：C4=261.63, D4=293.66, E4=329.63, F4=349.23, G4=392.00
+      const frequencies = [261.63, 293.66, 329.63, 349.23, 392.00];
+      const duration = 0.12; // 每个音符持续时间（秒），稍快一点更轻快
+      const baseTime = audioContext.currentTime + 0.1; // 稍微延迟，确保 AudioContext 已准备好
+
+      frequencies.forEach((freq, index) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        // 使用正弦波，声音更柔和温柔
+        oscillator.type = 'sine';
+        oscillator.frequency.value = freq;
+
+        // 音量包络：渐入渐出，更温柔
+        const startTime = baseTime + index * duration;
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.12, startTime + 0.03); // 快速渐入（音量较低，更温柔）
+        gainNode.gain.linearRampToValueAtTime(0.12, startTime + duration - 0.03); // 保持
+        gainNode.gain.linearRampToValueAtTime(0, startTime + duration); // 渐出
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      });
+
+      console.log('🎵 播放目标达成提示音（温柔版）');
+    } catch (error) {
+      console.warn('播放提示音失败（可能需要用户交互）:', error);
+    }
+  };
   
   // 加载主要计划作为默认
   const [availablePlans, setAvailablePlans] = useState<Array<{id:string; name:string; isPrimary:boolean; dailyGoalMinutes:number}>>([]);
@@ -432,8 +484,38 @@ export default function Focus() {
       setIsPaused(false);
       setCountdown(3);
       setTotalPauseTime(0);
+      // 重置提示音播放标记
+      hasPlayedGoalSoundRef.current = false;
     }
   }, [state]);
+
+  // 监听专注时长变化，检测是否达到目标时长并播放提示音
+  useEffect(() => {
+    if (state === 'running' && plannedMinutes > 0 && sessionRef.current) {
+      const currentElapsed = calculateElapsedTime(
+        sessionRef.current.startTime,
+        sessionRef.current.totalPauseTime || 0,
+        false
+      );
+      const totalSeconds = plannedMinutes * 60;
+      const isOverTime = currentElapsed >= totalSeconds; // 使用 >= 确保精确触发
+      
+      // 检测是否刚达到目标时长（从未达到变为达到）
+      if (isOverTime && !hasPlayedGoalSoundRef.current) {
+        hasPlayedGoalSoundRef.current = true;
+        // 延迟一点播放，确保界面已经变成金色
+        setTimeout(() => {
+          playGoalAchievementSound();
+        }, 100);
+      } else if (currentElapsed < totalSeconds - 1) {
+        // 如果还没达到目标（留1秒缓冲），重置标记（允许重新播放，以防用户重新开始）
+        hasPlayedGoalSoundRef.current = false;
+      }
+    } else if (state !== 'running') {
+      // 不在运行状态时，重置标记
+      hasPlayedGoalSoundRef.current = false;
+    }
+  }, [elapsedTime, state, plannedMinutes]);
 
 
   // 清理计时器
@@ -578,7 +660,11 @@ export default function Focus() {
         // 检查是否达到目标时长
         if (calculatedTime >= plannedMinutes * 60) {
           // 达到目标时长，不自动结束，继续计时（显示金色背景）
-          // 用户可以手动结束
+          // 播放温柔的提示音（仅播放一次）
+          if (!hasPlayedGoalSoundRef.current && plannedMinutes > 0) {
+            hasPlayedGoalSoundRef.current = true;
+            playGoalAchievementSound();
+          }
         }
       }, 100); // 每100ms更新一次，确保显示流畅
     }
@@ -705,7 +791,7 @@ export default function Focus() {
           completed,
           numericRating 
         });
-        (window as any).reportFocusSessionComplete(minutes, numericRating, completed);
+        (window as any).reportFocusSessionComplete(minutes, numericRating, completed, plannedMinutes);
       } else {
         console.warn('⚠️ reportFocusSessionComplete 函数不存在，使用备用方案');
         
@@ -814,35 +900,84 @@ export default function Focus() {
 
   // 处理页面关闭/刷新 - 保存当前状态和累计时间
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    // 保存状态的统一函数
+    const saveCurrentState = () => {
       if (state === 'running' || state === 'paused') {
-        // 保存最终状态（包括累计时间）
         if (sessionRef.current) {
-          saveState({ elapsedTime });
+          // 如果是运行状态，使用时间戳计算最新时长
+          if (state === 'running') {
+            const calculatedTime = calculateElapsedTime(
+              sessionRef.current.startTime,
+              sessionRef.current.totalPauseTime || 0,
+              false
+            );
+            saveState({ elapsedTime: calculatedTime });
+          } else {
+            saveState({ elapsedTime });
+          }
         }
         // 记录保存时间戳
         localStorage.setItem('focusTimerLastSaved', new Date().toISOString());
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (state === 'running' || state === 'paused') {
+        // 保存最终状态
+        saveCurrentState();
         // 允许关闭但先保存状态
         e.preventDefault();
         e.returnValue = '专注计时正在进行中，确定要离开吗？您的进度会被保存。';
       }
     };
 
-    // 定期保存（每10秒）
+    // pagehide 事件（比 beforeunload 更可靠，特别是在移动设备和电脑关机时）
+    const handlePageHide = () => {
+      if (state === 'running' || state === 'paused') {
+        // 保存最终状态
+        saveCurrentState();
+        console.log('💾 页面隐藏，已保存专注状态');
+      }
+    };
+
+    // 定期保存（每10秒）- 专注进行中时
     let saveInterval: NodeJS.Timeout | null = null;
     if (state === 'running') {
       saveInterval = setInterval(() => {
         if (sessionRef.current) {
-          saveState({ elapsedTime });
-          console.log('⏱️ 自动保存中...', { elapsedTime, timestamp: new Date().toISOString() });
+          // 使用时间戳计算最新时长
+          const calculatedTime = calculateElapsedTime(
+            sessionRef.current.startTime,
+            sessionRef.current.totalPauseTime || 0,
+            false
+          );
+          saveState({ elapsedTime: calculatedTime });
+          console.log('⏱️ 自动保存中...', { 
+            elapsedTime: calculatedTime, 
+            timestamp: new Date().toISOString() 
+          });
         }
       }, 10000); // 每10秒保存一次
     }
 
+    // 暂停状态也定期保存（每30秒），确保暂停时长准确
+    let pauseSaveInterval: NodeJS.Timeout | null = null;
+    if (state === 'paused') {
+      pauseSaveInterval = setInterval(() => {
+        if (sessionRef.current) {
+          saveCurrentState();
+          console.log('⏸️ 暂停状态自动保存...');
+        }
+      }, 30000); // 每30秒保存一次
+    }
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
       if (saveInterval) clearInterval(saveInterval);
+      if (pauseSaveInterval) clearInterval(pauseSaveInterval);
     };
   }, [state, elapsedTime]);
 
