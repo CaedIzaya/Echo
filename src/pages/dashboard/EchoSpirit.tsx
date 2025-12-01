@@ -20,9 +20,9 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
   const isAnimatingRef = useRef(false); // 标记是否正在动画中（2s内不可打断）
   const [currentState, setCurrentState] = useState(state);
 
-  // 同步外部state：如果外部state是excited（专注完成），强制设置为excited
-  // 如果用户没有主动控制，也同步外部state
+  // 同步外部state：如果用户没有主动控制，同步外部state
   // 注意：focus状态不应该在主页显示，如果外部传入focus或用户尝试设置focus，则强制转换为idle
+  // excited现在不再是特殊状态，而是普通的交互动作
   useEffect(() => {
     // 如果当前状态是focus但不允许focus，强制转换为idle
     if (currentState === 'focus' && !allowFocus) {
@@ -32,21 +32,9 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
       return;
     }
     
-    // 如果外部state是excited（专注完成），强制设置为excited，并清除用户控制标记
-    // 这样可以确保excited状态不会被用户点击的动画覆盖
-    if (state === 'excited') {
-      // 清除可能存在的定时器
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      setCurrentState('excited');
-      isUserControlledRef.current = false; // 允许外部控制
-      isAnimatingRef.current = false; // 清除动画标记
-      if (onStateChange) onStateChange('excited');
-    } else if (!isUserControlledRef.current && state !== 'focus') {
-      // 如果用户没有主动控制（没有点击过），则同步外部state
-      // 但忽略focus状态（focus状态不应该在主页显示）
+    // 如果用户没有主动控制（没有点击过），则同步外部state
+    // 但忽略focus状态（focus状态不应该在主页显示）
+    if (!isUserControlledRef.current && state !== 'focus') {
       setCurrentState(state);
       if (onStateChange) onStateChange(state);
     } else if (state === 'focus' && !allowFocus) {
@@ -84,16 +72,6 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         return;
       }
       
-      // 如果当前状态是excited（专注完成），不允许用户点击改变状态
-      // excited状态应该由外部控制，表示专注完成
-      if (currentState === 'excited') {
-        // 只触发onClick回调，但不改变状态
-        if (onClick) {
-          onClick();
-        }
-        return;
-      }
-      
       // 调用外部onClick回调（用于触发文案显示）
       if (onClick) {
         onClick();
@@ -110,13 +88,8 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
       }
       
       setCurrentState(prev => {
-        // 如果当前是excited状态，不允许改变
-        if (prev === 'excited') {
-          return prev;
-        }
-        
-        // 随机选择happy或nod（不包含excited，excited应该由外部控制）
-        const states: ('happy' | 'nod')[] = ['happy', 'nod'];
+        // 随机选择happy、nod或excited（excited现在是交互动作之一）
+        const states: ('happy' | 'nod' | 'excited')[] = ['happy', 'nod', 'excited'];
         const nextState = states[Math.floor(Math.random() * states.length)];
         
         // 通知状态变化
@@ -126,21 +99,14 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
         
         // 2秒后自动恢复到idle，并重置用户控制标记和动画标记
         timerRef.current = setTimeout(() => {
-          // 如果外部state是excited，不要恢复到idle
-          if (state !== 'excited') {
-            setCurrentState('idle');
-            timerRef.current = null;
-            // 恢复后允许外部state控制和再次交互
-            isUserControlledRef.current = false;
-            isAnimatingRef.current = false;
-            if (onStateChange) {
-              onStateChange('idle');
-            }
-          } else {
-            // 如果外部state是excited，保持excited状态
-            timerRef.current = null;
-            isUserControlledRef.current = false;
-            isAnimatingRef.current = false;
+          // 恢复到idle状态
+          setCurrentState('idle');
+          timerRef.current = null;
+          // 恢复后允许外部state控制和再次交互
+          isUserControlledRef.current = false;
+          isAnimatingRef.current = false;
+          if (onStateChange) {
+            onStateChange('idle');
           }
         }, 2000);
         
@@ -753,6 +719,9 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           opacity: 0 !important;
           pointer-events: none;
           visibility: hidden;
+          /* 确保隐藏的元素不会在动画时露出 */
+          position: absolute;
+          transform: translateZ(0);
         }
         
         /* 外圈光晕 - 初始隐藏 */
@@ -773,6 +742,25 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           opacity: 1 !important;
           pointer-events: auto;
           visibility: visible !important;
+          position: relative;
+        }
+        
+        /* 确保未完成状态下，completed形态完全隐藏 */
+        .echo-spirit-wrap[data-completed="false"] .head-wrap-completed {
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+          position: absolute;
+          /* 确保不会在动画时显示，移除所有transform和animation */
+          transform: none !important;
+          animation: none !important;
+          z-index: -1;
+        }
+        
+        /* 确保未完成状态下，completed形态的子元素也不参与动画 */
+        .echo-spirit-wrap[data-completed="false"] .head-wrap-completed * {
+          animation: none !important;
+          transform: none !important;
         }
         
         /* 专注完成后：所有状态使用completed颜色 */
@@ -787,6 +775,25 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           opacity: 1 !important;
           pointer-events: auto;
           visibility: visible !important;
+          position: relative;
+        }
+        
+        /* 确保completed状态下，idle形态完全隐藏且不会在动画时露出 */
+        .echo-spirit-wrap[data-completed="true"] .head-wrap-idle {
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+          position: absolute;
+          /* 确保不会在动画时显示，移除所有transform和animation */
+          transform: none !important;
+          animation: none !important;
+          z-index: -1;
+        }
+        
+        /* 确保completed状态下，idle形态的子元素也不参与动画 */
+        .echo-spirit-wrap[data-completed="true"] .head-wrap-idle * {
+          animation: none !important;
+          transform: none !important;
         }
         
         .particles-group {
@@ -858,18 +865,15 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           transform-origin: center;
         }
 
-        /* hover/interaction - look around and quick hop */
-        .echo-spirit-wrap:hover .head-wrap {
-          animation: headBounce 420ms ease-out forwards, headTilt 0.5s ease-out forwards;
-        }
-
-        .echo-spirit-wrap:hover .head {
-          animation: elasticSquish 0.5s ease-out forwards;
-          transform-origin: 100px 100px;
-        }
-
-        .echo-spirit-wrap:hover .eyes-group {
+        /* hover/interaction - 只向右看（简洁的交互） */
+        /* idle状态下，hover时只让眼睛向右看，不改变头部位置 */
+        .echo-spirit-wrap[data-state="idle"]:hover .eyes-group {
           animation: lookRight 0.6s ease-out forwards;
+        }
+        
+        /* 其他状态下hover时不改变眼睛动画（保持当前状态动画） */
+        .echo-spirit-wrap:not([data-state="idle"]):hover .eyes-group {
+          /* 保持当前状态的动画，不覆盖 */
         }
 
         /* excited/completed state - 庆祝但不浮夸，明亮金光 */
@@ -907,17 +911,34 @@ export default function EchoSpirit({ state = 'idle', className = '', onStateChan
           animation-delay: 1s;
         }
 
-        .echo-spirit-wrap[data-state="excited"] {
+        /* excited状态 - 只作用于completed形态，确保idle形态不参与 */
+        .echo-spirit-wrap[data-completed="true"][data-state="excited"] {
           animation: excitedBounce 2s ease-in-out infinite;
           transform-origin: center center;
         }
 
-        .echo-spirit-wrap[data-state="excited"] .head-wrap-completed {
+        .echo-spirit-wrap[data-completed="true"][data-state="excited"] .head-wrap-completed {
+          animation: floatY 2s ease-in-out infinite, headTilt 2s ease-in-out infinite, mochiBounce 2s ease-in-out infinite;
+          transform-origin: 100px 100px;
+        }
+        
+        /* 未完成状态下的excited，使用idle形态 */
+        .echo-spirit-wrap[data-completed="false"][data-state="excited"] {
+          animation: excitedBounce 2s ease-in-out infinite;
+          transform-origin: center center;
+        }
+
+        .echo-spirit-wrap[data-completed="false"][data-state="excited"] .head-wrap-idle {
           animation: floatY 2s ease-in-out infinite, headTilt 2s ease-in-out infinite, mochiBounce 2s ease-in-out infinite;
           transform-origin: 100px 100px;
         }
 
-        .echo-spirit-wrap[data-state="excited"] .head-completed {
+        .echo-spirit-wrap[data-completed="false"][data-state="excited"] .head-idle {
+          transform-origin: 100px 100px;
+          animation: headBounce 2s ease-in-out infinite, elasticSquish 2s ease-in-out infinite;
+        }
+
+        .echo-spirit-wrap[data-completed="true"][data-state="excited"] .head-completed {
           transform-origin: 100px 100px;
           animation: headBounce 2s ease-in-out infinite, elasticSquish 2s ease-in-out infinite;
         }

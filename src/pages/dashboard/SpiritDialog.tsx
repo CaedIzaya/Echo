@@ -415,8 +415,8 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
 
   return (
     <>
-      {/* PC端对话框 - 位于今日节奏卡片底部下方 */}
-      <div className="hidden sm:block fixed top-[440px] left-12 md:left-16 lg:left-20 xl:left-12 z-50 pointer-events-none max-w-xs sm:max-w-sm md:max-w-md">
+      {/* PC端对话框 - 位于今日节奏卡片底部下方，确保文本框顶部低于小精灵底部 */}
+      <div className="hidden sm:block fixed top-[500px] left-12 md:left-16 lg:left-20 xl:left-12 z-50 pointer-events-none max-w-xs sm:max-w-sm md:max-w-md">
         <div
           className={`
             ${dialogStyle.bg}
@@ -429,10 +429,10 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
             relative
           `}
         >
-          {/* 对话框小箭头 - 指向小精灵（上方） */}
-          <div className="absolute left-12 -top-3 w-0 h-0">
+          {/* 对话框小箭头 - 指向小精灵（上方，右侧） */}
+          <div className="absolute right-12 -top-3 w-0 h-0">
             <div
-              className={`w-6 h-6 bg-gradient-to-br ${dialogStyle.arrowBg} border-l-2 border-t-2 ${dialogStyle.border} rotate-45`}
+              className={`w-6 h-6 bg-gradient-to-br ${dialogStyle.arrowBg} border-r-2 border-t-2 ${dialogStyle.border} rotate-45`}
             />
           </div>
 
