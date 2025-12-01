@@ -31,9 +31,32 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
 
   const handleSignOut = async () => {
     try {
-      // 清除所有本地存储
+      // 只清除 sessionStorage（认证相关）
       sessionStorage.clear();
-      localStorage.clear();
+      
+      // 保留 localStorage 中的所有核心数据，只清除认证相关的临时数据
+      // 核心数据包括：
+      // - totalFocusMinutes: 总专注时长（累计）
+      // - todayStats: 今日数据（历史记录）
+      // - weeklyStats: 本周数据
+      // - dashboardStats: 统计数据（昨日时长、连续天数、完成目标数）
+      // - flowMetrics: 心流指标数据
+      // - userPlans: 用户计划
+      // - userExp: 用户经验值
+      // - achievedAchievements: 已解锁成就
+      // - unviewedAchievements: 未查看成就
+      // - dataRecovered: 数据恢复标记
+      // - lastFocusDate: 最后专注日期
+      // - lastWelcomeDate: 最后欢迎日期
+      // - focusCompleted: 专注完成标记
+      // - hasSecurityQuestions: 安全提示相关
+      // - securityGuideDismissed: 安全指南相关
+      // - loginCount: 登录计数
+      // - nextSecurityReminder: 下次安全提醒
+      // - forceOnboarding: 强制引导流程标记
+      
+      // 如果需要清除某些临时UI状态，可以单独清除：
+      // localStorage.removeItem('focusCompleted'); // 可选：清除专注完成标记
       
       // 手动清除所有可能的 NextAuth Cookie（包括生产环境的 __Secure- 前缀）
       const cookiesToDelete = [

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import ProgressRing from './dashboard/ProgressRing';
 
@@ -431,41 +431,58 @@ const FeatureGrid = () => (
   </section>
 );
 
-const LandingCTA = ({ onPrimaryAction }: { onPrimaryAction: () => void }) => (
-  <section className="py-24 relative overflow-hidden bg-gradient-to-br from-[#022b2f] via-[#044345] to-[#056060]">
-    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
-    <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500 rounded-full blur-[140px] opacity-30" />
-    <div className="absolute bottom-0 right-0 w-96 h-96 bg-cyan-400 rounded-full blur-[200px] opacity-30" />
+const LandingCTA = ({ onPrimaryAction }: { onPrimaryAction: (email?: string) => void }) => {
+  const [email, setEmail] = useState('');
 
-    <div className="relative max-w-4xl mx-auto px-6 text-center text-white">
-      <h2 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight">
-        准备好开始这段
-        <br />
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-emerald-200 to-cyan-100">
-          专注之旅了吗？
-        </span>
-      </h2>
-      <p className="text-xl text-emerald-100/80 mb-10">
-        在无序的噪音里选择 Echo，选择倾听内心的声音。免费注册，即刻开启。
-      </p>
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      // 如果有邮箱，跳转到登录页并传递邮箱参数
+      onPrimaryAction(email.trim());
+    } else {
+      // 如果没有邮箱，直接跳转
+      onPrimaryAction();
+    }
+  };
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-        <input
-          type="email"
-          placeholder="输入你的邮箱地址..."
-          className="w-full sm:w-80 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder-emerald-200 focus:outline-none focus:ring-2 focus:ring-teal-300 backdrop-blur-sm transition-all"
-        />
-        <button
-          onClick={onPrimaryAction}
-          className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 text-slate-900 font-bold rounded-full hover:shadow-[0_25px_50px_-25px_rgba(16,185,129,0.8)] transition-all transform hover:-translate-y-1"
-        >
-          即刻开始
-        </button>
+  return (
+    <section className="py-24 relative overflow-hidden bg-gradient-to-br from-[#022b2f] via-[#044345] to-[#056060]">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
+      <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500 rounded-full blur-[140px] opacity-30" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-cyan-400 rounded-full blur-[200px] opacity-30" />
+
+      <div className="relative max-w-4xl mx-auto px-6 text-center text-white">
+        <h2 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight">
+          准备好开始这段
+          <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-emerald-200 to-cyan-100">
+            专注之旅了吗？
+          </span>
+        </h2>
+        <p className="text-xl text-emerald-100/80 mb-10">
+          在无序的噪音里选择 Echo，选择倾听内心的声音。免费注册，即刻开启。
+        </p>
+
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="输入你的邮箱地址..."
+            className="w-full sm:w-80 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder-emerald-200 focus:outline-none focus:ring-2 focus:ring-teal-300 backdrop-blur-sm transition-all"
+          />
+          <button
+            type="submit"
+            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 text-slate-900 font-bold rounded-full hover:shadow-[0_25px_50px_-25px_rgba(16,185,129,0.8)] transition-all transform hover:-translate-y-1"
+          >
+            即刻开始
+          </button>
+        </form>
+        <p className="mt-6 text-sm text-emerald-100/60"></p>
       </div>
-      <p className="mt-6 text-sm text-emerald-100/60"></p>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 const LandingFooter = () => (
   <footer className="bg-slate-50 border-t border-slate-200 pt-16 pb-8">
@@ -778,7 +795,15 @@ export default function Home() {
     );
   }
 
-  const handlePrimaryAction = () => router.push('/auth/signin');
+  const handlePrimaryAction = (email?: string) => {
+    if (email) {
+      // 如果有邮箱，跳转到登录页并传递邮箱参数
+      router.push(`/auth/signin?email=${encodeURIComponent(email)}`);
+    } else {
+      // 如果没有邮箱，直接跳转
+      router.push('/auth/signin');
+    }
+  };
   const handleSecondaryAction = () => router.push('/auth/signin');
 
   // 未登录时显示欢迎界面

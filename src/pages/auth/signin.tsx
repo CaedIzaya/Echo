@@ -85,6 +85,18 @@ export default function SignIn() {
     checkAuthStatus();
   }, []);
 
+  // 检查 URL 参数中的邮箱并填充
+  useEffect(() => {
+    const emailFromUrl = router.query.email as string;
+    if (emailFromUrl) {
+      setFormData(prev => ({ ...prev, email: decodeURIComponent(emailFromUrl) }));
+      // 清除 URL 参数，避免刷新后重复填充
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/auth/signin');
+      }
+    }
+  }, [router.query.email]);
+
   const handlePostLoginRedirect = async () => {
     try {
       const response = await fetch('/api/auth/session');
@@ -567,6 +579,17 @@ export default function SignIn() {
             </svg>
             <span>使用 GitHub {isLogin ? "登录" : "注册"}</span>
           </button>
+
+          {/* 返回到欢迎页 */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              返回到欢迎页
+            </button>
+          </div>
         </div>
       </div>
 
