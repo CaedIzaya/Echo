@@ -28,32 +28,6 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
 
         {/* 内容区域 */}
         <div className="p-6 space-y-6">
-          {/* 键盘快捷键 */}
-          <section className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span>⌨️</span>
-              键盘快捷键
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-center justify-between p-3 bg-white rounded-xl">
-                <span className="text-gray-700">开始专注</span>
-                <kbd className="px-3 py-1 bg-gray-100 rounded-lg font-mono text-sm font-semibold">S</kbd>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-white rounded-xl">
-                <span className="text-gray-700">暂停/继续</span>
-                <kbd className="px-3 py-1 bg-gray-100 rounded-lg font-mono text-sm font-semibold">Space</kbd>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-white rounded-xl">
-                <span className="text-gray-700">结束专注</span>
-                <kbd className="px-3 py-1 bg-gray-100 rounded-lg font-mono text-sm font-semibold">E</kbd>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-white rounded-xl">
-                <span className="text-gray-700">返回首页</span>
-                <kbd className="px-3 py-1 bg-gray-100 rounded-lg font-mono text-sm font-semibold">H</kbd>
-              </div>
-            </div>
-          </section>
-
           {/* 页面导航 */}
           <section className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-100">
             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -74,109 +48,114 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
             </div>
           </section>
 
-          {/* 功能查找 */}
-          <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span>⚡</span>
-              常用功能快速查找
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* 功能项目 */}
-              {[
-                { icon: '📈', name: '本周统计', desc: '查看本周专注时长与趋势', path: 'dashboard#stats' },
-                { icon: '🏆', name: '成就系统', desc: '查看已解锁成就与徽章', path: 'dashboard#achievements' },
-                { icon: '🎯', name: '小目标', desc: '管理计划中的小目标', path: 'dashboard#milestones' },
-                { icon: '⭐', name: '心流指数', desc: '查看专注质量评分', path: 'dashboard#flow' },
-                { icon: '🔥', name: '连续天数', desc: '查看连续专注记录', path: 'dashboard#streak' },
-              ].map((item, idx) => (
-                <div key={idx} className="p-4 bg-white rounded-xl hover:shadow-md transition-all border border-gray-100">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{item.icon}</span>
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900">{item.name}</div>
-                      <div className="text-sm text-gray-500">{item.desc}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* 数据类型 */}
+          {/* 数据说明 */}
           <section className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-2xl p-6 border border-orange-100">
             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <span>📊</span>
               数据说明
             </h3>
             <div className="space-y-3">
+              {/* 今日节奏 */}
               <div className="p-4 bg-white rounded-xl">
-                <div className="font-semibold text-gray-900 mb-1">今日分钟数</div>
-                <div className="text-sm text-gray-600">今天已经专注的总时长（分钟）</div>
+                <div className="font-semibold text-gray-900 mb-1">今日节奏</div>
+                <div className="text-sm text-gray-600">
+                  用一行帮你看清：今天已经专注了多久，还差多少才能完成目标。
+                </div>
               </div>
+
+              {/* 完成进度 */}
               <div className="p-4 bg-white rounded-xl">
-                <div className="font-semibold text-gray-900 mb-1">今日目标</div>
-                <div className="text-sm text-gray-600">每日计划的专注时长目标</div>
+                <div className="font-semibold text-gray-900 mb-1">完成进度</div>
+                <div className="text-sm text-gray-600">
+                  告诉你：今天离「计划里写下的那件事」还有多远。
+                </div>
               </div>
+
+              {/* 连续专注 */}
               <div className="p-4 bg-white rounded-xl">
-                <div className="font-semibold text-gray-900 mb-1">本周分钟数</div>
-                <div className="text-sm text-gray-600">本周累计专注的总时长</div>
+                <div className="font-semibold text-gray-900 mb-1">连续专注</div>
+                <div className="text-sm text-gray-600">
+                  最近一段连续完成专注目标的天数。
+                </div>
               </div>
-              <div className="p-4 bg-white rounded-xl">
-                <div className="font-semibold text-gray-900 mb-1">连续天数</div>
-                <div className="text-sm text-gray-600">连续专注的天数（每日至少一次）</div>
-              </div>
+
+              {/* 心流指数 */}
               <div className="p-4 bg-white rounded-xl">
                 <div className="font-semibold text-gray-900 mb-1">心流指数</div>
-                <div className="text-sm text-gray-600">综合专注质量、时长和频率的计算评分（0-100）</div>
+                <div className="text-sm text-gray-600">
+                  用 0–100 分，概括你最近「专注得好不好、久不久、稳不稳」的综合表现。
+                </div>
               </div>
             </div>
           </section>
 
-          {/* 常见问题 */}
+          {/* 功能说明 / 常见问题（以「怎么做」为主） */}
           <section className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-100">
             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <span>❓</span>
-              常见问题
+              常见问题（怎么用）
             </h3>
             <div className="space-y-4">
               <details className="p-4 bg-white rounded-xl border border-gray-100">
                 <summary className="font-semibold text-gray-900 cursor-pointer">
-                  如何保存专注进度？
+                  怎么切换「主要计划」？
                 </summary>
                 <p className="mt-2 text-sm text-gray-600">
-                  系统每10秒自动保存一次，关闭页面时也会自动保存。重新打开页面时会自动恢复未完成的专注会话。
+                  打开「计划管理」页面，在计划列表里找到想设为主要的计划，点击更多操作（…）或编辑按钮，勾选「设为主要计划」即可。
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  设为主要计划后，仪表盘上的「完成进度」和「小目标」都会跟随这个计划更新。
                 </p>
               </details>
+
               <details className="p-4 bg-white rounded-xl border border-gray-100">
                 <summary className="font-semibold text-gray-900 cursor-pointer">
-                  专注计时支持暂停吗？
+                  怎么添加小目标？
                 </summary>
                 <p className="mt-2 text-sm text-gray-600">
-                  支持！每次专注会话可以暂停1次。暂停期间不会计入专注时长。
+                  在「计划管理」页面，选择一个计划，进入详情或编辑界面，在「小目标」区域点击「新增小目标」，写下你想完成的一小步（例如：读完一章、写 500 字），保存即可。
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  建议把大目标拆成 3–5 个清晰的小目标，更容易看到自己的推进。
                 </p>
               </details>
+
               <details className="p-4 bg-white rounded-xl border border-gray-100">
                 <summary className="font-semibold text-gray-900 cursor-pointer">
-                  如何修改每日目标？
+                  怎么新建计划？怎么删除计划？
                 </summary>
                 <p className="mt-2 text-sm text-gray-600">
-                  在"计划管理"页面找到主要计划，点击编辑可以修改每日目标时长（分钟）。
+                  在「计划管理」页面点击「新建计划」，填写计划名称、每日目标时间和小目标，就能创建一个新的成长方向。
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  删除计划时，在计划卡片上点击更多操作（…）或删除按钮，系统会弹出确认提示，确认后该计划及其小目标都会被移除。
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  建议只删除不再有意义的计划，对还在犹豫的目标可以先暂停或取消主要计划标记。
                 </p>
               </details>
+
               <details className="p-4 bg-white rounded-xl border border-gray-100">
                 <summary className="font-semibold text-gray-900 cursor-pointer">
-                  心流指数如何计算？
+                  如何编辑计划内容？
                 </summary>
                 <p className="mt-2 text-sm text-gray-600">
-                  基于专注质量（评分、完成率）、专注时长（平均时长、最长时长）、专注习惯（会话数、连续性、趋势）三个维度综合计算。
+                  在「计划管理」里点击某个计划的编辑按钮，可以修改计划名称、每日目标时间、小目标列表等内容；保存后，仪表盘会自动使用最新设置。
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  如果只是临时调整目标，可以先小幅修改每日目标，而不是直接删除计划。
                 </p>
               </details>
+
               <details className="p-4 bg-white rounded-xl border border-gray-100">
                 <summary className="font-semibold text-gray-900 cursor-pointer">
-                  数据存储在哪里？
+                  专注时如果意外退出，会发生什么？
                 </summary>
                 <p className="mt-2 text-sm text-gray-600">
-                  所有数据存储在浏览器本地（localStorage），无需网络即可使用。如需云端同步，请确保登录账户。
+                  专注过程中，如果你关闭页面、刷新或网络异常，系统会自动在本地保存当前进度；下次进入时，会根据记录补全到对应的「今日节奏」「本周专注」和「累计专注」中。
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  如果在很短时间内意外退出，可能只记下最近一次专注的结果，但不会影响你之前已记录的专注历史。
                 </p>
               </details>
             </div>
@@ -185,7 +164,7 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
           {/* 底部提示 */}
           <div className="bg-gradient-to-r from-teal-100 to-cyan-100 rounded-xl p-4 text-center">
             <p className="text-sm text-gray-700">
-              💡 <strong>提示：</strong>在所有页面输入框中使用 <kbd className="px-2 py-1 bg-white rounded font-mono text-xs">/</kbd> 可快速打开此搜索指南
+              💡 <strong>提示：</strong>点击右上角的 🔍 图标可以随时打开此指南
             </p>
           </div>
         </div>
@@ -193,5 +172,3 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
     </div>
   );
 }
-
-

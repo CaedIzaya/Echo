@@ -184,7 +184,7 @@ function AchievementsSection() {
             {recentAchievements.map((achievement) => (
               <div
                 key={achievement.id}
-                className={`flex-shrink-0 w-32 bg-gradient-to-br ${getAchievementGradient(achievement.category)} rounded-2xl p-4 text-center shadow-lg hover:shadow-xl transition-all transform hover:scale-105`}
+                className={`flex-shrink-0 w-32 bg-gradient-to-br ${getAchievementGradient(achievement.category)} rounded-2xl p-4 text-center shadow-lg hover:shadow-xl transition`}
                 title={achievement.description}
               >
                 <div className="text-4xl mb-2">{achievement.icon}</div>
@@ -1383,14 +1383,14 @@ export default function Dashboard() {
         </svg>
         <div className="absolute text-center">
           <p className="text-4xl font-bold text-zinc-900">{percentage}%</p>
-          <p className="text-xs uppercase tracking-[0.35em] text-zinc-400 mt-1">Today</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-teal-500 font-medium mt-1">Today</p>
         </div>
       </div>
     );
   };
 
   const FlowCard = () => (
-    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white">
+    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs uppercase tracking-[0.4em] text-white/80">心流指数</p>
         <span className="text-2xl">🌀</span>
@@ -1458,8 +1458,6 @@ export default function Dashboard() {
       );
     }
 
-    const confirmingMilestone = confirmMilestoneId ? planMilestones.find(m => m.id === confirmMilestoneId) : null;
-
     return (
       <>
         <div className="flex items-center justify-between mb-4">
@@ -1475,33 +1473,51 @@ export default function Dashboard() {
             <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
           )}
           {planMilestones.map((milestone) => (
-            <button
-              key={milestone.id}
-              onClick={() => handleMilestoneToggle(milestone.id)}
-              disabled={milestone.isCompleted}
-              className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
-                milestone.isCompleted
-                  ? 'bg-emerald-50 border-emerald-200'
-                  : 'bg-white border-zinc-100 hover:border-emerald-200 hover:bg-zinc-50'
-              }`}
-            >
-              <span
-                className={`text-sm font-medium ${
-                  milestone.isCompleted ? 'text-emerald-700 line-through decoration-emerald-300' : 'text-zinc-700'
-                }`}
-              >
-                {milestone.title}
-              </span>
-              <span
-                className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-300 ${
+            <div key={milestone.id} className="space-y-2">
+              <button
+                onClick={() => handleMilestoneToggle(milestone.id)}
+                disabled={milestone.isCompleted}
+                className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
                   milestone.isCompleted
-                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : 'bg-zinc-100 border-zinc-200 text-zinc-400'
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-white border-zinc-100 hover:border-emerald-200 hover:bg-zinc-50'
                 }`}
               >
-                ✓
-              </span>
-            </button>
+                <span
+                  className={`text-sm font-medium ${
+                    milestone.isCompleted ? 'text-emerald-700 line-through decoration-emerald-300' : 'text-zinc-700'
+                  }`}
+                >
+                  {milestone.title}
+                </span>
+                <span
+                  className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-300 ${
+                    milestone.isCompleted
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : 'bg-zinc-100 border-zinc-200 text-zinc-400'
+                  }`}
+                >
+                  ✓
+                </span>
+              </button>
+              {/* 显示完成/取消按钮 */}
+              {confirmMilestoneId === milestone.id && !milestone.isCompleted && (
+                <div className="flex gap-2 px-4">
+                  <button
+                    onClick={confirmMilestoneComplete}
+                    className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-medium transition-all shadow-lg shadow-teal-500/30"
+                  >
+                    完成
+                  </button>
+                  <button
+                    onClick={() => setConfirmMilestoneId(null)}
+                    className="flex-1 px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm font-medium transition-all"
+                  >
+                    取消
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
 
@@ -1529,31 +1545,6 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* 确认完成对话框 */}
-        {confirmingMilestone && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-              <h3 className="text-lg font-semibold text-zinc-900 mb-2">确认完成</h3>
-              <p className="text-sm text-zinc-600 mb-6">
-                确定要将「{confirmingMilestone.title}」标记为已完成吗？
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setConfirmMilestoneId(null)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm font-medium transition-all"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={confirmMilestoneComplete}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-medium transition-all shadow-lg shadow-teal-500/30"
-                >
-                  确认完成
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </>
     );
   };
@@ -1613,10 +1604,10 @@ export default function Dashboard() {
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-10 space-y-10">
         <section className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-8">
           <div className="space-y-6">
-            <div className="bg-white/80 border border-white/60 rounded-3xl p-6 shadow-sm">
+            <div className="bg-white/80 border border-white/60 rounded-3xl p-6 shadow-sm hover:scale-[1.02] transition-all duration-300 cursor-pointer">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="space-y-4">
-                  <p className="text-xs uppercase tracking-[0.4em] text-zinc-400">今日节奏</p>
+                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">今日节奏</p>
                   <h1 className="text-4xl font-semibold tracking-tight text-zinc-900">
                     {progress >= 1 ? '今天的时间，已经被你夺回。' : '准备好专注于真正重要的事了吗？'}
                   </h1>
@@ -1672,7 +1663,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-col gap-6">
-            <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40 order-1 xl:order-2">
+            <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40 order-1 xl:order-2 hover:scale-[1.02] transition-all duration-300 cursor-pointer">
               <div className="flex flex-col xl:flex-row gap-8">
                 <div className="flex flex-col items-center justify-center">
                   <FocusDial size={200} />
@@ -1686,7 +1677,7 @@ export default function Dashboard() {
 
             <div className="order-2 xl:order-1 grid gap-5 xl:grid-cols-4">
               {userLevel && (
-                <div className="bg-gradient-to-br from-[#fff7da] via-[#f3c575] to-[#d88b3b] rounded-[2rem] p-8 md:p-9 text-[#4f2a07] shadow-2xl shadow-amber-200/60 flex flex-col justify-between aspect-square md:aspect-auto hover:scale-[1.02] transition-all duration-300 hover:shadow-amber-300/80">
+                <div className="bg-gradient-to-br from-[#fff7da] via-[#f3c575] to-[#d88b3b] rounded-[2rem] p-8 md:p-9 text-[#4f2a07] shadow-2xl shadow-amber-200/60 flex flex-col justify-between aspect-square md:aspect-auto hover:scale-[1.02] transition-all duration-300 hover:shadow-amber-300/80 cursor-pointer">
                   <div className="flex items-start justify-between">
                     <p className="text-xs uppercase tracking-[0.4em] text-[#4f2a07]/70 font-medium">当前等级</p>
                     <span className="text-3xl animate-pulse">⭐</span>
@@ -1712,7 +1703,7 @@ export default function Dashboard() {
               <div
                 className={`grid grid-cols-1 md:grid-cols-3 gap-5 ${userLevel ? 'xl:col-span-3' : 'xl:col-span-4'}`}
               >
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3">
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer">
                 <div className="flex items-start justify-between">
                   <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">连续专注</p>
                   </div>
@@ -1725,7 +1716,7 @@ export default function Dashboard() {
                   <div className="h-1 w-12 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full"></div>
                 </div>
 
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative">
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
                   <div className="flex items-start justify-between">
                   <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
                     <button
@@ -1754,7 +1745,7 @@ export default function Dashboard() {
                   <p className="text-xs text-zinc-400 text-center">每周一 00:00 自动刷新</p>
                 </div>
 
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative">
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
                   <div className="flex items-start justify-between">
                   <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">累计专注</p>
                     <button
