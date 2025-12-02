@@ -130,21 +130,6 @@ export default function SignIn() {
           </button>
         </form>
 
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-gray-500">或</span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => signIn("github")}
-          className="flex w-full items-center justify-center gap-3 rounded-lg bg-gray-800 px-4 py-3 text-white font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition"
-        >
-          <span>使用 GitHub 登录</span>
-        </button>
       </div>
     </div>
   );

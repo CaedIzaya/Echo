@@ -1,5 +1,4 @@
 import NextAuth from "next-auth";
-import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "~/server/db";
@@ -37,10 +36,6 @@ declare module "next-auth/jwt" {
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db),
   providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
     CredentialsProvider({
       name: "邮箱登录",
       credentials: {
@@ -83,22 +78,10 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    jwt: async ({ token, user, account }) => {
+    jwt: async ({ token, user }) => {
       if (user) {
         token.id = user.id;
         token.hasCompletedOnboarding = user.hasCompletedOnboarding;
-      }
-      
-      // 对于 GitHub 登录，我们需要从数据库获取 onboarding 状态
-      if (account?.provider === "github" && token.email) {
-        const dbUser = await db.user.findUnique({
-          where: { email: token.email },
-          select: { hasCompletedOnboarding: true }
-        });
-        
-        if (dbUser) {
-          token.hasCompletedOnboarding = dbUser.hasCompletedOnboarding;
-        }
       }
       
       return token;

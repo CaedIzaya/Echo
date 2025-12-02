@@ -98,7 +98,7 @@ export default function ForgotPassword() {
                 </svg>
               </div>
             </div>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2 tracking-tight">Echo</h1>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 bg-clip-text text-transparent mb-2 tracking-tight">Echo</h1>
           </div>
 
           <div className="bg-white/70 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl shadow-black/5 border border-white/60 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
@@ -209,6 +209,7 @@ export default function ForgotPassword() {
     </>
   );
 }
+
 
 
 

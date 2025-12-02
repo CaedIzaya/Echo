@@ -87,12 +87,31 @@ export default function SignIn() {
 
   // 检查 URL 参数中的邮箱并填充
   useEffect(() => {
-    const emailFromUrl = router.query.email as string;
-    if (emailFromUrl) {
-      setFormData(prev => ({ ...prev, email: decodeURIComponent(emailFromUrl) }));
-      // 清除 URL 参数，避免刷新后重复填充
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, '', '/auth/signin');
+    const emailParam = router.query.email;
+    if (emailParam) {
+      // 处理 Next.js router.query 可能返回字符串或数组的情况
+      let emailStr: string;
+      if (Array.isArray(emailParam)) {
+        emailStr = emailParam[0] || '';
+      } else if (typeof emailParam === 'string') {
+        emailStr = emailParam;
+      } else {
+        // 如果是对象或其他类型，跳过
+        return;
+      }
+      
+      // 验证是有效的字符串且包含 @ 符号（基本邮箱格式验证）
+      if (emailStr && typeof emailStr === 'string' && emailStr.includes('@')) {
+        try {
+          const decodedEmail = decodeURIComponent(emailStr);
+          setFormData(prev => ({ ...prev, email: decodedEmail }));
+          // 清除 URL 参数，避免刷新后重复填充
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', '/auth/signin');
+          }
+        } catch (error) {
+          console.error('解码邮箱参数失败:', error);
+        }
       }
     }
   }, [router.query.email]);
@@ -249,20 +268,6 @@ export default function SignIn() {
     setIsLoading(false);
   };
 
-  const handleGitHubSignIn = async () => {
-    setIsLoading(true);
-    
-    try {
-      // GitHub 登录直接跳转，由 NextAuth 处理回调
-      await signIn("github", { 
-        callbackUrl: "/onboarding"
-      });
-    } catch (error) {
-      console.error("GitHub 登录出错:", error);
-      alert("GitHub 登录失败，请重试");
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="flex min-h-screen items-center justify-center relative overflow-hidden bg-gradient-to-br from-teal-50/40 via-cyan-50/30 to-blue-50/40 px-4 py-8">
@@ -328,8 +333,9 @@ export default function SignIn() {
               <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2 tracking-tight">Echo</h1>
-          <p className="text-gray-600 text-base font-medium">开启你的专注之旅</p>
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 bg-clip-text text-transparent mb-3 tracking-tight">Echo</h1>
+          <div className="w-16 h-px bg-gray-300 mx-auto mb-3"></div>
+          <p className="text-gray-900 text-base font-medium">开启你的专注之旅</p>
         </div>
 
         <div className="bg-white/70 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl shadow-black/5 border border-white/60 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
@@ -558,27 +564,6 @@ export default function SignIn() {
             </button>
           </form>
 
-          {/* 分隔线 */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200/60" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="bg-white/70 px-3 text-gray-400 text-xs">或</span>
-            </div>
-          </div>
-
-          {/* GitHub 登录 */}
-          <button
-            onClick={handleGitHubSignIn}
-            disabled={isLoading}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm px-4 py-3.5 text-gray-700 font-semibold hover:bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500/20 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.01]"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
-            </svg>
-            <span>使用 GitHub {isLogin ? "登录" : "注册"}</span>
-          </button>
 
           {/* 返回到欢迎页 */}
           <div className="mt-6 text-center">
