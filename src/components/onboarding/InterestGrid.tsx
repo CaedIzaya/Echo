@@ -115,19 +115,17 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
               disabled={isDisabled}
               style={{ 
                 animationDelay: `${index * 0.1}s`,
-              }}
-              className={`
-                bubble-tile group relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border text-center transition-all duration-500 will-change-transform
-                ${isSelected
-                  ? 'bg-white text-slate-900 border-transparent shadow-[0_0_40px_rgba(255,255,255,0.5),inset_0_0_20px_rgba(255,255,255,0.3)] scale-110 z-10'
-                  : 'bg-white/10 text-white/90 border-white/20 hover:border-white/40 hover:bg-white/15 backdrop-blur-sm'}
-                ${isDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
-              `}
-              style={{
                 boxShadow: isSelected 
                   ? '0 0 40px rgba(255,255,255,0.5), inset 0 0 20px rgba(255,255,255,0.3), 0 8px 32px rgba(0,0,0,0.1)'
                   : '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
               }}
+              className={`
+                bubble-tile group relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border text-center transition-all duration-500 will-change-transform
+                ${isSelected
+                  ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
+                  : 'bg-white/10 text-white/90 border-white/20 hover:border-white/40 hover:bg-white/15 backdrop-blur-sm'}
+                ${isDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
+              `}
             >
               {/* 气泡高光效果 */}
               <div className="absolute inset-0 rounded-full opacity-30" style={{
