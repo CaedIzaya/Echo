@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import InterestGrid from '../../components/onboarding/InterestGrid';
 
@@ -23,12 +24,12 @@ const INTERESTS: Interest[] = [
   // 第二行 - 技能成长  
   { id: '5', name: '编程', icon: '💻', color: 'bg-gradient-to-br from-teal-50 to-emerald-100 border-teal-200 text-teal-700' },
   { id: '6', name: '语言', icon: '🗣️', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
-  { id: '7', name: '健身', icon: '💪', color: 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200 text-teal-700' },
+  { id: '7', name: '运动', icon: '🏃', color: 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200 text-teal-700' },
   { id: '8', name: '厨艺', icon: '🍳', color: 'bg-gradient-to-br from-sky-50 to-emerald-100 border-sky-200 text-teal-700' },
   
   // 第三行 - 生活探索
-  { id: '9', name: '手工', icon: '🧵', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
-  { id: '10', name: '学科', icon: '🎓', color: 'bg-gradient-to-br from-teal-50 to-sky-100 border-teal-200 text-teal-700' },
+  { id: '9', name: '社交', icon: '🤝', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
+  { id: '10', name: '自学', icon: '🎓', color: 'bg-gradient-to-br from-teal-50 to-sky-100 border-teal-200 text-teal-700' },
   { id: '11', name: '观影', icon: '🎬', color: 'bg-gradient-to-br from-cyan-50 to-emerald-100 border-cyan-200 text-teal-700' },
   { id: '12', name: '写作', icon: '✍️', color: 'bg-gradient-to-br from-emerald-50 via-white to-cyan-100 border-emerald-200 text-teal-700' }
 ];
@@ -39,7 +40,6 @@ export default function OnboardingPage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
-  // 在 /src/pages/onboarding/index.tsx 中更新
   // 更新状态定义
   const [selectedInterestObjects, setSelectedInterestObjects] = useState<Interest[]>([]);
 
@@ -102,8 +102,6 @@ export default function OnboardingPage() {
         ? selectedInterestObjects 
         : INTERESTS.filter(interest => selectedInterests.includes(interest.id));
       
-      console.log('传递到第二步的兴趣:', interestsToPass);
-      
       // 传递from参数，以便后续页面识别来源
       const queryParams: any = { interests: JSON.stringify(interestsToPass) };
       if (allowReturn) {
@@ -119,65 +117,114 @@ export default function OnboardingPage() {
   };
 
   const handleSkip = () => {
-    // 跳过引导，进入主界面
     router.push('/dashboard');
   };
 
   if (isCheckingSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
-          <p className="mt-4 text-teal-600">正在验证登录状态...</p>
-        </div>
-      </div>
-    );
+    return null; // 极简加载，或者保持空白
   }
 
   if (!isAuthorized) {
     return null;
   }
 
+  // 极简背景气泡
+  const seaBubbles = [
+    { size: 300, top: '-10%', left: '-10%', delay: '0s', duration: '20s' },
+    { size: 400, bottom: '-10%', right: '-10%', delay: '5s', duration: '25s' },
+    { size: 200, top: '40%', left: '50%', delay: '2s', duration: '18s', opacity: 0.1 },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#e0f7ff] to-[#e1ebff] flex items-center justify-center p-4">
-      <div className="bg-white/90 rounded-3xl shadow-2xl shadow-emerald-100/50 border border-white/70 backdrop-blur-xl p-8 w-full max-w-4xl">
-        {/* 头部 */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-teal-900 mb-4">
-            发现你的热爱
-          </h1>
-          <p className="text-teal-700 text-lg max-w-md mx-auto">
-            选择让你心动的领域，我们将帮你开启一段专注的旅程
-          </p>
+    <>
+      <Head>
+        <title>选择兴趣</title>
+      </Head>
+      <div className="relative min-h-screen w-full overflow-hidden text-white flex flex-col items-center justify-center">
+        {/* 动态生机蓝绿渐变背景 */}
+        <div className="absolute inset-0 bg-gradient-animated pointer-events-none" />
+        
+        {/* 动态光晕效果 */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-400/20 rounded-full blur-[120px] animate-pulse-slow" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-400/20 rounded-full blur-[120px] animate-pulse-slow-delayed" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-400/15 rounded-full blur-[140px] animate-pulse-slow-very-delayed" />
         </div>
 
-        {/* 兴趣网格 */}
-        <InterestGrid onSelectionChange={handleInterestsSelected} />
-
-        {/* 底部操作 */}
-        <div className="flex justify-between items-center mt-12">
-          <button
-            onClick={handleSkip}
-            className="text-teal-500 hover:text-teal-600 font-medium transition-colors"
-          >
-            稍后再说
-          </button>
+        {/* 主体内容：极简，只有泡泡和底部按钮 */}
+        <div className="relative z-10 w-full max-w-5xl px-4 flex flex-col items-center h-full justify-center min-h-[80vh]">
           
-          <button
-            onClick={handleContinue}
-            disabled={selectedInterests.length === 0}
-            className={`
-              px-4 py-2 sm:px-8 sm:py-3 text-sm sm:text-base rounded-full font-medium transition-all
-              ${selectedInterests.length > 0
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-200/60 hover:shadow-teal-300/80 hover:-translate-y-0.5'
-                : 'bg-emerald-50 text-emerald-200 cursor-not-allowed'
-              }
-            `}
-          >
-            继续探索 ({selectedInterests.length}/3)
-          </button>
+          {/* 上方文案 */}
+          <div className="mb-8 text-center">
+            <p className="text-lg sm:text-xl font-light tracking-wider text-white/80 animate-fade-in">
+              还记得自己的热爱吗？
+            </p>
+          </div>
+          
+          {/* 中间是散落的泡泡 */}
+          <div className="flex-1 flex items-center w-full">
+             <InterestGrid onSelectionChange={handleInterestsSelected} />
+          </div>
+
+          {/* 底部极简操作栏 */}
+          <div className="mt-8 mb-12 flex items-center gap-8 text-sm font-light tracking-widest">
+            <button 
+              onClick={handleSkip}
+              className="text-white/40 hover:text-white transition-colors uppercase"
+            >
+              稍后再说
+            </button>
+
+            <div className="h-4 w-[1px] bg-white/20"></div>
+
+            <button 
+              onClick={handleContinue}
+              disabled={selectedInterests.length === 0}
+              className={`
+                uppercase transition-all duration-500
+                ${selectedInterests.length > 0 ? 'text-teal-300 hover:text-teal-200 scale-110 font-normal' : 'text-white/20 cursor-not-allowed'}
+              `}
+            >
+              下一步
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+      
+      <style jsx>{`
+        .bg-gradient-animated {
+          background: linear-gradient(135deg, #0a4d3a 0%, #0d7377 25%, #14b8a6 50%, #06b6d4 75%, #0891b2 100%);
+          background-size: 400% 400%;
+          animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes pulseSlow {
+          0%, 100% { opacity: 0.2; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.1); }
+        }
+        .animate-pulse-slow {
+          animation: pulseSlow 8s ease-in-out infinite;
+        }
+        .animate-pulse-slow-delayed {
+          animation: pulseSlow 8s ease-in-out infinite;
+          animation-delay: 2s;
+        }
+        .animate-pulse-slow-very-delayed {
+          animation: pulseSlow 8s ease-in-out infinite;
+          animation-delay: 4s;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 1s ease-out;
+        }
+      `}</style>
+    </>
   );
 }

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
-// 从第一步接收的兴趣数据接口
 interface Interest {
   id: string;
   name: string;
@@ -14,277 +13,232 @@ interface Interest {
 
 export default function FocusSelection() {
   const router = useRouter();
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<Interest[]>([]);
   const [focusedInterest, setFocusedInterest] = useState<Interest | null>(null);
-  const primaryInterest = focusedInterest ?? selectedInterests[0] ?? null;
-  const secondaryInterests = primaryInterest
-    ? selectedInterests.filter((interest) => interest.id !== primaryInterest.id)
-    : selectedInterests;
 
   const { isReady, query } = router;
-
-  // 检查是否允许老用户返回（从plans页面来的）
-  const allowReturn = isReady && (
-    query.from === 'plans' || 
-    query.allowReturn === '1'
-  );
+  const allowReturn = isReady && (query.from === 'plans' || query.allowReturn === '1');
 
   useEffect(() => {
     if (!isReady) return;
-
     const verifySession = async () => {
       try {
         const response = await fetch('/api/auth/session');
         const session = await response.json();
-
         if (!session?.user) {
-          router.replace('/auth/signin');
-          return;
+           router.replace('/auth/signin');
+           return;
         }
-
-        // 如果已完成onboarding且不是从plans页面来的，才跳转
         if (session.user.hasCompletedOnboarding && !allowReturn) {
-          router.replace('/dashboard');
-          return;
+           router.replace('/dashboard');
+           return;
         }
-
         setIsAuthorized(true);
-      } catch (error) {
-        console.error('验证登录状态失败:', error);
+      } catch {
         router.replace('/auth/signin');
-      } finally {
-        setIsCheckingSession(false);
       }
     };
-
     verifySession();
-  }, [router, isReady, allowReturn]);
+  }, [isReady, allowReturn, router]);
 
-  // 在useEffect中添加更健壮的解析逻辑
   useEffect(() => {
-    if (!isAuthorized) {
-      return;
-    }
-
-    if (router.query.interests) {
-      try {
-        const interests = JSON.parse(router.query.interests as string);
-        console.log('第二步接收到的兴趣:', interests);
-        
-        // 确保每个兴趣都有必要的属性
-        const validatedInterests = interests.map((interest: any) => ({
-          id: interest.id || 'unknown',
-          name: interest.name || '未知兴趣',
-          icon: interest.icon || '😊', // 自定义兴趣的默认图标
-          color: interest.color || 'bg-gray-100 border-gray-300 text-gray-700',
-        }));
-        
-        setSelectedInterests(validatedInterests);
-      } catch (error) {
-        console.error('解析兴趣数据失败:', error);
-        router.push('/onboarding');
+    if (!isAuthorized || !router.query.interests) return;
+    try {
+      const interests = JSON.parse(router.query.interests as string);
+      const validated = interests.map((i: any) => ({
+        id: i.id || 'unknown',
+        name: i.name || '未知',
+        icon: i.icon || '●',
+        color: i.color || ''
+      }));
+      setSelectedInterests(validated);
+      
+      // 如果从 goal-setting 返回，恢复之前选择的聚焦兴趣
+      if (router.query.focusedInterestId && validated.length > 0) {
+        const previousFocused = validated.find((i: Interest) => i.id === router.query.focusedInterestId);
+        if (previousFocused) {
+          setFocusedInterest(previousFocused);
+        }
       }
+    } catch {
+      router.push('/onboarding');
     }
   }, [isAuthorized, router.query]);
 
-  useEffect(() => {
-    if (!focusedInterest && selectedInterests.length > 0) {
-      setFocusedInterest(selectedInterests[0]);
-    }
-  }, [focusedInterest, selectedInterests]);
-
-  const handleSelectFocus = (interest: Interest) => {
+  // 默认不选中任何一个，强迫用户做出选择？或者默认第一个？
+  // 极简模式下，让用户点击一个才算选中
+  const handleSelect = (interest: Interest) => {
     setFocusedInterest(interest);
   };
 
-  // 在 /src/pages/onboarding/focus-selection.tsx 中更新导航函数
-  const handleContinue = () => {
-    if (focusedInterest) {
-      console.log('导航到第三步，聚焦兴趣:', focusedInterest);
-      console.log('所有选择的兴趣:', selectedInterests);
-      
-      // 传递from参数，以便后续页面识别来源
-      const queryParams: any = {
+  const handleNext = () => {
+    if (!focusedInterest) return;
+    
+    // 导航到下一步
+    const queryParams: any = {
         interestId: focusedInterest.id,
         interestName: focusedInterest.name,
         interestIcon: focusedInterest.icon,
-        // 传递所有选择的兴趣，用于创建空白计划卡片
         allInterests: JSON.stringify(selectedInterests)
-      };
-      if (allowReturn) {
+    };
+    if (allowReturn) {
         queryParams.from = query.from || 'plans';
         queryParams.allowReturn = '1';
-      }
-      
-      router.push({
+    }
+    router.push({
         pathname: '/onboarding/goal-setting',
         query: queryParams
-      });
-    }
+    });
   };
 
   const handleBack = () => {
-    // 返回第一步并携带当前选择的兴趣和from参数
-    const queryParams: any = { preselected: JSON.stringify(selectedInterests.map(i => i.id)) };
+    // 明确返回到第一步 InterestGrid 页面
+    const queryParams: any = {};
     if (allowReturn) {
       queryParams.from = query.from || 'plans';
       queryParams.allowReturn = '1';
     }
-    
     router.push({
       pathname: '/onboarding',
       query: queryParams
     });
   };
 
-  if (isCheckingSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
-          <p className="mt-4 text-teal-600">正在验证登录状态...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // 如果还没有加载兴趣数据，显示加载状态
-  if (!isAuthorized || selectedInterests.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
-          <p className="mt-4 text-teal-600">加载中...</p>
-        </div>
-      </div>
-    );
-  }
+  if (!isAuthorized) return null;
 
   return (
     <>
       <Head>
-        <title>选择首要兴趣 - 数字静默</title>
+        <title>锁定焦点</title>
       </Head>
-      
-      <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#def7ff] to-[#e3ecff] flex items-center justify-center px-5 sm:px-12 lg:px-20 py-6 sm:py-16">
-        <div className="bg-white/90 rounded-[28px] shadow-[0_35px_85px_-45px_rgba(15,23,42,0.45)] p-6 sm:p-9 w-full max-w-2xl mx-auto border border-white/60 backdrop-blur-xl">
-          {/* 头部 */}
-          <div className="text-center mb-12">
-          <h1 className="text-2xl sm:text-3xl font-bold text-teal-900 mb-4">
-              聚焦你的热爱
-            </h1>
-            <p className="text-teal-700 text-base sm:text-lg max-w-md mx-auto">
-              先选择一个你最想开始的，其他的我们帮你记着
-            </p>
-          </div>
+      <div className="relative min-h-screen w-full overflow-hidden text-white flex flex-col items-center justify-center">
+        {/* 动态生机蓝绿渐变背景 */}
+        <div className="absolute inset-0 bg-gradient-animated pointer-events-none" />
+        
+        {/* 动态光晕效果 */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-teal-400/25 rounded-full blur-[120px] animate-pulse-slow" />
+          <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-cyan-400/25 rounded-full blur-[120px] animate-pulse-slow-delayed" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-400/20 rounded-full blur-[140px] animate-pulse-slow-very-delayed" />
+        </div>
 
-          {/* 悬浮主计划卡片 */}
-          {primaryInterest && (
-            <div className="relative mb-12 px-2">
-              <div className="relative w-full max-w-xl mx-auto">
-                <div className="absolute -inset-4 sm:-inset-5 -z-10 rounded-[32px] bg-gradient-to-r from-emerald-200 via-teal-100 to-sky-200 opacity-60 blur-lg pointer-events-none"></div>
-                <div className="absolute -inset-[2px] -z-[5] rounded-[28px] bg-gradient-to-br from-white via-slate-50 to-slate-100 shadow-[0_30px_70px_-45px_rgba(15,23,42,0.5)] pointer-events-none"></div>
-                <button
-                  onClick={() => handleSelectFocus(primaryInterest)}
-                  className={`
-                    relative w-full flex flex-col sm:flex-row items-start sm:items-center gap-6 
-                    p-7 sm:p-9 rounded-[24px] border-2 border-emerald-300/70 outline outline-1 outline-white/80 bg-white text-left
-                    shadow-[0_28px_90px_-50px_rgba(15,23,42,0.55)] transition-transform duration-300 transform -translate-y-1 hover:-translate-y-3
-                  `}
-                >
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white text-4xl shadow-lg">
-                    {primaryInterest.icon}
-                  </div>
-                  <div className="flex-1">
-                    <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-1 text-sm font-medium text-teal-700 mb-4">
-                      当前首要计划
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-semibold text-teal-900 mb-3">
-                      {primaryInterest.name}
-                    </h2>
-                    <p className="text-teal-700 text-base sm:text-lg leading-relaxed">
-                      这是你目前聚焦的核心方向，我们会围绕它为你定制更深度的目标与引导。
-                    </p>
-                  </div>
-                  <div className="hidden sm:block text-sm font-medium text-teal-600">
-                    点击切换其他计划
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
+        {/* 极简内容区 */}
+        <div className="relative z-10 flex flex-col items-center gap-16 animate-fade-in">
+          
+          {/* 只有一句话 */}
+          <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center px-4">
+            哪一个是你此刻最想开始的？
+          </h2>
 
-          {/* 其他计划卡片 */}
-          {secondaryInterests.length > 0 && (
-            <div className="px-2">
-              <div className="max-w-xl mx-auto grid grid-cols-1 gap-5 mb-12">
-              {secondaryInterests.map((interest) => (
+          {/* 三个大泡泡 */}
+          <div className="flex flex-wrap justify-center gap-8 px-4">
+            {selectedInterests.map((interest, idx) => {
+              const isFocused = focusedInterest?.id === interest.id;
+              return (
                 <button
                   key={interest.id}
-                  onClick={() => handleSelectFocus(interest)}
+                  onClick={() => handleSelect(interest)}
+                  style={{
+                    animationDelay: `${idx * 0.2}s`,
+                    boxShadow: isFocused
+                      ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                      : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                  }}
                   className={`
-                    flex flex-col items-center justify-center p-6 rounded-2xl 
-                    border-2 transition-all duration-300 transform bg-white/98
-                    hover:-translate-y-1.5 hover:shadow-lg hover:border-slate-300 active:scale-95
-                    ${focusedInterest?.id === interest.id 
-                      ? `${interest.color} border-transparent ring-2 ring-offset-2 ring-teal-200 text-teal-800 scale-100`
-                      : 'border-slate-200 text-teal-700/70 shadow-[0_16px_38px_-32px_rgba(15,23,42,0.32)]'
-                    }
+                    bubble-appear relative group flex flex-col items-center justify-center
+                    w-32 h-32 sm:w-40 sm:h-40 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                    ${isFocused 
+                      ? 'bg-white text-slate-900 border-transparent scale-110 z-10' 
+                      : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white'}
                   `}
                 >
-                  <span className="text-3xl mb-3">{interest.icon}</span>
-                  <span className="text-xl sm:text-2xl font-semibold mb-2 text-teal-900">{interest.name}</span>
-                  <span className="text-sm text-teal-600 text-center">
-                    {focusedInterest?.id === interest.id ? '点击回到主计划' : '点击设为主计划'}
+                  {/* 气泡高光效果 */}
+                  {!isFocused && (
+                    <>
+                      <div className="absolute inset-0 rounded-full opacity-30" style={{
+                        background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+                      }} />
+                      <div className="absolute inset-0 rounded-full opacity-15" style={{
+                        background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+                      }} />
+                    </>
+                  )}
+                  <span className="text-5xl sm:text-6xl mb-2 transition-transform duration-500 group-hover:scale-110 relative z-10">{interest.icon}</span>
+                  <span className={`text-sm font-medium tracking-widest transition-opacity duration-300 ${isFocused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {interest.name}
                   </span>
+                  
+                  {isFocused && (
+                    <div className="absolute -bottom-8 text-teal-400 text-xs tracking-[0.2em] uppercase animate-pulse">
+                      Selected
+                    </div>
+                  )}
                 </button>
-              ))}
-              </div>
-            </div>
-          )}
-
-          {/* 底部操作 */}
-          <div className="flex justify-between items-center">
-            <button
-              onClick={handleBack}
-              className="flex items-center text-teal-500 hover:text-teal-600 font-medium transition-colors text-sm sm:text-base"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              返回重新选择
-            </button>
-            
-            <button
-              onClick={handleContinue}
-              disabled={!focusedInterest}
-              className={`
-                px-4 py-2 sm:px-8 sm:py-3 text-sm sm:text-base rounded-full font-medium transition-all flex items-center
-                ${focusedInterest
-                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-200/60 hover:shadow-teal-300/80 hover:-translate-y-0.5'
-                  : 'bg-emerald-50 text-emerald-200 cursor-not-allowed'
-                }
-              `}
-            >
-              继续探索
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+              );
+            })}
           </div>
 
-          {/* 进度指示器 */}
-          <div className="mt-8 flex justify-center">
-            <div className="flex space-x-2">
-              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
-              <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
-              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
-            </div>
+          {/* 极简导航 */}
+          <div className="mt-8 flex items-center gap-12">
+            <button 
+              onClick={handleBack}
+              className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:border-white/40 transition-all"
+            >
+              ←
+            </button>
+
+            <button 
+              onClick={handleNext}
+              disabled={!focusedInterest}
+              className={`
+                px-8 py-3 rounded-full text-sm tracking-[0.2em] uppercase transition-all duration-500
+                ${focusedInterest 
+                  ? 'bg-white text-slate-900 hover:scale-105 shadow-lg shadow-white/10' 
+                  : 'bg-white/5 text-white/20 cursor-not-allowed'}
+              `}
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .bg-gradient-animated {
+          background: linear-gradient(135deg, #0a4d3a 0%, #0d7377 25%, #14b8a6 50%, #06b6d4 75%, #0891b2 100%);
+          background-size: 400% 400%;
+          animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes pulseSlow {
+          0%, 100% { opacity: 0.2; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.1); }
+        }
+        .animate-pulse-slow {
+          animation: pulseSlow 8s ease-in-out infinite;
+        }
+        .animate-pulse-slow-delayed {
+          animation: pulseSlow 8s ease-in-out infinite;
+          animation-delay: 2s;
+        }
+        .animate-pulse-slow-very-delayed {
+          animation: pulseSlow 8s ease-in-out infinite;
+          animation-delay: 4s;
+        }
+        @keyframes appear {
+          from { opacity: 0; transform: translateY(20px) scale(0.9); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .bubble-appear {
+          animation: appear 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+          opacity: 0; 
+        }
+      `}</style>
     </>
   );
 }

@@ -325,19 +325,51 @@ export default function GoalSetting() {
       return;
     }
     
-    // 如果是从plans页面来的（创建新计划），返回到focus-selection页面
-    // 否则使用浏览器返回
-    if (allowReturn && focusedInterest) {
+    // 返回到 focus-selection 页面，确保传递所有三个选择的兴趣
+    // 优先使用 allSelectedInterests（从路由参数解析的）
+    // 如果 allSelectedInterests 为空，尝试从路由参数重新解析
+    let interestsToPass = allSelectedInterests;
+    
+    if (interestsToPass.length === 0 && router.query.allInterests) {
+      try {
+        interestsToPass = JSON.parse(router.query.allInterests as string);
+      } catch (e) {
+        console.warn('重新解析 allInterests 失败:', e);
+      }
+    }
+    
+    // 如果还是没有，至少使用当前聚焦的兴趣
+    if (interestsToPass.length === 0 && focusedInterest) {
+      interestsToPass = [focusedInterest];
+    }
+    
+    if (interestsToPass.length > 0) {
+      const queryParams: any = {
+        interests: JSON.stringify(interestsToPass),
+        // 如果之前有选择聚焦的兴趣，也传递过去以便恢复选中状态
+        focusedInterestId: focusedInterest?.id || ''
+      };
+      
+      if (allowReturn) {
+        queryParams.from = query.from as string || 'plans';
+        queryParams.allowReturn = '1';
+      }
+      
       router.push({
         pathname: '/onboarding/focus-selection',
-        query: {
-          interests: JSON.stringify([focusedInterest]),
-          from: query.from as string || 'plans',
-          allowReturn: '1'
-        }
+        query: queryParams
       });
     } else {
-      router.back();
+      // 如果没有兴趣数据，返回到第一步
+      const backParams: any = {};
+      if (allowReturn) {
+        backParams.from = query.from as string || 'plans';
+        backParams.allowReturn = '1';
+      }
+      router.push({
+        pathname: '/onboarding',
+        query: backParams
+      });
     }
   };
 

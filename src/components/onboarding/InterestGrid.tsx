@@ -24,12 +24,12 @@ const INTERESTS: Interest[] = [
   // 第二行 - 技能成长  
   { id: '5', name: '编程', icon: '💻', color: 'bg-gradient-to-br from-teal-50 to-emerald-100 border-teal-200 text-teal-700' },
   { id: '6', name: '语言', icon: '🗣️', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
-  { id: '7', name: '健身', icon: '💪', color: 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200 text-teal-700' },
+  { id: '7', name: '运动', icon: '🏃', color: 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200 text-teal-700' },
   { id: '8', name: '厨艺', icon: '🍳', color: 'bg-gradient-to-br from-sky-50 to-emerald-100 border-sky-200 text-teal-700' },
   
   // 第三行 - 生活探索
-  { id: '9', name: '手工', icon: '🧵', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
-  { id: '10', name: '学科', icon: '🎓', color: 'bg-gradient-to-br from-teal-50 to-sky-100 border-teal-200 text-teal-700' },
+  { id: '9', name: '社交', icon: '🤝', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
+  { id: '10', name: '自学', icon: '🎓', color: 'bg-gradient-to-br from-teal-50 to-sky-100 border-teal-200 text-teal-700' },
   { id: '11', name: '观影', icon: '🎬', color: 'bg-gradient-to-br from-cyan-50 to-emerald-100 border-cyan-200 text-teal-700' },
   { id: '12', name: '写作', icon: '✍️', color: 'bg-gradient-to-br from-emerald-50 via-white to-cyan-100 border-emerald-200 text-teal-700' }
 ];
@@ -45,6 +45,7 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInterest, setCustomInterest] = useState('');
+  const [selectedInterestObjects, setSelectedInterestObjects] = useState<Interest[]>([]);
   const maxSelection = 3;
 
   // 在 InterestGrid.tsx 中更新自定义兴趣处理逻辑
@@ -75,127 +76,140 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
     }
   };
 
-// 添加状态来存储完整的兴趣对象
-const [selectedInterestObjects, setSelectedInterestObjects] = useState<Interest[]>([]);
-
-// 更新处理函数
-const handleInterestClick = (interest: Interest) => {
-  let newSelection: string[];
-  let newObjects: Interest[];
-  
-  if (selectedInterests.includes(interest.id)) {
-    // 取消选择
-    newSelection = selectedInterests.filter(id => id !== interest.id);
-    newObjects = selectedInterestObjects.filter(obj => obj.id !== interest.id);
-  } else {
-    // 选择（不超过最大数量）
-    if (selectedInterests.length >= maxSelection) return;
-    newSelection = [...selectedInterests, interest.id];
-    newObjects = [...selectedInterestObjects, interest];
-  }
-  
-  setSelectedInterests(newSelection);
-  setSelectedInterestObjects(newObjects);
-  
-  // 传递ID数组和完整对象数组
-  if (typeof onSelectionChange === 'function') {
-    onSelectionChange(newSelection, newObjects);
-  }
-};
+  // 更新处理函数
+  const handleInterestClick = (interest: Interest) => {
+    let newSelection: string[];
+    let newObjects: Interest[];
+    
+    if (selectedInterests.includes(interest.id)) {
+      // 取消选择
+      newSelection = selectedInterests.filter(id => id !== interest.id);
+      newObjects = selectedInterestObjects.filter(obj => obj.id !== interest.id);
+    } else {
+      // 选择（不超过最大数量）
+      if (selectedInterests.length >= maxSelection) return;
+      newSelection = [...selectedInterests, interest.id];
+      newObjects = [...selectedInterestObjects, interest];
+    }
+    
+    setSelectedInterests(newSelection);
+    setSelectedInterestObjects(newObjects);
+    
+    // 传递ID数组和完整对象数组
+    if (typeof onSelectionChange === 'function') {
+      onSelectionChange(newSelection, newObjects);
+    }
+  };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      {/* 选择提示 */}
-      <div className="text-center mb-8">
-        <p className="text-teal-700 text-base sm:text-lg font-medium">
-          选择你感兴趣的领域（最多3个）
-          {selectedInterests.length > 0 && (
-            <span className="text-teal-500 font-semibold ml-2">
-              {selectedInterests.length}/{maxSelection}
-            </span>
-          )}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2 sm:gap-4">
-  {INTERESTS.map((interest) => {
-    const isSelected = selectedInterests.includes(interest.id);
-    const isDisabled = !isSelected && selectedInterests.length >= maxSelection;
-    
-    return (
-      <button
-        key={interest.id}
-        onClick={() => handleInterestClick(interest)}
-        disabled={isDisabled}
-        className={`
-          flex flex-col items-center justify-center 
-          p-3 sm:p-4 rounded-2xl
-          border-2 transition-all duration-300 transform
-          hover:scale-105 active:scale-95
-          aspect-square
-          ${isSelected 
-            ? `${interest.color} border-transparent ring-2 ring-white/70 scale-105 shadow-[0_15px_45px_-20px_rgba(13,148,136,0.8)]` 
-            : isDisabled
-            ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
-            : 'bg-white/80 border-emerald-50 text-teal-700 hover:border-teal-200 hover:shadow-md'
-          }
-        `}
-      >
-        {/* 增大图标尺寸 */}
-        <span className="text-3xl sm:text-4xl mb-2 sm:mb-3">{interest.icon}</span>
-        
-        {/* 增大文字尺寸并确保单行显示 */}
-        <span className="text-base sm:text-lg font-semibold leading-tight text-center text-teal-800">
-          {interest.name}
-        </span>
-        
-        {/* 选中状态指示器 - 稍微增大 */}
-        {isSelected && (
-          <div className="mt-2 sm:mt-3 w-2.5 h-2.5 bg-white/80 rounded-full border border-white/70"></div>
-        )}
-      </button>
-    );
-  })}
-</div>
-
-      {/* 自定义兴趣输入 */}
-      {showCustomInput ? (
-        <div className="mt-4 p-4 bg-emerald-50/70 rounded-lg border border-emerald-100">
-          <input
-            type="text"
-            value={customInterest}
-            onChange={(e) => setCustomInterest(e.target.value)}
-            placeholder="输入你的自定义兴趣..."
-            className="w-full px-3 py-2 border border-emerald-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-            autoFocus
-          />
-          <div className="flex justify-end space-x-2 mt-2">
+    <div className="relative w-full max-w-5xl mx-auto py-10">
+      <div className="grid grid-cols-6 gap-4 sm:gap-6 md:gap-8 px-4 justify-items-center">
+        {INTERESTS.map((interest, index) => {
+          const isSelected = selectedInterests.includes(interest.id);
+          const isDisabled = !isSelected && selectedInterests.length >= maxSelection;
+          
+          return (
             <button
-              onClick={() => setShowCustomInput(false)}
-              className="px-3 py-1 text-teal-500 hover:text-teal-600"
+              key={interest.id}
+              onClick={() => handleInterestClick(interest)}
+              disabled={isDisabled}
+              style={{ 
+                animationDelay: `${index * 0.1}s`,
+              }}
+              className={`
+                bubble-tile group relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border text-center transition-all duration-500 will-change-transform
+                ${isSelected
+                  ? 'bg-white text-slate-900 border-transparent shadow-[0_0_40px_rgba(255,255,255,0.5),inset_0_0_20px_rgba(255,255,255,0.3)] scale-110 z-10'
+                  : 'bg-white/10 text-white/90 border-white/20 hover:border-white/40 hover:bg-white/15 backdrop-blur-sm'}
+                ${isDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
+              `}
+              style={{
+                boxShadow: isSelected 
+                  ? '0 0 40px rgba(255,255,255,0.5), inset 0 0 20px rgba(255,255,255,0.3), 0 8px 32px rgba(0,0,0,0.1)'
+                  : '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
+              }}
             >
-              取消
+              {/* 气泡高光效果 */}
+              <div className="absolute inset-0 rounded-full opacity-30" style={{
+                background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+              }} />
+              
+              {/* 气泡底部反光 */}
+              <div className="absolute inset-0 rounded-full opacity-20" style={{
+                background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+              }} />
+              
+              <div className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 bg-gradient-to-tr from-teal-500/20 via-cyan-500/10 to-sky-500/10 rounded-full" />
+              <div className="relative flex flex-col items-center gap-1 z-10">
+                <span className="text-3xl sm:text-4xl filter drop-shadow-lg">{interest.icon}</span>
+                <span className="text-sm font-medium tracking-wide drop-shadow-md mt-1">{interest.name}</span>
+              </div>
+              {isSelected && (
+                <span className="absolute -right-1 -top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-teal-600 text-xs font-bold shadow-lg">
+                  ✓
+                </span>
+              )}
             </button>
-            <button
-              onClick={handleAddCustomInterest}
-              disabled={!customInterest.trim()}
-              className="px-3 py-1 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded disabled:opacity-40"
-            >
-              添加
-            </button>
+          );
+        })}
+
+        {/* 自定义兴趣泡泡 */}
+        {showCustomInput ? (
+          <div className="relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md p-2 animate-fade-in">
+            <input
+              type="text"
+              value={customInterest}
+              onChange={(e) => setCustomInterest(e.target.value)}
+              placeholder="输入..."
+              className="w-full bg-transparent text-center text-white text-sm placeholder-white/30 focus:outline-none mb-2"
+              autoFocus
+              maxLength={6}
+            />
+            <div className="flex gap-1">
+              <button onClick={() => setShowCustomInput(false)} className="text-xs text-white/50 hover:text-white">✕</button>
+              <button 
+                onClick={handleAddCustomInterest}
+                disabled={!customInterest.trim()} 
+                className="text-xs text-teal-300 hover:text-teal-200 font-bold"
+              >
+                ✓
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="mt-8 text-center">
+        ) : (
           <button 
             onClick={() => setShowCustomInput(true)}
             disabled={selectedInterests.length >= maxSelection}
-            className="text-teal-500 hover:text-teal-600 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`
+              bubble-tile relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border border-dashed border-white/30 
+              bg-white/5 text-white/60 transition-all hover:border-white/50 hover:text-white/90 hover:bg-white/10 backdrop-blur-sm
+              ${selectedInterests.length >= maxSelection ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
+            `}
+            style={{
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
+            }}
           >
-            + 添加自定义兴趣
+            {/* 气泡高光效果 */}
+            <div className="absolute inset-0 rounded-full opacity-20" style={{
+              background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), transparent 60%)'
+            }} />
+            <span className="text-2xl mb-1">+</span>
+            <span className="text-xs">自定义</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
+
+      <style jsx>{`
+        .bubble-tile {
+          animation: bubbleFloat 6s ease-in-out infinite;
+          transform-origin: center center;
+        }
+        @keyframes bubbleFloat {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+          100% { transform: translateY(0px); }
+        }
+      `}</style>
     </div>
   );
 }
