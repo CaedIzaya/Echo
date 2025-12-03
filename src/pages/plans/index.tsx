@@ -5,6 +5,7 @@ import PlanCard from './PlanCard';
 import PlanManagement from './PlanManagement';
 import CompletionDialog from './CompletionDialog';
 import AddMilestoneModal from './AddMilestoneModal';
+import EditPlanModal from './EditPlanModal';
 import BottomNavigation from '../dashboard/BottomNavigation';
 
 interface Project {
@@ -39,6 +40,8 @@ export default function PlansPage() {
   const [completionPlan, setCompletionPlan] = useState<Project | null>(null);
   const [showAddMilestone, setShowAddMilestone] = useState(false);
   const [milestoneTargetPlanId, setMilestoneTargetPlanId] = useState<string | null>(null);
+  const [showEditPlanModal, setShowEditPlanModal] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Project | null>(null);
 
   // 从localStorage加载计划数据
   const [plans, setPlans] = useState<Project[]>(() => {
@@ -225,30 +228,34 @@ export default function PlansPage() {
     setShowAddMilestone(true);
   };
 
-  // 编辑计划 - 跳转到表单填写页面
+  // 编辑计划 - 打开弹窗
   const handleEditPlan = (planId: string) => {
     const plan = plans.find(p => p.id === planId);
     if (!plan) return;
+    setEditingPlan(plan);
+    setShowEditPlanModal(true);
+  };
 
-    // 构建兴趣对象
-    const interest = {
-      id: planId,
-      name: plan.focusBranch || plan.name,
-      icon: plan.icon
-    };
-
-    // 跳转到goal-setting页面，传递计划信息用于编辑
-    router.push({
-      pathname: '/onboarding/goal-setting',
-      query: {
-        interestId: interest.id,
-        interestName: interest.name,
-        interestIcon: interest.icon,
-        editPlanId: planId, // 标记为编辑模式
-        from: 'plans',
-        allowReturn: '1'
+  // 保存编辑的计划
+  const handleSavePlan = (planId: string, updates: { name: string; focusBranch: string; dailyGoalMinutes: number }) => {
+    const updatedPlans = plans.map(plan => {
+      if (plan.id === planId) {
+        return {
+          ...plan,
+          name: updates.name,
+          focusBranch: updates.focusBranch,
+          dailyGoalMinutes: updates.dailyGoalMinutes,
+        };
       }
+      return plan;
     });
+    
+    setPlans(updatedPlans);
+    
+    // 保存到localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+    }
   };
 
   // 添加小目标
@@ -448,6 +455,17 @@ export default function PlansPage() {
           setMilestoneTargetPlanId(null);
         }}
         onSave={handleAddMilestone}
+      />
+
+      {/* 编辑计划弹窗 */}
+      <EditPlanModal
+        plan={editingPlan}
+        isOpen={showEditPlanModal}
+        onClose={() => {
+          setShowEditPlanModal(false);
+          setEditingPlan(null);
+        }}
+        onSave={handleSavePlan}
       />
 
       <BottomNavigation active="plans" />

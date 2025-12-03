@@ -48,6 +48,7 @@ export default function GoalSetting() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editPlanId, setEditPlanId] = useState<string | null>(null);
   const [selectedBranchFromBubble, setSelectedBranchFromBubble] = useState(false); // 跟踪是否从泡泡选择
+  const [customTimeInput, setCustomTimeInput] = useState(''); // 自定义时间输入
 
   const { isReady, query } = router;
   const allowReturn = isReady && (query.from === 'plans' || query.allowReturn === '1');
@@ -600,48 +601,82 @@ export default function GoalSetting() {
 
   // 渲染时间选择页面
   const renderTime = () => {
+    // 检查是否选择了预设时间
+    const isPresetSelected = TIME_OPTIONS.includes(formData.dailyMinTime);
+    
     return (
-      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
+      <div className="relative w-full max-w-5xl mx-auto flex flex-col items-center">
         <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
-          选择每日最小专注时长
+          你每天愿意投入多少时间？
         </h2>
 
-        <div className="flex flex-wrap justify-center gap-6 md:gap-8">
-          {TIME_OPTIONS.map((time, idx) => {
-            const isSelected = formData.dailyMinTime === time;
-            return (
-              <button
-                key={time}
-                onClick={() => handleInputChange('dailyMinTime', time)}
-                style={{
-                  animationDelay: `${idx * 0.1}s`,
-                  boxShadow: isSelected
-                    ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
-                    : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+        <div className="flex flex-col items-center gap-8 w-full">
+          {/* 预设时间选项泡泡 */}
+          <div className="flex flex-wrap justify-center gap-6 md:gap-8">
+            {TIME_OPTIONS.map((time, idx) => {
+              const isSelected = formData.dailyMinTime === time && isPresetSelected;
+              return (
+                <button
+                  key={time}
+                  onClick={() => {
+                    handleInputChange('dailyMinTime', time);
+                    setCustomTimeInput(''); // 清除自定义输入
+                  }}
+                  style={{
+                    animationDelay: `${idx * 0.1}s`,
+                    boxShadow: isSelected
+                      ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                      : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                  }}
+                  className={`
+                    bubble-time relative group flex flex-col items-center justify-center
+                    w-24 h-24 md:w-32 md:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                    ${isSelected
+                      ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
+                      : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white'}
+                  `}
+                >
+                  {!isSelected && (
+                    <>
+                      <div className="absolute inset-0 rounded-full opacity-30" style={{
+                        background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+                      }} />
+                      <div className="absolute inset-0 rounded-full opacity-15" style={{
+                        background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+                      }} />
+                    </>
+                  )}
+                  <span className="text-2xl md:text-3xl font-semibold relative z-10">{time}</span>
+                  <span className="text-xs md:text-sm relative z-10 mt-1">分钟</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 自定义输入框 */}
+          <div className="w-full max-w-md mt-4">
+            <div className="relative">
+              <input
+                type="number"
+                min="1"
+                max="480"
+                value={isPresetSelected ? '' : (customTimeInput || formData.dailyMinTime.toString())}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setCustomTimeInput(value);
+                  const numValue = parseInt(value, 10);
+                  if (!isNaN(numValue) && numValue > 0 && numValue <= 480) {
+                    handleInputChange('dailyMinTime', numValue);
+                  } else if (value === '') {
+                    handleInputChange('dailyMinTime', 0);
+                  }
                 }}
-                className={`
-                  bubble-time relative group flex flex-col items-center justify-center
-                  w-24 h-24 md:w-32 md:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
-                  ${isSelected
-                    ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
-                    : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white'}
-                `}
-              >
-                {!isSelected && (
-                  <>
-                    <div className="absolute inset-0 rounded-full opacity-30" style={{
-                      background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
-                    }} />
-                    <div className="absolute inset-0 rounded-full opacity-15" style={{
-                      background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
-                    }} />
-                  </>
-                )}
-                <span className="text-2xl md:text-3xl font-semibold relative z-10">{time}</span>
-                <span className="text-xs md:text-sm relative z-10 mt-1">分钟</span>
-              </button>
-            );
-          })}
+                placeholder="或输入自定义分钟数"
+                className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl md:text-2xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
+              />
+              <span className="absolute right-0 top-1/2 -translate-y-1/2 text-white/50 text-sm">分钟</span>
+            </div>
+          </div>
         </div>
       </div>
     );

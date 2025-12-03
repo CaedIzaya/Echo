@@ -394,6 +394,7 @@ export default function Dashboard() {
   const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
   const [confirmMilestoneId, setConfirmMilestoneId] = useState<string | null>(null);
+  const [completingMilestoneId, setCompletingMilestoneId] = useState<string | null>(null); // 正在完成的小目标ID（用于动画）
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
   const [showTotalInfo, setShowTotalInfo] = useState(false);
 
@@ -415,6 +416,40 @@ export default function Dashboard() {
     });
   };
 
+  // 播放完成音效 - 叮咚音效
+  const playCompletionSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // 生成叮咚音效（两个音符：D5和A5，形成和谐的"叮咚"声）
+      const frequencies = [587.33, 880.00]; // D5和A5音符
+      
+      frequencies.forEach((freq, index) => {
+        setTimeout(() => {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = freq;
+          oscillator.type = 'sine'; // 使用正弦波，声音更柔和
+          
+          // 音量包络：快速上升，然后缓慢衰减
+          gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0.4, audioContext.currentTime + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.4);
+        }, index * 150); // 两个音符间隔150ms
+      });
+    } catch (error) {
+      // 如果Web Audio API不可用，忽略错误
+      console.log('Web Audio API not available');
+    }
+  };
+
   // 切换小目标状态 - 先显示确认对话框
   const handleMilestoneToggle = (milestoneId: string) => {
     const milestone = primaryPlan?.milestones.find(m => m.id === milestoneId);
@@ -427,55 +462,73 @@ export default function Dashboard() {
   const confirmMilestoneComplete = () => {
     if (!confirmMilestoneId) return;
     
-    setPrimaryPlan(prev => {
-      if (!prev) return prev;
-      
-      const updatedMilestones = prev.milestones.map(m =>
-        m.id === confirmMilestoneId ? { ...m, isCompleted: true } : m
-      );
-
-      const updatedPlan = {
-        ...prev,
-        milestones: updatedMilestones
-      };
-
-      // 同步到localStorage
-      if (typeof window !== 'undefined') {
-        const savedPlans = localStorage.getItem('userPlans');
-        const plans = savedPlans ? JSON.parse(savedPlans) : [];
-        const updatedPlans = plans.map((p: Project) => 
-          p.id === updatedPlan.id ? updatedPlan : p
+    // 播放完成音效
+    playCompletionSound();
+    
+    // 设置正在完成状态，显示划掉动画
+    setCompletingMilestoneId(confirmMilestoneId);
+    
+    // 延迟执行完成逻辑，让动画先播放
+    setTimeout(() => {
+      setPrimaryPlan(prev => {
+        if (!prev) return prev;
+        
+        const updatedMilestones = prev.milestones.map(m =>
+          m.id === confirmMilestoneId ? { ...m, isCompleted: true } : m
         );
-        localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
-      }
 
-      // 小目标完成获得经验值
-      if (typeof window !== 'undefined') {
-        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-        const milestoneExp = LevelManager.calculateMilestoneExp(); // 5 EXP
-        const newExp = currentExp + milestoneExp;
-        localStorage.setItem('userExp', newExp.toString());
-        
-        const oldLevel = LevelManager.calculateLevel(currentExp);
-        const newLevel = LevelManager.calculateLevel(newExp);
-        setUserLevel(newLevel);
-        
-        if (newLevel.currentLevel > oldLevel.currentLevel) {
-          console.log('🎉 等级提升！（完成小目标触发）', newLevel);
+        const updatedPlan = {
+          ...prev,
+          milestones: updatedMilestones
+        };
+
+        // 同步到localStorage
+        if (typeof window !== 'undefined') {
+          const savedPlans = localStorage.getItem('userPlans');
+          const plans = savedPlans ? JSON.parse(savedPlans) : [];
+          const updatedPlans = plans.map((p: Project) => 
+            p.id === updatedPlan.id ? updatedPlan : p
+          );
+          localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
         }
-      }
 
-      return updatedPlan;
-    });
+        // 小目标完成获得经验值
+        if (typeof window !== 'undefined') {
+          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+          const milestoneExp = LevelManager.calculateMilestoneExp(); // 5 EXP
+          const newExp = currentExp + milestoneExp;
+          localStorage.setItem('userExp', newExp.toString());
+          
+          const oldLevel = LevelManager.calculateLevel(currentExp);
+          const newLevel = LevelManager.calculateLevel(newExp);
+          setUserLevel(newLevel);
+          
+          if (newLevel.currentLevel > oldLevel.currentLevel) {
+            console.log('🎉 等级提升！（完成小目标触发）', newLevel);
+          }
+        }
 
-    // 更新完成的小目标计数（触发成就检查）
-    incrementCompletedGoals(1);
+        return updatedPlan;
+      });
 
-    setConfirmMilestoneId(null);
+      // 更新完成的小目标计数（触发成就检查）
+      incrementCompletedGoals(1);
+
+      // 清除状态
+      setConfirmMilestoneId(null);
+      setTimeout(() => {
+        setCompletingMilestoneId(null);
+      }, 300); // 等待淡出动画完成
+    }, 500); // 显示划掉动画的时间
   };
 
   // 批量完成多个小目标
   const handleBulkMilestoneToggle = (milestoneIds: string[]) => {
+    // 播放完成音效（批量完成时播放一次）
+    if (milestoneIds.length > 0) {
+      playCompletionSound();
+    }
+    
     setPrimaryPlan(prev => {
       if (!prev) return prev;
       
@@ -1330,6 +1383,7 @@ export default function Dashboard() {
   const effectiveSpiritState = 'idle';
 
   const planMilestones = primaryPlan?.milestones ?? [];
+  const activeMilestones = planMilestones.filter((milestone) => !milestone.isCompleted); // 只显示未完成的小目标
   const completedMilestones = planMilestones.filter((milestone) => milestone.isCompleted).length;
   const planProgressPercent = planMilestones.length > 0 ? Math.round((completedMilestones / planMilestones.length) * 100) : 0;
   const totalFocusHours = Math.floor(totalFocusMinutes / 60);
@@ -1469,56 +1523,65 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-3">
-          {planMilestones.length === 0 && (
+          {activeMilestones.length === 0 && planMilestones.length === 0 && (
             <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
           )}
-          {planMilestones.map((milestone) => (
-            <div key={milestone.id} className="space-y-2">
-              <button
-                onClick={() => handleMilestoneToggle(milestone.id)}
-                disabled={milestone.isCompleted}
-                className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
-                  milestone.isCompleted
-                    ? 'bg-emerald-50 border-emerald-200'
-                    : 'bg-white border-zinc-100 hover:border-emerald-200 hover:bg-zinc-50'
+          {activeMilestones.length === 0 && planMilestones.length > 0 && (
+            <p className="text-sm text-emerald-600 font-medium">🎉 所有小目标已完成！</p>
+          )}
+          {activeMilestones.map((milestone) => {
+            const isCompleting = completingMilestoneId === milestone.id;
+            return (
+              <div 
+                key={milestone.id} 
+                className={`space-y-2 transition-all duration-500 ${
+                  isCompleting ? 'opacity-0 transform scale-95' : 'opacity-100'
                 }`}
               >
-                <span
-                  className={`text-sm font-medium ${
-                    milestone.isCompleted ? 'text-emerald-700 line-through decoration-emerald-300' : 'text-zinc-700'
+                <button
+                  onClick={() => handleMilestoneToggle(milestone.id)}
+                  disabled={isCompleting}
+                  className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
+                    isCompleting
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-white border-zinc-100 hover:border-emerald-200 hover:bg-zinc-50'
                   }`}
                 >
-                  {milestone.title}
-                </span>
-                <span
-                  className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-300 ${
-                    milestone.isCompleted
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                  <span className={`text-sm font-medium transition-all duration-300 ${
+                    isCompleting 
+                      ? 'text-emerald-700 line-through decoration-emerald-500 decoration-2' 
+                      : 'text-zinc-700'
+                  }`}>
+                    {milestone.title}
+                  </span>
+                  <span className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-300 ${
+                    isCompleting
+                      ? 'bg-emerald-500 border-emerald-500 text-white scale-110'
                       : 'bg-zinc-100 border-zinc-200 text-zinc-400'
-                  }`}
-                >
-                  ✓
-                </span>
-              </button>
-              {/* 显示完成/取消按钮 */}
-              {confirmMilestoneId === milestone.id && !milestone.isCompleted && (
-                <div className="flex gap-2 px-4">
-                  <button
-                    onClick={confirmMilestoneComplete}
-                    className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-medium transition-all shadow-lg shadow-teal-500/30"
-                  >
-                    完成
-                  </button>
-                  <button
-                    onClick={() => setConfirmMilestoneId(null)}
-                    className="flex-1 px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm font-medium transition-all"
-                  >
-                    取消
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+                  }`}>
+                    ✓
+                  </span>
+                </button>
+                {/* 显示完成/取消按钮 */}
+                {confirmMilestoneId === milestone.id && !isCompleting && (
+                  <div className="flex gap-2 px-4 animate-fade-in">
+                    <button
+                      onClick={confirmMilestoneComplete}
+                      className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-medium transition-all shadow-lg shadow-teal-500/30"
+                    >
+                      完成
+                    </button>
+                    <button
+                      onClick={() => setConfirmMilestoneId(null)}
+                      className="flex-1 px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm font-medium transition-all"
+                    >
+                      取消
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {planMilestones.length > 0 && (
