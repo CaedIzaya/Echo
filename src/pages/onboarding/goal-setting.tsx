@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -8,570 +10,784 @@ interface Interest {
   icon: string;
 }
 
+enum FormStep {
+  Branch = 'BRANCH',
+  Milestone = 'MILESTONE',
+  Name = 'NAME',
+  Time = 'TIME',
+  Date = 'DATE',
+}
+
+// 分支建议（暂时为空，后续会从数据库获取）
+// 即使为空，也会显示5个空泡泡
+const BRANCH_SUGGESTIONS: string[] = [];
+
+// 里程碑提示（中文）
+const MILESTONE_HINTS = [
+  { label: '小步骤', delay: '0s' },
+  { label: '可执行', delay: '1s' },
+  { label: '积极正面', delay: '2s' },
+];
+
+// 时间选项
+const TIME_OPTIONS = [15, 30, 45, 60];
+
 export default function GoalSetting() {
   const router = useRouter();
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [focusedInterest, setFocusedInterest] = useState<Interest | null>(null);
+  const [allSelectedInterests, setAllSelectedInterests] = useState<Interest[]>([]);
+  const [currentStep, setCurrentStep] = useState<FormStep>(FormStep.Branch);
   const [formData, setFormData] = useState({
-    projectName: '',
     focusBranch: '',
     firstMilestone: '',
+    projectName: '',
     dailyMinTime: 30,
     targetDate: '' as string | null,
   });
-  const [allSelectedInterests, setAllSelectedInterests] = useState<Interest[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editPlanId, setEditPlanId] = useState<string | null>(null);
+  const [selectedBranchFromBubble, setSelectedBranchFromBubble] = useState(false); // 跟踪是否从泡泡选择
 
   const { isReady, query } = router;
-
-  // 检查是否允许老用户返回（从plans页面来的）
-  const allowReturn = isReady && (
-    query.from === 'plans' || 
-    query.allowReturn === '1'
-  );
+  const allowReturn = isReady && (query.from === 'plans' || query.allowReturn === '1');
 
   useEffect(() => {
     if (!isReady) return;
-
     const verifySession = async () => {
       try {
         const response = await fetch('/api/auth/session');
         const session = await response.json();
-
         if (!session?.user) {
           router.replace('/auth/signin');
           return;
         }
-
-        // 如果已完成onboarding且不是从plans页面来的，才跳转
         if (session.user.hasCompletedOnboarding && !allowReturn) {
           router.replace('/dashboard');
           return;
         }
-
         setIsAuthorized(true);
-      } catch (error) {
-        console.error('验证登录状态失败:', error);
+      } catch {
         router.replace('/auth/signin');
-      } finally {
-        setIsCheckingSession(false);
       }
     };
-
     verifySession();
-  }, [router, isReady, allowReturn]);
+  }, [isReady, allowReturn, router]);
 
-  // 从路由参数获取聚焦的兴趣
-  // 在 /src/pages/onboarding/goal-setting.tsx 中更新参数接收
   useEffect(() => {
-    if (!isAuthorized) {
-      return;
-    }
-
-    if (router.query.interestId) {
-      try {
-        // 从查询参数重建兴趣对象
-        const interest = {
-          id: router.query.interestId as string,
-          name: router.query.interestName as string,
-          icon: router.query.interestIcon as string,
-        };
-        
-        setFocusedInterest(interest);
-        // 自动生成项目名称
+    if (!isAuthorized || !router.query.interestId) return;
+    try {
+      const interest = {
+        id: router.query.interestId as string,
+        name: router.query.interestName as string,
+        icon: router.query.interestIcon as string,
+      };
+      setFocusedInterest(interest);
+      
+      if (router.query.allInterests) {
+        try {
+          const allInterests = JSON.parse(router.query.allInterests as string);
+          setAllSelectedInterests(allInterests);
+        } catch (e) {
+          console.warn('解析所有兴趣失败:', e);
+        }
+      }
+      
+      // 检查是否为编辑模式
+      if (router.query.editPlanId) {
+        setIsEditMode(true);
+        setEditPlanId(router.query.editPlanId as string);
+        try {
+          const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
+          const planToEdit = existingPlans.find((p: any) => p.id === router.query.editPlanId);
+          if (planToEdit) {
+            setFormData({
+              focusBranch: planToEdit.focusBranch || '',
+              firstMilestone: planToEdit.milestones?.[0]?.title || '',
+              projectName: planToEdit.name || `我为${interest.name}而投资`,
+              dailyMinTime: planToEdit.dailyGoalMinutes || 30,
+              targetDate: null
+            });
+            // 编辑模式下，即使有值也不高亮泡泡（因为是手动输入或编辑）
+            setSelectedBranchFromBubble(false);
+          }
+        } catch (e) {
+          console.error('加载计划数据失败:', e);
+        }
+      } else {
+        // 新建模式：初始化项目名称
         setFormData(prev => ({
           ...prev,
-          projectName: `我为${interest.name}而投资`,
-          focusBranch: '' // 保持空白，让占位符显示
+          projectName: `我为${interest.name}而投资`
         }));
-        
-        // 解析所有选择的兴趣
-        if (router.query.allInterests) {
-          try {
-            const allInterests = JSON.parse(router.query.allInterests as string);
-            setAllSelectedInterests(allInterests);
-            console.log('所有选择的兴趣:', allInterests);
-          } catch (e) {
-            console.warn('解析所有兴趣失败:', e);
-          }
-        }
-        
-        // 检查是否为编辑模式
-        if (router.query.editPlanId) {
-          setIsEditMode(true);
-          setEditPlanId(router.query.editPlanId as string);
-          
-          // 加载现有计划数据
-          try {
-            const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
-            const planToEdit = existingPlans.find((p: any) => p.id === router.query.editPlanId);
-            
-            if (planToEdit) {
-              setFormData({
-                projectName: planToEdit.name || `我为${interest.name}而投资`,
-                focusBranch: planToEdit.focusBranch || '', // 如果有值则使用，否则保持空白
-                firstMilestone: planToEdit.milestones && planToEdit.milestones.length > 0 
-                  ? planToEdit.milestones[0].title 
-                  : '',
-                dailyMinTime: planToEdit.dailyGoalMinutes || 30,
-                targetDate: null
-              });
-              console.log('加载编辑计划数据:', planToEdit);
-            }
-          } catch (e) {
-            console.error('加载计划数据失败:', e);
-          }
-        }
-      } catch (error) {
-        console.error('解析兴趣数据失败:', error);
-        // 如果解析失败，退回第一步
-        router.push('/onboarding');
       }
-    } else if (router.query.focusedInterest) {
-      // 保持对旧格式的兼容
-      try {
-        const interest = JSON.parse(router.query.focusedInterest as string);
-        setFocusedInterest(interest);
-        setFormData(prev => ({
-          ...prev,
-          projectName: `我为${interest.name}而投资`,
-          focusBranch: '' // 保持空白，让占位符显示
-        }));
-      } catch (error) {
-        console.error('解析兴趣数据失败:', error);
-        router.push('/onboarding');
-      }
+    } catch {
+      router.push('/onboarding');
     }
   }, [isAuthorized, router.query]);
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // 如果是 focusBranch 字段，且是手动输入（不是从泡泡选择），清除泡泡高亮状态
+    if (field === 'focusBranch') {
+      setSelectedBranchFromBubble(false);
+    }
   };
 
-  const handleSubmit = async () => {
-    // 编辑模式下不需要第一个里程碑
-    if (!formData.projectName) {
-      alert('请填写项目名称');
-      return;
+  // 处理从泡泡选择分支
+  const handleBranchSelectFromBubble = (suggestion: string) => {
+    if (suggestion) {
+      setFormData(prev => ({ ...prev, focusBranch: suggestion }));
+      setSelectedBranchFromBubble(true);
     }
-    if (!isEditMode && !formData.firstMilestone) {
-      alert('请填写项目名称和第一个里程碑');
-      return;
-    }
-  
-    try {
-      console.log("开始提交表单...");
-      
-      // 创建计划数据
-      const newPlan = {
-        id: Date.now().toString(),
-        name: formData.projectName,
-        focusBranch: formData.focusBranch || focusedInterest?.name || '', // 添加focusBranch字段
-        icon: focusedInterest?.icon || '📝',
-        dailyGoalMinutes: formData.dailyMinTime,
-        milestones: [
-          {
-            id: `milestone-${Date.now()}`,
-            title: formData.firstMilestone,
-            isCompleted: false,
-            order: 1
-          }
-        ],
-        isActive: true,
-        isPrimary: false,
-        isCompleted: false
-      };
-      
-      // 从localStorage获取现有计划
-      const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
-      
-      if (isEditMode && editPlanId) {
-        // 编辑模式：更新现有计划
-        const planIndex = existingPlans.findIndex((p: any) => p.id === editPlanId);
-        if (planIndex !== -1) {
-          const existingPlan = existingPlans[planIndex];
-            // 更新计划数据，保留原有的一些属性
-            // 编辑模式下不修改小目标，小目标通过专门的管理通道管理
-            existingPlans[planIndex] = {
-              ...existingPlan,
-              name: formData.projectName,
-              focusBranch: formData.focusBranch || focusedInterest?.name || '',
-              dailyGoalMinutes: formData.dailyMinTime,
-              icon: focusedInterest?.icon || existingPlan.icon,
-              // 编辑模式下保留原有的小目标，不修改
-              milestones: existingPlan.milestones || [],
-              isBlank: false // 编辑后不再是空白计划
-            };
-          console.log('更新计划:', existingPlans[planIndex]);
-        }
-      } else {
-        // 创建模式：添加新计划
-        const activePlans = existingPlans.filter((p: any) => p.isActive && !p.isCompleted);
-        
-        // 检查是否是第一次创建计划（首次成就）- 在添加之前检查
-        const nonBlankPlansBefore = existingPlans.filter((p: any) => !p.isBlank);
-        const isFirstPlan = nonBlankPlansBefore.length === 0;
-        
-        // 如果是第一个计划，设为主要
-        if (activePlans.length === 0) {
-          newPlan.isPrimary = true;
-          // 清除其他计划的主要标志
-          existingPlans.forEach((p: any) => {
-            p.isPrimary = false;
-          });
-        }
-        
-        // 添加新计划
-        existingPlans.push(newPlan);
-        
-        // 如果是第一次创建计划，标记到 localStorage
-        if (isFirstPlan) {
-          localStorage.setItem('firstPlanCreated', 'true');
-        }
-      }
-      
-      // 为新用户首次创建时，为其他选择的兴趣创建空白计划卡片
-      if (!allowReturn && allSelectedInterests.length > 1) {
-        const otherInterests = allSelectedInterests.filter(
-          interest => interest.id !== focusedInterest?.id
-        );
-        
-        otherInterests.forEach((interest, index) => {
-          // 检查是否已存在该兴趣的计划（避免重复创建）
-          const existingInterestPlan = existingPlans.find(
-            (p: any) => p.focusBranch === interest.name && p.icon === interest.icon
-          );
-          
-          if (!existingInterestPlan) {
-            const blankPlan = {
-              id: `blank_${Date.now()}_${index}`,
-              name: `我为${interest.name}而投资`, // 默认项目名称
-              focusBranch: interest.name, // 使用兴趣名称作为focusBranch
-              icon: interest.icon,
-              dailyGoalMinutes: 30, // 默认值
-              milestones: [], // 空白计划没有小目标
-              isActive: true,
-              isPrimary: false,
-              isCompleted: false,
-              isBlank: true // 标记为空白计划
-            };
-            existingPlans.push(blankPlan);
-            console.log('创建空白计划卡片:', blankPlan);
-          }
-        });
-      }
-      
-      // 保存到localStorage
-      localStorage.setItem('userPlans', JSON.stringify(existingPlans));
-      
-      console.log('计划已创建:', newPlan);
-      
-      // 只有新用户首次创建计划时才标记onboarding完成
-      // 老用户从plans页面创建新计划时不需要再次标记
-      if (!allowReturn) {
-        try {
-          // 尝试调用API标记onboarding完成
-          const response = await fetch('/api/user/complete-onboarding', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan: newPlan })
-          });
-          
-          if (response.ok) {
-            console.log('✅ Onboarding已标记为完成');
-          } else {
-            console.warn('⚠️ 标记onboarding完成失败，但计划已创建');
-          }
-        } catch (error) {
-          console.warn('⚠️ 调用API失败，但计划已创建:', error);
-          // 即使API调用失败，也继续流程，因为计划已经保存到localStorage
-        }
-      } else {
-        console.log('ℹ️ 老用户创建新计划，跳过onboarding标记');
-      }
-      
-      // 清除强制onboarding标记（如果存在）
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('forceOnboarding');
-      }
-      
-      // 根据来源决定跳转目标
-      // 如果是从plans页面来的老用户，跳转回plans页面
-      // 否则跳转到dashboard（新用户首次创建）
-      setTimeout(() => {
-        if (allowReturn) {
-          router.push('/plans');
-        } else {
-          router.push('/dashboard');
-        }
-      }, 500);
-      
-    } catch (error) {
-      console.error('提交失败详情:', error);
-      const errorMessage = error instanceof Error ? error.message : '未知错误';
-      alert(`提交失败: ${errorMessage}`);
+  };
+
+  const handleNext = () => {
+    // 验证当前步骤
+    if (currentStep === FormStep.Branch && !formData.focusBranch.trim()) return;
+    if (currentStep === FormStep.Milestone && !formData.firstMilestone.trim()) return;
+    if (currentStep === FormStep.Name && !formData.projectName.trim()) return;
+    if (currentStep === FormStep.Time && !formData.dailyMinTime) return;
+    
+    // 移动到下一步
+    const steps = [FormStep.Branch, FormStep.Milestone, FormStep.Name, FormStep.Time, FormStep.Date];
+    const currentIndex = steps.indexOf(currentStep);
+    if (currentIndex < steps.length - 1) {
+      setCurrentStep(steps[currentIndex + 1]);
+    } else {
+      handleSubmit();
     }
   };
 
   const handleBack = () => {
-    // 如果是编辑计划模式，直接返回到计划页面
     if (isEditMode && editPlanId) {
       router.push('/plans');
       return;
     }
     
-    // 返回到 focus-selection 页面，确保传递所有三个选择的兴趣
-    // 优先使用 allSelectedInterests（从路由参数解析的）
-    // 如果 allSelectedInterests 为空，尝试从路由参数重新解析
-    let interestsToPass = allSelectedInterests;
-    
-    if (interestsToPass.length === 0 && router.query.allInterests) {
-      try {
-        interestsToPass = JSON.parse(router.query.allInterests as string);
-      } catch (e) {
-        console.warn('重新解析 allInterests 失败:', e);
-      }
-    }
-    
-    // 如果还是没有，至少使用当前聚焦的兴趣
-    if (interestsToPass.length === 0 && focusedInterest) {
-      interestsToPass = [focusedInterest];
-    }
-    
-    if (interestsToPass.length > 0) {
-      const queryParams: any = {
-        interests: JSON.stringify(interestsToPass),
-        // 如果之前有选择聚焦的兴趣，也传递过去以便恢复选中状态
-        focusedInterestId: focusedInterest?.id || ''
-      };
-      
-      if (allowReturn) {
-        queryParams.from = query.from as string || 'plans';
-        queryParams.allowReturn = '1';
-      }
-      
-      router.push({
-        pathname: '/onboarding/focus-selection',
-        query: queryParams
-      });
+    const steps = [FormStep.Branch, FormStep.Milestone, FormStep.Name, FormStep.Time, FormStep.Date];
+    const currentIndex = steps.indexOf(currentStep);
+    if (currentIndex > 0) {
+      setCurrentStep(steps[currentIndex - 1]);
     } else {
-      // 如果没有兴趣数据，返回到第一步
-      const backParams: any = {};
-      if (allowReturn) {
-        backParams.from = query.from as string || 'plans';
-        backParams.allowReturn = '1';
+      // 返回到 focus-selection
+      let interestsToPass = allSelectedInterests;
+      if (interestsToPass.length === 0 && router.query.allInterests) {
+        try {
+          interestsToPass = JSON.parse(router.query.allInterests as string);
+        } catch (e) {
+          console.warn('重新解析 allInterests 失败:', e);
+        }
       }
-      router.push({
-        pathname: '/onboarding',
-        query: backParams
-      });
+      if (interestsToPass.length === 0 && focusedInterest) {
+        interestsToPass = [focusedInterest];
+      }
+      
+      if (interestsToPass.length > 0) {
+        const queryParams: any = {
+          interests: JSON.stringify(interestsToPass),
+          focusedInterestId: focusedInterest?.id || ''
+        };
+        if (allowReturn) {
+          queryParams.from = query.from as string || 'plans';
+          queryParams.allowReturn = '1';
+        }
+        router.push({
+          pathname: '/onboarding/focus-selection',
+          query: queryParams
+        });
+      } else {
+        router.push('/onboarding');
+      }
     }
   };
 
-  if (isCheckingSession) {
+  const handleSubmit = async () => {
+    if (!formData.projectName || (!isEditMode && !formData.firstMilestone)) {
+      return;
+    }
+
+    try {
+      const newPlan = {
+        id: Date.now().toString(),
+        name: formData.projectName,
+        focusBranch: formData.focusBranch || focusedInterest?.name || '',
+        icon: focusedInterest?.icon || '📝',
+        dailyGoalMinutes: formData.dailyMinTime,
+        milestones: isEditMode ? [] : [{
+          id: `milestone-${Date.now()}`,
+          title: formData.firstMilestone,
+          isCompleted: false,
+          order: 1
+        }],
+        isActive: true,
+        isPrimary: false,
+        isCompleted: false
+      };
+
+      const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
+      
+      if (isEditMode && editPlanId) {
+        const planIndex = existingPlans.findIndex((p: any) => p.id === editPlanId);
+        if (planIndex !== -1) {
+          const existingPlan = existingPlans[planIndex];
+          existingPlans[planIndex] = {
+            ...existingPlan,
+            name: formData.projectName,
+            focusBranch: formData.focusBranch || focusedInterest?.name || '',
+            dailyGoalMinutes: formData.dailyMinTime,
+            icon: focusedInterest?.icon || existingPlan.icon,
+            milestones: existingPlan.milestones || [],
+            isBlank: false
+          };
+        }
+      } else {
+        const activePlans = existingPlans.filter((p: any) => p.isActive && !p.isCompleted);
+        if (activePlans.length === 0) {
+          newPlan.isPrimary = true;
+          existingPlans.forEach((p: any) => { p.isPrimary = false; });
+        }
+        existingPlans.push(newPlan);
+        
+        if (!allowReturn && allSelectedInterests.length > 1) {
+          const otherInterests = allSelectedInterests.filter(i => i.id !== focusedInterest?.id);
+          otherInterests.forEach((interest, index) => {
+            const existingInterestPlan = existingPlans.find(
+              (p: any) => p.focusBranch === interest.name && p.icon === interest.icon
+            );
+            if (!existingInterestPlan) {
+              existingPlans.push({
+                id: `blank_${Date.now()}_${index}`,
+                name: `我为${interest.name}而投资`,
+                focusBranch: interest.name,
+                icon: interest.icon,
+                dailyGoalMinutes: 30,
+                milestones: [],
+                isActive: true,
+                isPrimary: false,
+                isCompleted: false,
+                isBlank: true
+              });
+            }
+          });
+        }
+      }
+
+      localStorage.setItem('userPlans', JSON.stringify(existingPlans));
+
+      if (!allowReturn) {
+        try {
+          await fetch('/api/user/complete-onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: newPlan })
+          });
+        } catch (error) {
+          console.warn('API调用失败:', error);
+        }
+      }
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('forceOnboarding');
+      }
+
+      setTimeout(() => {
+        router.push(allowReturn ? '/plans' : '/dashboard');
+      }, 500);
+    } catch (error) {
+      console.error('提交失败:', error);
+      alert('提交失败，请重试');
+    }
+  };
+
+  if (!isAuthorized || !focusedInterest) return null;
+
+  // 渲染分支选择页面
+  const renderBranch = () => {
+    // 非规则但仍保持平衡的布局：左3右2，带有横纵双向位移
+    const bubbleLayouts = [
+      { index: 0, side: 'left', offsetX: -35, offsetY: -110 }, // 左上外扩
+      { index: 1, side: 'left', offsetX: 12, offsetY: -10 },   // 左中微靠近
+      { index: 2, side: 'left', offsetX: -28, offsetY: 130 },  // 左下外扩
+      { index: 3, side: 'right', offsetX: 28, offsetY: -80 },  // 右上外扩
+      { index: 4, side: 'right', offsetX: -8, offsetY: 145 },  // 右下靠近
+    ];
+
+    const leftBubbles = bubbleLayouts.filter(b => b.side === 'left');
+    const rightBubbles = bubbleLayouts.filter(b => b.side === 'right');
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
-          <p className="mt-4 text-teal-600">正在验证登录状态...</p>
+      <div className="relative w-full max-w-6xl mx-auto flex flex-col items-center">
+        <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
+          想好专注于<span className="text-teal-300">{focusedInterest.name}</span>的哪个方向了吗！
+        </h2>
+
+        {/* 桌面端布局：左右泡泡 + 中间文本框 */}
+        <div className="hidden md:flex relative w-full items-center justify-center gap-8 lg:gap-12 min-h-[450px]">
+          {/* 左侧3个泡泡 - 非规则排列 */}
+          <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
+            {leftBubbles.map((layout) => {
+              const suggestion = BRANCH_SUGGESTIONS[layout.index] || '';
+              // 只有当从泡泡选择且值匹配时才高亮
+              const isSelected = selectedBranchFromBubble && formData.focusBranch === suggestion;
+              
+              return (
+                <button
+                  key={layout.index}
+                  onClick={() => suggestion && handleBranchSelectFromBubble(suggestion)}
+                  disabled={!suggestion}
+                  style={{
+                    position: 'absolute',
+                    transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
+                    animationDelay: `${layout.index * 0.15}s`,
+                    boxShadow: isSelected
+                      ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                      : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                  }}
+                  className={`
+                    bubble-branch group flex flex-col items-center justify-center
+                    w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                    ${isSelected
+                      ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
+                      : suggestion
+                        ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
+                        : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
+                  `}
+                >
+                  {/* 气泡高光效果 */}
+                  {!isSelected && suggestion && (
+                    <>
+                      <div className="absolute inset-0 rounded-full opacity-30" style={{
+                        background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+                      }} />
+                      <div className="absolute inset-0 rounded-full opacity-15" style={{
+                        background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+                      }} />
+                    </>
+                  )}
+                  {suggestion ? (
+                    <span className="text-sm lg:text-base font-medium text-center px-2 relative z-10">
+                      {suggestion}
+                    </span>
+                  ) : (
+                    <span className="text-2xl relative z-10">●</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 中间输入框 */}
+          <div className="flex-shrink-0 w-full max-w-md relative z-10">
+            <input
+              type="text"
+              value={formData.focusBranch}
+              onChange={(e) => handleInputChange('focusBranch', e.target.value)}
+              placeholder="输入你的专注方向..."
+              className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl lg:text-2xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
+              autoFocus
+            />
+          </div>
+
+          {/* 右侧2个泡泡 - 非规则排列 */}
+          <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
+            {rightBubbles.map((layout) => {
+              const suggestion = BRANCH_SUGGESTIONS[layout.index] || '';
+              // 只有当从泡泡选择且值匹配时才高亮
+              const isSelected = selectedBranchFromBubble && formData.focusBranch === suggestion;
+              
+              return (
+                <button
+                  key={layout.index}
+                  onClick={() => suggestion && handleBranchSelectFromBubble(suggestion)}
+                  disabled={!suggestion}
+                  style={{
+                    position: 'absolute',
+                    transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
+                    animationDelay: `${layout.index * 0.15}s`,
+                    boxShadow: isSelected
+                      ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                      : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                  }}
+                  className={`
+                    bubble-branch group flex flex-col items-center justify-center
+                    w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                    ${isSelected
+                      ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
+                      : suggestion
+                        ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
+                        : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
+                  `}
+                >
+                  {/* 气泡高光效果 */}
+                  {!isSelected && suggestion && (
+                    <>
+                      <div className="absolute inset-0 rounded-full opacity-30" style={{
+                        background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+                      }} />
+                      <div className="absolute inset-0 rounded-full opacity-15" style={{
+                        background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+                      }} />
+                    </>
+                  )}
+                  {suggestion ? (
+                    <span className="text-sm lg:text-base font-medium text-center px-2 relative z-10">
+                      {suggestion}
+                    </span>
+                  ) : (
+                    <span className="text-2xl relative z-10">●</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 移动端布局 */}
+        <div className="md:hidden w-full flex flex-col items-center">
+          {/* 移动端选项列表 */}
+          {BRANCH_SUGGESTIONS.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-4 mb-8">
+              {BRANCH_SUGGESTIONS.map((suggestion, i) => {
+                // 只有当从泡泡选择且值匹配时才高亮
+                const isSelected = selectedBranchFromBubble && formData.focusBranch === suggestion;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleBranchSelectFromBubble(suggestion)}
+                    style={{
+                      animationDelay: `${i * 0.1}s`,
+                      boxShadow: isSelected
+                        ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                        : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                    }}
+                    className={`
+                      bubble-branch relative group flex items-center justify-center
+                      w-24 h-24 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                      ${isSelected
+                        ? 'bg-white text-slate-900 border-transparent scale-110'
+                        : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40'}
+                    `}
+                  >
+                    {!isSelected && (
+                      <>
+                        <div className="absolute inset-0 rounded-full opacity-30" style={{
+                          background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+                        }} />
+                        <div className="absolute inset-0 rounded-full opacity-15" style={{
+                          background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+                        }} />
+                      </>
+                    )}
+                    <span className="text-sm font-medium relative z-10 px-3">{suggestion}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 输入框 */}
+          <div className="w-full max-w-md">
+            <input
+              type="text"
+              value={formData.focusBranch}
+              onChange={(e) => handleInputChange('focusBranch', e.target.value)}
+              placeholder="输入你的专注方向..."
+              className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
+              autoFocus
+            />
+          </div>
         </div>
       </div>
     );
-  }
+  };
 
-  if (!isAuthorized) {
-    return null;
-  }
-
-  if (!focusedInterest) {
+  // 渲染里程碑页面
+  const renderMilestone = () => {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-sky-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
-          <p className="mt-4 text-teal-600">加载中...</p>
+      <div className="relative w-full max-w-5xl mx-auto flex flex-col items-center">
+        <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
+          让我们来设置第一个里程碑吧！
+        </h2>
+
+        <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 min-h-[300px]">
+          {/* 左侧提示泡泡 */}
+          <div className="flex md:flex-col gap-6 md:gap-8 order-2 md:order-1">
+            {MILESTONE_HINTS.slice(0, 2).map((hint, i) => (
+              <div
+                key={i}
+                className="bubble-milestone relative group flex items-center justify-center
+                  w-24 h-24 md:w-28 md:h-28 rounded-full border border-white/20 bg-white/10 backdrop-blur-sm pointer-events-none"
+                style={{
+                  animationDelay: hint.delay,
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                }}
+              >
+                {/* 气泡高光效果 */}
+                <div className="absolute inset-0 rounded-full opacity-30" style={{
+                  background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+                }} />
+                <div className="absolute inset-0 rounded-full opacity-15" style={{
+                  background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+                }} />
+                <span className="text-xs md:text-sm font-medium text-white/70 text-center px-2 relative z-10">
+                  {hint.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* 中间输入框 */}
+          <div className="order-1 md:order-2 w-full max-w-md relative z-10">
+            <input
+              type="text"
+              value={formData.firstMilestone}
+              onChange={(e) => handleInputChange('firstMilestone', e.target.value)}
+              placeholder="例如：完成第一幅画"
+              className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl md:text-2xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
+              autoFocus
+            />
+          </div>
+
+          {/* 右侧提示泡泡 */}
+          <div className="flex md:flex-col gap-6 md:gap-8 order-3">
+            <div
+              className="bubble-milestone relative group flex items-center justify-center
+                w-24 h-24 md:w-28 md:h-28 rounded-full border border-white/20 bg-white/10 backdrop-blur-sm pointer-events-none"
+              style={{
+                animationDelay: MILESTONE_HINTS[2].delay,
+                boxShadow: '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+              }}
+            >
+              {/* 气泡高光效果 */}
+              <div className="absolute inset-0 rounded-full opacity-30" style={{
+                background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+              }} />
+              <div className="absolute inset-0 rounded-full opacity-15" style={{
+                background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+              }} />
+              <span className="text-xs md:text-sm font-medium text-white/70 text-center px-2 relative z-10">
+                {MILESTONE_HINTS[2].label}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     );
-  }
+  };
+
+  // 渲染计划名称页面
+  const renderName = () => {
+    return (
+      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
+        <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
+          为你的计划设定名称吧！
+        </h2>
+
+        <div className="w-full max-w-md">
+          <input
+            type="text"
+            value={formData.projectName}
+            onChange={(e) => handleInputChange('projectName', e.target.value)}
+            placeholder={`我为${formData.focusBranch || focusedInterest.name}而投资`}
+            className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl md:text-2xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
+            autoFocus
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // 渲染时间选择页面
+  const renderTime = () => {
+    return (
+      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
+        <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
+          选择每日最小专注时长
+        </h2>
+
+        <div className="flex flex-wrap justify-center gap-6 md:gap-8">
+          {TIME_OPTIONS.map((time, idx) => {
+            const isSelected = formData.dailyMinTime === time;
+            return (
+              <button
+                key={time}
+                onClick={() => handleInputChange('dailyMinTime', time)}
+                style={{
+                  animationDelay: `${idx * 0.1}s`,
+                  boxShadow: isSelected
+                    ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                    : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                }}
+                className={`
+                  bubble-time relative group flex flex-col items-center justify-center
+                  w-24 h-24 md:w-32 md:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                  ${isSelected
+                    ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
+                    : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white'}
+                `}
+              >
+                {!isSelected && (
+                  <>
+                    <div className="absolute inset-0 rounded-full opacity-30" style={{
+                      background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)'
+                    }} />
+                    <div className="absolute inset-0 rounded-full opacity-15" style={{
+                      background: 'radial-gradient(circle at 70% 70%, rgba(255,255,255,0.2), transparent 50%)'
+                    }} />
+                  </>
+                )}
+                <span className="text-2xl md:text-3xl font-semibold relative z-10">{time}</span>
+                <span className="text-xs md:text-sm relative z-10 mt-1">分钟</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // 渲染日期选择页面
+  const renderDate = () => {
+    return (
+      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
+        <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
+          预期计划完成日期
+        </h2>
+
+        <div className="w-full max-w-md">
+          <input
+            type="date"
+            value={formData.targetDate || ''}
+            onChange={(e) => handleInputChange('targetDate', e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
+            className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-lg md:text-xl text-white py-4 focus:outline-none focus:border-teal-300 transition-all"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case FormStep.Branch:
+        return renderBranch();
+      case FormStep.Milestone:
+        return renderMilestone();
+      case FormStep.Name:
+        return renderName();
+      case FormStep.Time:
+        return renderTime();
+      case FormStep.Date:
+        return renderDate();
+      default:
+        return null;
+    }
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case FormStep.Branch:
+        return formData.focusBranch.trim().length > 0;
+      case FormStep.Milestone:
+        return formData.firstMilestone.trim().length > 0;
+      case FormStep.Name:
+        return formData.projectName.trim().length > 0;
+      case FormStep.Time:
+        return formData.dailyMinTime > 0;
+      case FormStep.Date:
+        return true; // 日期可选
+      default:
+        return false;
+    }
+  };
 
   return (
     <>
       <Head>
         <title>设定目标 - 数字静默</title>
       </Head>
-      
-      <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#def7ff] to-[#e3ecff] flex items-center justify-center p-4 sm:p-8">
-        <div className="bg-white/90 rounded-3xl shadow-2xl shadow-emerald-100/50 border border-white/60 backdrop-blur-xl p-4 sm:p-8 w-full max-w-2xl mx-2 sm:mx-auto">
-          {/* 头部 */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center items-center mb-4">
-              <span className="text-4xl mr-3">{focusedInterest.icon}</span>
-              <h1 className="text-2xl sm:text-3xl font-bold text-teal-900">
-                {isEditMode ? '编辑计划' : '绘制你的蓝图'}
-              </h1>
-            </div>
-            <p className="text-teal-700 text-sm sm:text-base">
-              {isEditMode 
-                ? '修改你的计划设置和目标'
-                : (
-                    <>
-                      为你的 <span className="font-semibold text-teal-600">{focusedInterest.name}</span> 之旅设定清晰的目标
-                    </>
-                  )}
-            </p>
-          </div>
+      <div className="relative min-h-screen w-full overflow-hidden text-white flex flex-col items-center justify-center">
+        {/* 动态生机蓝绿渐变背景 */}
+        <div className="absolute inset-0 bg-gradient-animated pointer-events-none" />
+        
+        {/* 动态光晕效果 */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-teal-400/25 rounded-full blur-[120px] animate-pulse-slow" />
+          <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-cyan-400/25 rounded-full blur-[120px] animate-pulse-slow-delayed" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-400/20 rounded-full blur-[140px] animate-pulse-slow-very-delayed" />
+        </div>
 
-          {/* 表单 */}
-          <div className="space-y-6 mb-8">
-            {/* 项目名称 */}
-            <div>
-              <label className="block text-sm font-medium text-teal-900 mb-2">
-                项目名称
-              </label>
-              <input
-                type="text"
-                value={formData.projectName}
-                onChange={(e) => handleInputChange('projectName', e.target.value)}
-                className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
-                placeholder="为你的项目起个名字"
-              />
-            </div>
+        {/* 内容区 */}
+        <div className="relative z-10 w-full flex flex-col items-center min-h-screen justify-center px-4 py-12">
+          {renderCurrentStep()}
 
-            {/* 专注分支 */}
-            <div>
-              <label className="block text-sm font-medium text-teal-900 mb-2">
-                专注分支
-                <span className="text-teal-600/80 text-xs ml-2">（你希望专注的具体方向）</span>
-              </label>
-              <input
-                type="text"
-                value={formData.focusBranch}
-                onChange={(e) => handleInputChange('focusBranch', e.target.value)}
-                className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
-                placeholder="例如：水彩风景画、React前端开发、吉他弹唱"
-              />
-              <button className="mt-2 text-teal-500 hover:text-teal-600 text-sm font-medium transition-colors">
-                🔍 寻找灵感？
-              </button>
-            </div>
-
-            {/* 第一个里程碑 - 只在新建模式下显示 */}
-            {!isEditMode && (
-              <div>
-                <label className="block text-sm font-medium text-teal-900 mb-2 flex items-center gap-2">
-                  第一个里程碑
-                  <span className="text-teal-600/80 text-xs">（可达成的小目标）</span>
-                  {/* 提示图标 */}
-                  <div className="group relative">
-                    <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center cursor-help">
-                      <span className="text-teal-600 text-xs font-bold">!</span>
-                    </div>
-                    {/* Tooltip */}
-                    <div className="absolute left-0 bottom-full mb-2 w-48 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                      作为计划中第一个最小可实现的小目标
-                      <div className="absolute left-2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
-                    </div>
-                  </div>
-                </label>
-                <input
-                  type="text"
-                  value={formData.firstMilestone}
-                  onChange={(e) => handleInputChange('firstMilestone', e.target.value)}
-                  className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
-                  placeholder="例如：完成第一幅画、搭建个人博客首页、学会弹奏《小星星》"
-                  required
-                />
-                <button className="mt-2 text-teal-500 hover:text-teal-600 text-sm font-medium transition-colors">
-                  🔍 寻找灵感？
-                </button>
-              </div>
-            )}
-
-            {/* 每日最小剂量 */}
-            <div>
-              <label className="block text-sm font-medium text-teal-900 mb-2">
-                每日专注时间
-                <span className="text-teal-600/80 text-xs ml-2">（建议从小的开始）</span>
-              </label>
-              <div className="flex space-x-4">
-                {[15, 30, 45, 60].map((time) => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => handleInputChange('dailyMinTime', time)}
-                    className={`flex-1 py-3 rounded-lg border-2 transition ${
-                      formData.dailyMinTime === time
-                        ? 'bg-emerald-100 border-teal-500 text-teal-700 font-medium'
-                        : 'bg-white/80 border-emerald-100 text-teal-700/70 hover:border-teal-200'
-                    }`}
-                  >
-                    {time}分钟
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 期望达成日 */}
-            <div>
-              <label className="block text-sm font-medium text-teal-900 mb-2">
-                期望达成日 <span className="text-teal-600/80 text-xs">（可选）</span>
-              </label>
-              <input
-                type="date"
-                value={formData.targetDate || ''}
-                onChange={(e) => handleInputChange('targetDate', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full px-4 py-3 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/80"
-              />
-            </div>
-          </div>
-
-          {/* 底部操作 */}
-          <div className="flex justify-between items-center">
+          {/* 导航按钮 */}
+          <div className="mt-16 flex items-center gap-12">
             <button
               onClick={handleBack}
-              className="flex items-center text-teal-500 hover:text-teal-600 font-medium transition-colors text-sm sm:text-base"
+              className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:border-white/40 transition-all"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              返回
+              ←
             </button>
-            
+
             <button
-              onClick={handleSubmit}
-              disabled={!formData.projectName || (!isEditMode && !formData.firstMilestone)}
+              onClick={handleNext}
+              disabled={!canProceed()}
               className={`
-                px-6 py-3 sm:px-8 sm:py-3 text-sm sm:text-base rounded-full font-medium transition-all flex items-center
-                ${formData.projectName && (isEditMode || formData.firstMilestone)
-                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-200/60 hover:shadow-teal-300/80 hover:-translate-y-0.5'
-                  : 'bg-emerald-50 text-emerald-200 cursor-not-allowed'
-                }
+                px-8 py-3 rounded-full text-sm tracking-[0.2em] uppercase transition-all duration-500
+                ${canProceed()
+                  ? 'bg-white text-slate-900 hover:scale-105 shadow-lg shadow-white/10'
+                  : 'bg-white/5 text-white/20 cursor-not-allowed'}
               `}
             >
-              {isEditMode ? '保存修改' : '开启我的旅程'}
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
+              {currentStep === FormStep.Date ? '完成' : 'Next'}
             </button>
-          </div>
-
-          {/* 进度指示器 */}
-          <div className="mt-8 flex justify-center">
-            <div className="flex space-x-2">
-              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
-              <div className="w-3 h-3 bg-emerald-200 rounded-full"></div>
-              <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
-            </div>
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .bg-gradient-animated {
+          background: linear-gradient(135deg, #0a4d3a 0%, #0d7377 25%, #14b8a6 50%, #06b6d4 75%, #0891b2 100%);
+          background-size: 400% 400%;
+          animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes pulseSlow {
+          0%, 100% { opacity: 0.2; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.1); }
+        }
+        .animate-pulse-slow {
+          animation: pulseSlow 8s ease-in-out infinite;
+        }
+        .animate-pulse-slow-delayed {
+          animation: pulseSlow 8s ease-in-out infinite;
+          animation-delay: 2s;
+        }
+        .animate-pulse-slow-very-delayed {
+          animation: pulseSlow 8s ease-in-out infinite;
+          animation-delay: 4s;
+        }
+        .bubble-branch {
+          animation: bubbleFloat 6s ease-in-out infinite;
+        }
+        .bubble-milestone {
+          animation: bubbleFloat 6s ease-in-out infinite;
+        }
+        .bubble-time {
+          animation: bubbleFloat 6s ease-in-out infinite;
+        }
+        @keyframes bubbleFloat {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+          100% { transform: translateY(0px); }
+        }
+      `}</style>
     </>
   );
 }
-
