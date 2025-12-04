@@ -1628,8 +1628,9 @@ export default function Dashboard() {
         mobileContainerStyle={{ bottom: '15.5rem', right: '-1.6rem' }}
       />
 
-      {/* 新版布局 */}
-      <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/70 shadow-sm">
+      {/* 新版布局 - 顶部导航栏仅在dashboard页面显示 */}
+      {router.pathname === '/dashboard' && (
+        <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/70 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.7)]" />
@@ -1663,11 +1664,12 @@ export default function Dashboard() {
           </div>
         </div>
       </nav>
+      )}
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-10 space-y-10">
         <section className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-8">
           <div className="space-y-6">
-            <div className="bg-white/80 border border-white/60 rounded-3xl p-6 shadow-sm hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+            <div className="bg-white/80 border border-white/60 rounded-3xl p-6 pb-32 shadow-sm hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="space-y-4">
                   <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">今日节奏</p>
@@ -1685,38 +1687,37 @@ export default function Dashboard() {
                       开始专注
                     </button>
                   </div>
-                  <div className="hidden lg:block">
-                    <EchoSpirit
-                      state="idle"
-                      allowFocus={false}
-                      isCompleted={progress >= 1}
-                      onStateChange={(newState) => {
-                        if (newState === 'focus') {
-                          setCurrentSpiritState('idle');
-                        } else {
-                          setCurrentSpiritState(newState);
-                        }
-                      }}
-                      onClick={() => {
-                        // 小精灵互动经验值奖励（每天只奖励一次）
-                        const today = getTodayDate();
-                        const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
-                        if (lastSpiritInteractionDate !== today) {
-                          const spiritExp = LevelManager.calculateSpiritInteractionExp();
-                          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-                          const newExp = currentExp + spiritExp;
-                          localStorage.setItem('userExp', newExp.toString());
-                          localStorage.setItem('lastSpiritInteractionDate', today);
-                          console.log('📈 小精灵互动经验值奖励', { exp: spiritExp, total: newExp });
-                          setUserLevel(LevelManager.calculateLevel(newExp));
-                        }
-                        
-                        if (spiritDialogRef.current) {
-                          spiritDialogRef.current.showMessage();
-                        }
-                      }}
-                    />
-                  </div>
+                </div>
+              </div>
+              {/* 小精灵定位在卡片下方，大幅下移 */}
+              <div className="hidden lg:block absolute pointer-events-none" style={{ bottom: '-110px', left: 'calc(50% + 80px)', transform: 'translateX(-50%)' }}>
+                <div className="pointer-events-auto">
+                  <EchoSpirit
+                    state="idle"
+                    onStateChange={(newState) => {
+                      if (newState === 'idle' || newState === 'happy' || newState === 'excited') {
+                        setCurrentSpiritState(newState as 'idle' | 'happy' | 'excited');
+                      }
+                    }}
+                    onClick={() => {
+                      // 小精灵互动经验值奖励（每天只奖励一次）
+                      const today = getTodayDate();
+                      const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
+                      if (lastSpiritInteractionDate !== today) {
+                        const spiritExp = LevelManager.calculateSpiritInteractionExp();
+                        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+                        const newExp = currentExp + spiritExp;
+                        localStorage.setItem('userExp', newExp.toString());
+                        localStorage.setItem('lastSpiritInteractionDate', today);
+                        console.log('📈 小精灵互动经验值奖励', { exp: spiritExp, total: newExp });
+                        setUserLevel(LevelManager.calculateLevel(newExp));
+                      }
+                      
+                      if (spiritDialogRef.current) {
+                        spiritDialogRef.current.showMessage();
+                      }
+                    }}
+                  />
                 </div>
               </div>
             </div>

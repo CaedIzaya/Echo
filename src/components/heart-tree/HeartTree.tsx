@@ -1,10 +1,6 @@
 'use client';
 
-import React, { useMemo, useId } from 'react';
-import { motion } from 'framer-motion';
-import { FractalBranch } from './FractalBranch';
-import { FractalRoots } from './FractalRoots';
-import { createSeededRandom, randomBetween } from './random';
+import React from 'react';
 
 interface HeartTreeProps {
   seed?: number;
@@ -14,195 +10,143 @@ interface HeartTreeProps {
   showParticles?: boolean;
 }
 
-const VIEWBOX = { width: 320, height: 320 };
-const BASE = { x: VIEWBOX.width / 2, y: 255 };
-const TRUNK_LENGTH = 105;
-const MAX_DEPTH = 8;
-const HEART_PARTICLE_PATH =
-  'M0,-1 C-3,-7 -10,-5 -10,1 C-10,7 -5,11 0,16 C5,11 10,7 10,1 C10,-5 3,-7 0,-1 Z';
-
-const createPalette = (seed: number) => {
-  const rand = createSeededRandom(seed + 404);
-  const leafHue = randomBetween(rand, 140, 165);
-  const accentHue = leafHue + randomBetween(rand, -12, 12);
-  const fruitHue = randomBetween(rand, 12, 28);
-
-  return {
-    backgroundTop: `hsl(${randomBetween(rand, 210, 230)}, 70%, 14%)`,
-    backgroundBottom: `hsl(${randomBetween(rand, 215, 235)}, 80%, 5%)`,
-    auraInner: 'rgba(120, 255, 230, 0.6)',
-    auraOuter: 'rgba(40, 200, 170, 0)',
-    leafPrimary: `hsl(${leafHue}, 60%, ${randomBetween(rand, 38, 50)}%)`,
-    leafAccent: `hsl(${accentHue}, 55%, ${randomBetween(rand, 45, 60)}%)`,
-    fruitPrimary: `hsl(${fruitHue}, 80%, 64%)`,
-    fruitHighlight: `hsl(${fruitHue + 8}, 90%, 78%)`,
-    trunkLight: '#5d5045',
-    trunkDark: '#3e352e',
-    rootColor: '#463326',
-    sparkle: `hsla(${randomBetween(rand, 180, 200)}, 80%, 70%, 0.4)`,
-  };
-};
-
-export const HeartTree: React.FC<HeartTreeProps> = ({
-  seed = 0,
-  windIntensity = 1,
-  showRoots = true,
-  showFruits = true,
-  showParticles = true,
-}) => {
-  const palette = useMemo(() => createPalette(seed), [seed]);
-  const uniqueId = useId().replace(/:/g, '');
-  const gradientIds = useMemo(
-    () => ({
-      bg: `heart-bg-${uniqueId}`,
-      aura: `heart-aura-${uniqueId}`,
-      trunk: `heart-trunk-${uniqueId}`,
-      fruit: `heart-fruit-${uniqueId}`,
-    }),
-    [uniqueId]
-  );
-
-  const particles = useMemo(() => {
-    if (!showParticles) return [];
-    const rand = createSeededRandom(seed + 777);
-    return Array.from({ length: 9 }).map((_, idx) => ({
-      key: `particle-${idx}`,
-      x: randomBetween(rand, 40, VIEWBOX.width - 40),
-      startY: randomBetween(rand, 140, 200),
-      endY: randomBetween(rand, 40, 90),
-      delay: rand() * 4,
-      duration: randomBetween(rand, 6, 9),
-      scale: randomBetween(rand, 0.4, 0.85),
-      opacity: randomBetween(rand, 0.15, 0.4),
-    }));
-  }, [seed, showParticles]);
-
-  const clampedWind = Math.max(0.35, Math.min(2.5, windIntensity));
-
+export const HeartTree: React.FC<HeartTreeProps> = () => {
   return (
-    <div className="w-full h-full max-w-[460px] max-h-[460px] select-none">
-      <motion.svg
-        viewBox={`0 0 ${VIEWBOX.width} ${VIEWBOX.height}`}
-        className="w-full h-full drop-shadow-2xl"
-        style={{ overflow: 'visible' }}
-      >
+    <div className="w-full h-full max-w-[460px] max-h-[460px] select-none flex items-center justify-center">
+      <svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl">
         <defs>
-          <radialGradient id={gradientIds.bg} cx="50%" cy="30%" r="70%">
-            <stop offset="0%" stopColor={palette.backgroundTop} />
-            <stop offset="100%" stopColor={palette.backgroundBottom} />
-          </radialGradient>
-          <radialGradient id={gradientIds.aura} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={palette.auraInner} />
-            <stop offset="70%" stopColor={palette.auraInner} />
-            <stop offset="100%" stopColor={palette.auraOuter} />
-          </radialGradient>
-          <linearGradient id={gradientIds.trunk} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={palette.trunkDark} />
-            <stop offset="50%" stopColor={palette.trunkLight} />
-            <stop offset="100%" stopColor={palette.trunkDark} />
+          {/* Existing Foliage Gradient */}
+          <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style={{stopColor:'#90d38d',stopOpacity:1}} />
+            <stop offset="100%" style={{stopColor:'#6dbb6b',stopOpacity:1}} />
           </linearGradient>
-          <radialGradient id={gradientIds.fruit} cx="35%" cy="25%" r="70%">
-            <stop offset="0%" stopColor={palette.fruitHighlight} />
-            <stop offset="60%" stopColor={palette.fruitPrimary} />
-            <stop offset="100%" stopColor="#a83248" />
-          </radialGradient>
-          <filter id={`fruitGlow-${uniqueId}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
+          
+          {/* Existing Trunk Gradient */}
+          <linearGradient id="trunkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style={{stopColor:'#b48a59',stopOpacity:1}} />
+            <stop offset="80%" style={{stopColor:'#9c7548',stopOpacity:1}} />
+          </linearGradient>
+
+          {/* CSS Animation Logic */}
+          <style>
+            {`
+              /* --- Existing Animations --- */
+              
+              .tree-sway {
+                transform-origin: 150px 260px;
+                animation: sway 6s ease-in-out infinite;
+              }
+
+              .foliage-breathe {
+                transform-origin: 145px 100px;
+                animation: breathe 6s ease-in-out infinite;
+              }
+
+              /* --- New Animations --- */
+
+              /* Grass breathes very subtly in sync with the tree */
+              .grass-breathe {
+                transform-origin: 150px 300px;
+                animation: grassPulse 6s ease-in-out infinite;
+              }
+
+              /* Leaf 1: Falls from left side */
+              .fallLeaf1 {
+                transform-box: fill-box;
+                transform-origin: center;
+                opacity: 0;
+                animation: fallLeft 8s ease-in-out infinite;
+              }
+
+              /* Leaf 2: Falls from right side, delayed start */
+              .fallLeaf2 {
+                transform-box: fill-box;
+                transform-origin: center;
+                opacity: 0;
+                animation: fallRight 11s ease-in-out infinite; /* Slower different timing for variety */
+                animation-delay: 2s;
+              }
+
+              /* Keyframes */
+              
+              @keyframes sway {
+                0%   { transform: rotate(0deg); }
+                25%  { transform: rotate(1.5deg); }
+                50%  { transform: rotate(0deg); }
+                75%  { transform: rotate(-1.5deg); }
+                100% { transform: rotate(0deg); }
+              }
+
+              @keyframes breathe {
+                0%   { transform: scale(1); }
+                50%  { transform: scale(1.03); }
+                100% { transform: scale(1); }
+              }
+
+              @keyframes grassPulse {
+                0%   { transform: scaleY(1) scaleX(1); }
+                50%  { transform: scaleY(1.02) scaleX(1.01); } /* Very subtle rise */
+                100% { transform: scaleY(1) scaleX(1); }
+              }
+
+              /* Fall Path 1: Starts at canopy left, drifts left & down */
+              @keyframes fallLeft {
+                0% { opacity: 0; transform: translate(120px, 110px) rotate(0deg); }
+                20% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { opacity: 0; transform: translate(90px, 280px) rotate(-45deg); }
+              }
+
+              /* Fall Path 2: Starts at canopy right, drifts right & down */
+              @keyframes fallRight {
+                0% { opacity: 0; transform: translate(180px, 120px) rotate(15deg); }
+                20% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { opacity: 0; transform: translate(220px, 285px) rotate(60deg); }
+              }
+            `}
+          </style>
         </defs>
 
-        <rect width={VIEWBOX.width} height={VIEWBOX.height} fill={`url(#${gradientIds.bg})`} />
-
-        <motion.circle
-          cx={VIEWBOX.width / 2}
-          cy={VIEWBOX.height * 0.55}
-          r={110}
-          fill="none"
-          stroke="rgba(90, 240, 210, 0.65)"
-          strokeWidth={4}
-          animate={{ scale: [0.95, 1.05, 0.95], opacity: [0.35, 0.6, 0.35] }}
-          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <circle
-          cx={VIEWBOX.width / 2}
-          cy={VIEWBOX.height * 0.55}
-          r={94}
-          fill={`url(#${gradientIds.aura})`}
-          opacity={0.25}
-        />
-
-        {showParticles &&
-          particles.map((particle) => (
-            <motion.path
-              key={particle.key}
-              d={HEART_PARTICLE_PATH}
-              fill={palette.sparkle}
-              style={{ transformOrigin: `${particle.x}px ${particle.startY}px` }}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{
-                opacity: [0, particle.opacity, 0],
-                translateY: [0, -(particle.startY - particle.endY)],
-                scale: [0, particle.scale, 0],
-              }}
-              transition={{
-                duration: particle.duration,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: particle.delay,
-              }}
-              transform={`translate(${particle.x}, ${particle.startY})`}
-            />
-          ))}
-
-        <g>
-          <ellipse
-            cx={BASE.x}
-            cy={BASE.y + 8}
-            rx={110}
-            ry={18}
-            fill="rgba(0,0,0,0.45)"
-            style={{ filter: 'blur(10px)' }}
-          />
-
-          <g transform={`translate(${BASE.x}, ${BASE.y})`}>
-            {showRoots && (
-              <FractalRoots
-                seed={seed + 1000}
-                length={55}
-                depth={0}
-                maxDepth={4}
-                thickness={10}
-                angle={90}
-                stroke={palette.rootColor}
-              />
-            )}
-
-            <g transform="rotate(-90)">
-              <FractalBranch
-                seed={seed || 1}
-                depth={0}
-                maxDepth={MAX_DEPTH}
-                length={TRUNK_LENGTH}
-                thickness={15}
-                angle={0}
-                windIntensity={clampedWind}
-                palette={{
-                  leafPrimary: palette.leafPrimary,
-                  leafAccent: palette.leafAccent,
-                  fruitPrimary: palette.fruitPrimary,
-                  fruitHighlight: palette.fruitHighlight,
-                }}
-                showFruits={showFruits}
-                trunkGradientId={gradientIds.trunk}
-              />
+        {/* 1. Main Tree Group (Existing logic) - Foliage first (bottom layer) */}
+        <g className="tree-sway">
+          {/* Foliage */}
+          <g className="foliage-breathe">
+            <g id="FoliageCluster">
+              <circle cx="115" cy="130" r="35" fill="url(#leafGradient)" />
+              <circle cx="185" cy="125" r="32" fill="url(#leafGradient)" />
+              <circle cx="100" cy="95" r="38" fill="url(#leafGradient)" />
+              <circle cx="190" cy="85" r="36" fill="url(#leafGradient)" />
+              <circle cx="145" cy="70" r="45" fill="url(#leafGradient)" />
+              <circle cx="145" cy="100" r="40" fill="url(#leafGradient)" />
             </g>
           </g>
+          
+          {/* Trunk */}
+          <g id="TreeTrunk">
+            <path d="M142,260 C142,260 135,200 145,160 C148,145 155,130 165,120 M145,160 C145,160 125,145 115,135" 
+                  stroke="url(#trunkGradient)" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M150,260 C150,260 145,190 150,130" 
+                  stroke="url(#trunkGradient)" strokeWidth="16" strokeLinecap="round" fill="none" />
+          </g>
         </g>
-      </motion.svg>
+
+        {/* 2. Ground Grass Layer (Above trunk, below falling leaves) */}
+        <g id="GrassLayer" className="grass-breathe">
+          {/* A gentle hill curve filling the bottom, starting from trunk base (y=260) */}
+          <path d="M0,300 L0,260 C50,255 150,258 300,260 L300,300 Z" fill="#5a9c59" />
+        </g>
+
+        {/* 3. Falling Leaves (Front Layer - Top layer) */}
+        <g id="FallingLeaves">
+          {/* Defined at 0,0, moved via CSS animation */}
+          {/* Leaf 1 */}
+          <path className="fallLeaf1" d="M0,0 Q6,-6 12,0 Q6,6 0,0" fill="url(#leafGradient)" />
+          
+          {/* Leaf 2 */}
+          <path className="fallLeaf2" d="M0,0 Q5,-5 10,0 Q5,5 0,0" fill="url(#leafGradient)" />
+        </g>
+      </svg>
     </div>
   );
 };

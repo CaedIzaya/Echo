@@ -103,7 +103,8 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
 
   return (
     <div className="relative w-full max-w-5xl mx-auto py-10">
-      <div className="grid grid-cols-6 gap-4 sm:gap-6 md:gap-8 px-4 justify-items-center">
+      {/* 手机端：4列布局，PC端：6列布局 */}
+      <div className="grid grid-cols-4 md:grid-cols-6 gap-3 sm:gap-4 md:gap-6 lg:gap-8 px-2 sm:px-4 justify-items-center">
         {INTERESTS.map((interest, index) => {
           const isSelected = selectedInterests.includes(interest.id);
           const isDisabled = !isSelected && selectedInterests.length >= maxSelection;
@@ -120,7 +121,7 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
                   : '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
               }}
               className={`
-                bubble-tile group relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border text-center transition-all duration-500 will-change-transform
+                bubble-tile group relative flex aspect-square w-16 sm:w-20 md:w-24 lg:w-28 flex-col items-center justify-center rounded-full border text-center transition-all duration-500 will-change-transform
                 ${isSelected
                   ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
                   : 'bg-white/10 text-white/90 border-white/20 hover:border-white/40 hover:bg-white/15 backdrop-blur-sm'}
@@ -139,11 +140,11 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
               
               <div className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 bg-gradient-to-tr from-teal-500/20 via-cyan-500/10 to-sky-500/10 rounded-full" />
               <div className="relative flex flex-col items-center gap-1 z-10">
-                <span className="text-3xl sm:text-4xl filter drop-shadow-lg">{interest.icon}</span>
-                <span className="text-sm font-medium tracking-wide drop-shadow-md mt-1">{interest.name}</span>
+                <span className="text-2xl sm:text-3xl md:text-4xl filter drop-shadow-lg">{interest.icon}</span>
+                <span className="text-xs sm:text-sm font-medium tracking-wide drop-shadow-md mt-1">{interest.name}</span>
               </div>
               {isSelected && (
-                <span className="absolute -right-1 -top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-teal-600 text-xs font-bold shadow-lg">
+                <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-white text-teal-600 text-xs font-bold shadow-lg">
                   ✓
                 </span>
               )}
@@ -151,15 +152,15 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
           );
         })}
 
-        {/* 自定义兴趣泡泡 */}
+        {/* 自定义兴趣泡泡 - 手机端单独占一行，PC端正常排列 */}
         {showCustomInput ? (
-          <div className="relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md p-2 animate-fade-in">
+          <div className="relative flex aspect-square w-16 sm:w-20 md:w-24 lg:w-28 flex-col items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md p-2 animate-fade-in col-span-4 md:col-span-1">
             <input
               type="text"
               value={customInterest}
               onChange={(e) => setCustomInterest(e.target.value)}
               placeholder="输入..."
-              className="w-full bg-transparent text-center text-white text-sm placeholder-white/30 focus:outline-none mb-2"
+              className="w-full bg-transparent text-center text-white text-xs sm:text-sm placeholder-white/30 focus:outline-none mb-2"
               autoFocus
               maxLength={6}
             />
@@ -179,9 +180,10 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
             onClick={() => setShowCustomInput(true)}
             disabled={selectedInterests.length >= maxSelection}
             className={`
-              bubble-tile relative flex aspect-square w-20 sm:w-24 md:w-28 flex-col items-center justify-center rounded-full border border-dashed border-white/30 
+              bubble-tile relative flex aspect-square w-16 sm:w-20 md:w-24 lg:w-28 flex-col items-center justify-center rounded-full border border-dashed border-white/30 
               bg-white/5 text-white/60 transition-all hover:border-white/50 hover:text-white/90 hover:bg-white/10 backdrop-blur-sm
               ${selectedInterests.length >= maxSelection ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
+              col-span-4 md:col-span-1
             `}
             style={{
               boxShadow: '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
@@ -191,7 +193,7 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
             <div className="absolute inset-0 rounded-full opacity-20" style={{
               background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), transparent 60%)'
             }} />
-            <span className="text-2xl mb-1">+</span>
+            <span className="text-xl sm:text-2xl mb-1">+</span>
             <span className="text-xs">自定义</span>
           </button>
         )}
