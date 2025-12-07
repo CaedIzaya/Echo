@@ -180,14 +180,11 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
 
   // 渲染树的SVG（根据阶段和开花状态）- 改进版
   const renderTree = () => {
-    // 幼苗阶段
+    // 幼苗阶段 - 使用新的幼苗SVG图标
     if (tree.stage === 'seedling') {
-      const treeHeight = 90;
-      const topY = 230 - treeHeight;
-      
       return (
         <svg
-          viewBox="0 0 120 250"
+          viewBox="0 0 200 200"
           className="w-full h-auto max-w-xs mx-auto cursor-pointer tree-svg tree-seedling"
           onClick={handleTreeClick}
           style={{ 
@@ -195,44 +192,76 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
             transition: 'all 1s ease-in-out'
           }}
         >
-          {/* 地面 */}
-          <ellipse cx="60" cy="240" rx="100" ry="8" fill="#8B4513" opacity="0.3" />
+          <defs>
+            {/* 叶子渐变 */}
+            <linearGradient id="leafGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" style={{stopColor: '#66BB6A', stopOpacity: 1}} />
+              <stop offset="100%" style={{stopColor: '#81C784', stopOpacity: 1}} />
+            </linearGradient>
+          </defs>
           
-          {/* 主干 - 使用path让主干更自然 */}
-          <path
-            d={`M60,240 Q65,${240 - treeHeight * 0.6} 60,${topY + 15} Q55,${topY + 10} 60,${topY}`}
-            stroke="#8B4513"
-            strokeWidth="3"
-            fill="none"
-            className={isWatering || isFertilizing ? 'animate-pulse' : ''}
-          />
+          {/* 幼苗图标组 */}
+          <g id="Seedling" className={isWatering || isFertilizing ? 'animate-pulse' : ''}>
+            {/* Y形树干 */}
+            <path
+              id="Trunk"
+              d="M96,170 
+                 L104,170 
+                 C104,170 104,145 116,125 
+                 L112,122 
+                 C100,140 100,140 88,125 
+                 L84,128 
+                 C96,145 96,170 96,170 
+                 Z"
+              fill="#43A047"
+            />
+            
+            {/* 左叶子 */}
+            <path
+              id="LeftLeaf"
+              d="M86,126 
+                 Q55,130 45,90 
+                 Q75,80 86,126 
+                 Z"
+              fill="url(#leafGradient)"
+              className="leaf leaf-1"
+            />
+            
+            {/* 右叶子 */}
+            <path
+              id="RightLeaf"
+              d="M114,123 
+                 Q145,125 155,75 
+                 Q115,70 114,123 
+                 Z"
+              fill="url(#leafGradient)"
+              className="leaf leaf-2"
+            />
+          </g>
           
-          {/* 三片小叶子 - 不同大小和颜色 */}
-          <circle cx="50" cy={topY + 20} r="8" fill="#2E8B57" className="leaf leaf-1" />
-          <circle cx="70" cy={topY + 10} r="6" fill="#3CB371" className="leaf leaf-2" />
-          <circle cx="55" cy={topY + 5} r="5" fill="#90EE90" className="leaf leaf-3" />
-          
-          {/* 花苞/开花效果 */}
+          {/* 花苞/开花效果 - 在叶子上添加 */}
           {tree.bloomState === 'budding' && (
-            <circle cx="50" cy={topY + 20} r="3" fill="#FFB6C1" className="blossom-bud" />
+            <g className="blossoms-budding">
+              <circle cx="65" cy="108" r="3" fill="#FFB6C1" className="blossom-bud" />
+              <circle cx="135" cy="99" r="3" fill="#FFB6C1" className="blossom-bud" />
+            </g>
           )}
           
           {tree.bloomState === 'blooming' && (
             <g className="blossoms">
-              <circle cx="50" cy={topY + 20} r="4" fill="#FFB6C1" className="blossom" />
-              <circle cx="70" cy={topY + 10} r="3.5" fill="#FF69B4" className="blossom" />
-              <circle cx="55" cy={topY + 5} r="3" fill="#FF1493" className="blossom" />
+              <circle cx="65" cy="108" r="4" fill="#FFB6C1" className="blossom" />
+              <circle cx="135" cy="99" r="4" fill="#FF69B4" className="blossom" />
             </g>
           )}
           
-          {/* 浇水/施肥动画 */}
+          {/* 浇水动画 - 在幼苗上方，避免与幼苗重叠 */}
           {isWatering && (
             <g className="water-drops">
               {[...Array(3)].map((_, i) => (
                 <circle
                   key={i}
-                  cx={60}
-                  cy={topY + 30 + i * 12}
+                  cx={100 + (i % 2 === 0 ? -8 : 8)}
+                  cy={60 + i * 12}
                   r="3"
                   fill="#3b82f6"
                   className="water-drop"
@@ -242,6 +271,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
             </g>
           )}
           
+          {/* 施肥动画 - 在幼苗周围，避免与幼苗重叠 */}
           {isFertilizing && (
             <g className="sparkles">
               {[...Array(4)].map((_, i) => {
@@ -250,8 +280,8 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
                 return (
                   <circle
                     key={i}
-                    cx={60 + Math.cos(rad) * 12}
-                    cy={topY + 25 + Math.sin(rad) * 12}
+                    cx={100 + Math.cos(rad) * 25}
+                    cy={120 + Math.sin(rad) * 25}
                     r="3"
                     fill="#84cc16"
                     className="sparkle"

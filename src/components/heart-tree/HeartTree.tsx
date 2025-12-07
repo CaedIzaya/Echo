@@ -10,10 +10,10 @@ interface HeartTreeProps {
   showParticles?: boolean;
 }
 
-export const HeartTree: React.FC<HeartTreeProps> = () => {
+export const HeartTree: React.FC<HeartTreeProps & { animState?: 'idle' | 'watering' | 'fertilizing' }> = ({ animState = 'idle' }) => {
   return (
-    <div className="w-full h-full max-w-[460px] max-h-[460px] select-none flex items-center justify-center">
-      <svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl">
+    <div className="w-full h-full max-w-[460px] max-h-[460px] select-none flex items-center justify-center relative">
+      <svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl heart-tree-svg" data-anim-state={animState}>
         <defs>
           {/* Existing Foliage Gradient */}
           <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -104,14 +104,45 @@ export const HeartTree: React.FC<HeartTreeProps> = () => {
                 80% { opacity: 1; }
                 100% { opacity: 0; transform: translate(220px, 285px) rotate(60deg); }
               }
+
+              /* ==============================
+                 INTERACTION ANIMATIONS
+                 ============================== */
+              
+              /* Watering: Tree hydration reaction */
+              .heart-tree-svg[data-anim-state="watering"] .foliage-group {
+                animation: treeHydrate 0.8s cubic-bezier(0.2, 1.5, 0.5, 1) forwards;
+                animation-delay: 0.5s;
+              }
+
+              @keyframes treeHydrate {
+                0% { transform: scale(1, 1); }
+                20% { transform: scale(1.05, 0.9); } /* Squash down on impact */
+                50% { transform: scale(0.95, 1.05); } /* Stretch up (refresh) */
+                80% { transform: scale(1.02, 0.98); }
+                100% { transform: scale(1, 1); }
+              }
+
+              /* Fertilizing: Tree power-up pop */
+              .heart-tree-svg[data-anim-state="fertilizing"] .foliage-group {
+                animation: powerPop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                animation-delay: 0.6s;
+              }
+
+              @keyframes powerPop {
+                0% { transform: scale(1); }
+                40% { transform: scale(1.08); } /* Big expansion */
+                70% { transform: scale(0.97); }
+                100% { transform: scale(1); }
+              }
             `}
           </style>
         </defs>
 
         {/* 1. Main Tree Group (Existing logic) - Foliage first (bottom layer) */}
-        <g className="tree-sway">
+        <g className="tree-sway tree-group">
           {/* Foliage */}
-          <g className="foliage-breathe">
+          <g className="foliage-breathe foliage-group">
             <g id="FoliageCluster">
               <circle cx="115" cy="130" r="35" fill="url(#leafGradient)" />
               <circle cx="185" cy="125" r="32" fill="url(#leafGradient)" />
@@ -123,7 +154,7 @@ export const HeartTree: React.FC<HeartTreeProps> = () => {
           </g>
           
           {/* Trunk */}
-          <g id="TreeTrunk">
+          <g id="TreeTrunk" className="trunk-group">
             <path d="M142,260 C142,260 135,200 145,160 C148,145 155,130 165,120 M145,160 C145,160 125,145 115,135" 
                   stroke="url(#trunkGradient)" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             <path d="M150,260 C150,260 145,190 150,130" 

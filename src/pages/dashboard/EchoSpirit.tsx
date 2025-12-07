@@ -33,8 +33,9 @@ export default function EchoSpirit({
     setIsAnimating(true);
     if (onClick) onClick();
     
-    // Randomly choose happy or excited
-    const nextState = Math.random() > 0.5 ? 'happy' : 'excited';
+    // Randomly choose happy, nod, or excited (三个动作：摆头、点头、弹跳)
+    const actions: ('happy' | 'nod' | 'excited')[] = ['happy', 'nod', 'excited'];
+    const nextState = actions[Math.floor(Math.random() * actions.length)];
     setCurrentState(nextState);
     if (onStateChange) onStateChange(nextState);
     
@@ -57,62 +58,78 @@ export default function EchoSpirit({
       >
       <svg className="echo-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          {/* --- NEW COLOR PALETTE: Soft, Magical, Ethereal --- */}
-          
-          {/* Body: Pastel Yellow -> Soft Peach -> Golden Edge */}
-          <radialGradient id="gradBodySoft" cx="35%" cy="35%" r="65%">
-            <stop offset="0%" stopColor="#FFFBF0" />     {/* Highlight: Milky White */}
-            <stop offset="40%" stopColor="#FFE0B2" />    {/* Core: Soft Peach */}
-            <stop offset="100%" stopColor="#FFB74D" />   {/* Edge: Golden Orange */}
+          {/* 外圈光晕 - 增强可见度 */}
+          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FFD27F" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#FFB84D" stopOpacity="0" />
           </radialGradient>
-          {/* Eyes: Softer brown, less harsh than black */}
+          {/* 身体颜色 - 参考手机版 */}
+          <radialGradient id="gradBodySoft" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FFE09A" />
+            <stop offset="100%" stopColor="#FFD27F" />
+          </radialGradient>
+          {/* Eyes: 深棕色 */}
           <linearGradient id="gradEye" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#5D4037" />
-            <stop offset="100%" stopColor="#3E2723" />
+            <stop offset="0%" stopColor="#3A2F2F" />
+            <stop offset="100%" stopColor="#2A1F1F" />
           </linearGradient>
-          {/* Glow Filter: Creates the "Spirit" atmosphere */}
-          <filter id="spiritGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-            <feComposite in="coloredBlur" in2="SourceGraphic" operator="in" result="softGlow" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
+        
         {/* --- GROUP: MAIN ROTATOR (Handles Body Tilt) --- */}
         <g className="main-rotator" transform="translate(100, 100)">
-          {/* --- LAYER 2: BODY (The Spirit) --- */}
+          {/* 外圈光晕层 - 扩大半径确保可见，且位于底层 */}
+          <circle cx="0" cy="0" r="110" fill="url(#glow)" className="glow-layer" />
+          
+          {/* --- LAYER 2: BODY (The Spirit) - 使用圆形建模，参考手机版 --- */}
           <g className="body-physics-group">
-            {/* 3.1 Shape: Teardrop/Tadpole - Tapered bottom for aerodynamics (Smaller size) */}
-            <path 
+            {/* 身体圆形 - 参考手机版设计 */}
+            <circle 
               className="body-shape"
-              d="M0,-40 C21,-40 40,-21 40,4 C40,33 17,46 0,46 C-17,46 -40,33 -40,4 C-40,-21 -21,-40 0,-40 Z" 
+              cx="0"
+              cy="0"
+              r="64"
               fill="url(#gradBodySoft)"
-              filter="url(#spiritGlow)"
             />
-            {/* 3.2 Hands: Little energy nubs (Integrated, smaller) */}
-            <circle cx="-32" cy="12" r="6" fill="#FFCC80" className="hand left-hand" opacity="0.8" />
-            <circle cx="32" cy="12" r="6" fill="#FFCC80" className="hand right-hand" opacity="0.8" />
+            
+            {/* 小手组 - 参考手机版，初始隐藏 */}
+            <g className="hand-group">
+              <circle 
+                cx="-64" 
+                cy="20" 
+                r="12" 
+                fill="url(#gradBodySoft)" 
+                className="hand left-hand" 
+                opacity="0"
+              />
+              <circle 
+                cx="64" 
+                cy="20" 
+                r="12" 
+                fill="url(#gradBodySoft)" 
+                className="hand right-hand" 
+                opacity="0"
+              />
+            </g>
+            
             {/* 3.3 Face Container (Independent from body stretch) */}
-            <g className="face-container" transform="translate(0, -5)">
-              {/* Blush */}
-              <circle cx="-28" cy="12" r="9" fill="#FFAB91" opacity="0.4" />
-              <circle cx="28" cy="12" r="9" fill="#FFAB91" opacity="0.4" />
-              {/* EXPRESSIVE EYES GROUP */}
-              {/* The entire group moves for "looking around" */}
+            <g className="face-container" transform="translate(0, -10)">
+              {/* 腮红 - 新增 */}
+              <ellipse cx="-40" cy="15" rx="10" ry="6" fill="#FFAB91" opacity="0.5" />
+              <ellipse cx="40" cy="15" rx="10" ry="6" fill="#FFAB91" opacity="0.5" />
+
+              {/* EXPRESSIVE EYES GROUP - 参考手机版的眼睛设计 */}
               <g className="eyes-look-controller">
-                {/* Left Eye */}
-                <g className="eye-left" transform="translate(-18, 0)">
-                  <ellipse cx="0" cy="0" rx="7.5" ry="11" fill="url(#gradEye)" />
-                  <circle cx="2" cy="-4" r="3" fill="white" opacity="0.95" /> {/* Highlight */}
-                  <path d="M-6,-8 Q0,-12 6,-8" stroke="#5D4037" strokeWidth="1.5" opacity="0.3" fill="none" /> {/* Lid crease */}
+                {/* Left Eye - 参考手机版：偏上，大间距 */}
+                <g className="eye-left" transform="translate(-24, -10)">
+                  <ellipse cx="0" cy="0" rx="12" ry="20" fill="url(#gradEye)" />
+                  {/* 高光 - 固定居于眼睛内部上方 */}
+                  <circle cx="4" cy="-7" r="4" fill="white" opacity="0.7" className="eye-high left-high" />
                 </g>
                 {/* Right Eye */}
-                <g className="eye-right" transform="translate(18, 0)">
-                  <ellipse cx="0" cy="0" rx="7.5" ry="11" fill="url(#gradEye)" />
-                  <circle cx="2" cy="-4" r="3" fill="white" opacity="0.95" /> {/* Highlight */}
-                  <path d="M-6,-8 Q0,-12 6,-8" stroke="#5D4037" strokeWidth="1.5" opacity="0.3" fill="none" />
+                <g className="eye-right" transform="translate(24, -10)">
+                  <ellipse cx="0" cy="0" rx="12" ry="20" fill="url(#gradEye)" />
+                  {/* 高光 */}
+                  <circle cx="4" cy="-7" r="4" fill="white" opacity="0.7" className="eye-high right-high" />
                 </g>
               </g>
             </g>
@@ -128,8 +145,8 @@ export default function EchoSpirit({
       </svg>
       <style jsx>{`
         .echo-spirit-container {
-          width: 180px;
-          height: 180px;
+          width: 110px;
+          height: 110px;
           display: inline-block;
           cursor: pointer;
           position: relative;
@@ -141,25 +158,43 @@ export default function EchoSpirit({
           height: 100%;
           overflow: visible;
         }
+        
+        /* 光晕层动画 - 参考手机版 */
+        .glow-layer {
+          animation: glowPulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes glowPulse {
+          0%, 100% { 
+            opacity: 0.8;
+            transform: scale(1);
+          }
+          50% { 
+            opacity: 1;
+            transform: scale(1.05);
+          }
+        }
+        
         /* =========================================
            1. IDLE ANIMATIONS (Always Active)
            ========================================= */
         
-        /* Body: Gentle floating sine wave */
+        /* Body: Gentle floating sine wave - PC端保留 */
         @keyframes floatIdle {
-          0%, 100% { transform: translateY(0px) rotate(-5deg); }
-          50% { transform: translateY(-8px) rotate(-3deg); }
+          0%, 100% { transform: translateY(0px) rotate(-5deg) scale(1); }
+          50% { transform: translateY(-8px) rotate(-3deg) scale(1.04); }
         }
-        /* Eyes: Randomly looking around (Simulated randomness via long keyframe) */
+        
+        /* Eyes: Randomly looking around - PC端保留 */
         @keyframes eyeLookAround {
           0%, 35% { transform: translate(0, 0); } /* Center */
-          40%, 45% { transform: translate(-6px, 2px); } /* Look Left */
+          40%, 45% { transform: translate(-8px, -6px); } /* Look Left Up - 参考手机版 */
           50%, 75% { transform: translate(0, 0); } /* Center */
-          80%, 85% { transform: translate(6px, -2px); } /* Look Right Up */
+          80%, 85% { transform: translate(8px, -6px); } /* Look Right Up */
           90%, 100% { transform: translate(0, 0); } /* Center */
         }
         
-        /* Blink: Natural eye closing - only scale Y axis at center */
+        /* Blink: Natural eye closing - PC端保留 */
         @keyframes blink {
           0%, 48%, 52%, 100% { 
             transform: scaleY(1);
@@ -170,11 +205,13 @@ export default function EchoSpirit({
             opacity: 0.9;
           }
         }
-        /* Particle Sparkle */
+        
+        /* Particle Sparkle - PC端保留 */
         @keyframes sparkle {
           0%, 100% { opacity: 0; transform: translateY(0); }
           50% { opacity: 0.8; transform: translateY(-10px); }
         }
+        
         /* --- APPLY IDLE --- */
         .echo-spirit-container[data-state="idle"] .main-rotator {
           animation: floatIdle 4s ease-in-out infinite;
@@ -183,22 +220,25 @@ export default function EchoSpirit({
         
         .echo-spirit-container[data-state="idle"] .eyes-look-controller {
           animation: eyeLookAround 8s ease-in-out infinite;
+          transform-origin: 0px -10px; /* 相对于main-rotator的中心，眼睛在face-container的translate(0, -10)位置 */
         }
         
-        /* Apply blink animation to both eyes independently with proper origin */
+        /* Apply blink animation to both eyes independently - PC端保留 */
         .echo-spirit-container[data-state="idle"] .eye-left ellipse {
-          transform-origin: 0px 0px; /* Center of the eye at translate(-18, 0) */
+          transform-origin: 0px 0px;
           animation: blink 4s infinite;
         }
         .echo-spirit-container[data-state="idle"] .eye-right ellipse {
-          transform-origin: 0px 0px; /* Center of the eye at translate(18, 0) */
-          animation: blink 4.2s infinite; /* Slight delay for more natural look */
+          transform-origin: 0px 0px;
+          animation: blink 4.2s infinite;
         }
+        
         .echo-spirit-container .p1 { animation: sparkle 3s infinite; }
         .echo-spirit-container .p2 { animation: sparkle 4s infinite 1s; }
         .echo-spirit-container .p3 { animation: sparkle 5s infinite 2s; }
+        
         /* =========================================
-           2. HAPPY ANIMATION (Wiggle & Bounce)
+           2. HAPPY ANIMATION (Wiggle & Bounce) - PC端保留
            ========================================= */
         @keyframes happyWiggle {
           0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
@@ -207,8 +247,44 @@ export default function EchoSpirit({
           75% { transform: translateY(-5px) rotate(3deg) scale(1.05); }
         }
         
+        /* happy状态 - 左右轻微晃脑袋 - 参考手机版 */
+        @keyframes headShake {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-3deg); }
+          50% { transform: rotate(0deg); }
+          75% { transform: rotate(3deg); }
+        }
+        
+        /* happy状态 - 眼睛高光跑动 - 参考手机版 */
+        @keyframes highlightRun {
+          0% { transform: translateX(0px) translateY(0px); }
+          25% { transform: translateX(3px) translateY(-2px); }
+          50% { transform: translateX(-2px) translateY(-1px); }
+          75% { transform: translateX(2px) translateY(1px); }
+          100% { transform: translateX(0px) translateY(0px); }
+        }
+        
+        /* happy和nod状态 - 显示小手并上下摆动 - 参考手机版 */
+        @keyframes nodHands {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-6px); }
+        }
+        
+        /* nod状态 - 头部点头动画（覆盖基础动画） - 参考手机版 */
+        @keyframes nodHeadTilt {
+          0%, 100% { transform: rotate(4deg); }
+          50% { transform: rotate(10deg); }
+        }
+        
+        /* nod状态 - 眼睛跟随头部点头 - 参考手机版 */
+        @keyframes nodBounce {
+          0%, 100% { transform: rotate(0deg); }
+          50% { transform: rotate(6deg); }
+        }
+        
+        /* happy状态 - 组合动画：headShake和happyWiggle都应用在main-rotator上，避免容器位移 */
         .echo-spirit-container[data-state="happy"] .main-rotator {
-          animation: happyWiggle 0.6s ease-in-out infinite;
+          animation: happyWiggle 0.6s ease-in-out infinite, headShake 2s ease-in-out infinite;
           transform-origin: center center;
         }
         
@@ -216,8 +292,53 @@ export default function EchoSpirit({
           animation: none;
         }
         
+        .echo-spirit-container[data-state="happy"] .eye-high {
+          animation: highlightRun 2s ease-in-out infinite;
+        }
+        
+        .echo-spirit-container[data-state="happy"] .hand-group {
+          opacity: 1;
+          transition: opacity 0.3s ease-in-out;
+        }
+        
+        .echo-spirit-container[data-state="happy"] .hand-left,
+        .echo-spirit-container[data-state="happy"] .hand-right {
+          opacity: 1;
+          animation: nodHands 1.2s ease-in-out infinite;
+        }
+        
+        .echo-spirit-container[data-state="happy"] .hand-right {
+          animation-delay: 0.15s;
+        }
+        
+        /* nod状态 - 头部点头 - 参考手机版，应用在main-rotator上避免容器位移 */
+        .echo-spirit-container[data-state="nod"] .main-rotator {
+          animation: nodHeadTilt 1.2s ease-in-out infinite;
+          transform-origin: center bottom; /* 头部底部中心 */
+        }
+        
+        .echo-spirit-container[data-state="nod"] .eyes-look-controller {
+          animation: nodBounce 1.2s ease-in-out infinite;
+          transform-origin: center center;
+        }
+        
+        .echo-spirit-container[data-state="nod"] .hand-group {
+          opacity: 1;
+          transition: opacity 0.3s ease-in-out;
+        }
+        
+        .echo-spirit-container[data-state="nod"] .hand-left,
+        .echo-spirit-container[data-state="nod"] .hand-right {
+          opacity: 1;
+          animation: nodHands 1.2s ease-in-out infinite;
+        }
+        
+        .echo-spirit-container[data-state="nod"] .hand-right {
+          animation-delay: 0.15s;
+        }
+        
         /* =========================================
-           3. EXCITED ANIMATION (Bounce & Dart)
+           3. EXCITED ANIMATION (Bounce & Dart) - PC端保留
            ========================================= */
         @keyframes excitedBounce {
           0%, 100% { transform: translateY(0) scale(1); }
@@ -234,6 +355,21 @@ export default function EchoSpirit({
         
         .echo-spirit-container[data-state="excited"] .eyes-look-controller {
           animation: none;
+        }
+        
+        .echo-spirit-container[data-state="excited"] .hand-group {
+          opacity: 1;
+          transition: opacity 0.3s ease-in-out;
+        }
+        
+        .echo-spirit-container[data-state="excited"] .hand-left,
+        .echo-spirit-container[data-state="excited"] .hand-right {
+          opacity: 1;
+          animation: nodHands 0.8s ease-in-out infinite;
+        }
+        
+        .echo-spirit-container[data-state="excited"] .hand-right {
+          animation-delay: 0.1s;
         }
       `}</style>
     </div>

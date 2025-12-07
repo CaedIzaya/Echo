@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import ProgressRing from './dashboard/ProgressRing';
+import EchoSpirit from './dashboard/EchoSpirit';
 
 const FOCUS_QUOTES = [
   { text: 'Attention is the rarest and purest form of generosity.', author: 'Simone Weil' },
@@ -22,8 +23,8 @@ const LOADING_STEPS = [
 
 const LANDING_FEATURES = [
   {
-    title: '真我发掘',
-    description: '找到自己真正热爱的事物，并有计划地投入时间',
+    title: '轻量规划',
+    description: '找到自己的热爱，并随时随地完成小目标',
     icon: '🎯',
     accent: 'from-emerald-50 via-white to-teal-50/60 border-emerald-100/70',
   },
@@ -40,12 +41,6 @@ const LANDING_FEATURES = [
     accent: 'from-teal-50 via-white to-emerald-50/60 border-teal-100/70',
   },
 ] as const;
-
-const HERO_STATS = [
-  { label: '本周心流', value: '12h 40m' },
-  { label: '最长专注', value: '95 min' },
-  { label: '当前连胜', value: '7 days' },
-];
 
 const HERO_PLAN_TASKS = [
   { title: '晨间写作', detail: '完成 500 字手稿', done: true },
@@ -146,17 +141,8 @@ const LandingNavbar = ({
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-2xl p-2 shadow-lg shadow-cyan-500/40">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M4 12c3-4 7-4 10 0s7 4 10 0"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-              <circle cx="6" cy="12" r="1.6" fill="currentColor" />
-              <circle cx="12" cy="12" r="1.6" fill="currentColor" />
-            </svg>
+          <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-2xl p-1.5 shadow-lg shadow-cyan-500/40 flex items-center justify-center overflow-hidden w-11 h-11">
+            <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Echo</p>
@@ -243,7 +229,7 @@ const LandingHero = ({
   onSecondaryAction: () => void;
 }) => {
   return (
-    <section className="relative min-h-screen pt-32 md:pt-48 pb-20 overflow-hidden" id="mission">
+    <section className="relative min-h-screen pt-32 md:pt-48 pb-8 overflow-hidden" id="mission">
       <div className="absolute top-20 right-0 -z-10 w-[720px] h-[720px] bg-gradient-to-br from-emerald-100/70 via-cyan-100/60 to-sky-100/40 rounded-full blur-3xl opacity-70 translate-x-1/3" />
       <div className="absolute bottom-0 left-0 -z-10 w-[520px] h-[520px] bg-gradient-to-br from-cyan-100/70 via-teal-100/60 to-emerald-100/40 rounded-full blur-3xl opacity-70 -translate-x-1/4" />
 
@@ -258,7 +244,7 @@ const LandingHero = ({
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
-          在算法之外，
+          算法之外
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400">
             重遇自我
@@ -266,8 +252,8 @@ const LandingHero = ({
           </h1>
 
           <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
-            <p>你拥有夺回注意力与意识主权的力量。</p>
-            <p>成长来自光，也来自你敢看见自己的影。</p>
+            <p>在这个时代，你的注意力就是最后的领地。</p>
+            <p>Echo 会陪你一点点，重建你的节奏与清醒。</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -293,7 +279,7 @@ const LandingHero = ({
               <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-emerald-50 p-6 z-10 transform rotate-2 hover:rotate-0 transition-transform duration-500">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">今日计划</h3>
+                <h3 className="text-lg font-bold text-slate-900">投资自己</h3>
                 <p className="text-sm text-slate-500">按节奏投入热爱的事</p>
               </div>
               <div className="px-3 py-1 bg-teal-50 text-teal-500 text-xs font-semibold rounded-full">
@@ -311,19 +297,19 @@ const LandingHero = ({
               </div>
               <div className="flex-1 grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-100">
-                  <p className="text-xs text-emerald-500">已投入</p>
-                  <p className="text-lg font-semibold text-slate-900 mt-1">54 分钟</p>
+                  <p className="text-xs text-emerald-500">  本周心流</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">12h 40m</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-cyan-50 to-white border border-cyan-100">
                   <p className="text-xs text-cyan-500">今日目标</p>
-                  <p className="text-lg font-semibold text-slate-900 mt-1">75 分钟</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">25 分钟</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-50 to-white border border-sky-100">
-                  <p className="text-xs text-sky-500">剩余</p>
-                  <p className="text-lg font-semibold text-slate-900 mt-1">21 分钟</p>
+                  <p className="text-xs text-sky-500">心流指数</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">75</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-teal-50 to-white border border-teal-100">
-                  <p className="text-xs text-teal-500">连续专注</p>
+                  <p className="text-xs text-teal-500">当前连胜</p>
                   <p className="text-lg font-semibold text-slate-900 mt-1">3 天</p>
                 </div>
               </div>
@@ -383,30 +369,18 @@ const LandingHero = ({
           </div>
         </div>
       </div>
-
-      <div className="mt-16 max-w-3xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {HERO_STATS.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-2xl border border-teal-50 bg-gradient-to-br from-white via-emerald-50/40 to-cyan-50/30 backdrop-blur-md p-5 text-center shadow-lg shadow-emerald-100/40"
-          >
-            <p className="text-xs uppercase tracking-[0.3em] text-teal-500">{item.label}</p>
-            <p className="text-2xl font-semibold text-slate-900 mt-3">{item.value}</p>
-          </div>
-        ))}
-      </div>
     </section>
   );
 };
 
 const FeatureGrid = () => (
-  <section id="features" className="py-24 bg-white">
+  <section id="features" className="pt-8 pb-24 bg-white">
     <div className="max-w-7xl mx-auto px-6">
       <div className="text-center max-w-3xl mx-auto mb-16">
         <span className="text-teal-600 font-semibold tracking-wider uppercase text-sm bg-teal-50 px-4 py-1 rounded-full">
           核心功能
         </span>
-        <h2 className="mt-6 text-4xl font-bold text-slate-900">夺回你宝贵的注意力</h2>
+        <h2 className="mt-6 text-4xl font-bold text-slate-900">夺回你的注意力</h2>
         <p className="mt-4 text-lg text-slate-500">
           Echo 是你的注意力伙伴，它是你在嘈杂数字世界里的静谧避难所。
         </p>
@@ -490,16 +464,8 @@ const LandingFooter = () => (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text白 p-2 rounded-xl">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" opacity="0.6" />
-                <path
-                  d="M4 12c3-4 7-4 10 0s7 4 10 0"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              </svg>
+            <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white p-1.5 rounded-xl flex items-center justify-center overflow-hidden w-10 h-10">
+              <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
             </div>
             <span className="text-xl font-bold text-slate-900">Echo</span>
           </div>
@@ -523,7 +489,7 @@ const LandingFooter = () => (
             </li>
             <li>
               <a href="#" className="hover:text-teal-600 transition-colors">
-                定价方案
+                
               </a>
             </li>
           </ul>
@@ -587,6 +553,19 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const isTransitioning = loading || authStatus.startsWith('已登录');
+  
+  // 小精灵相关状态
+  const [showSpiritMessage, setShowSpiritMessage] = useState(false);
+  const [spiritMessage, setSpiritMessage] = useState('');
+  const [spiritClickCount, setSpiritClickCount] = useState(0);
+  const hasShownWelcome = useRef(false);
+  
+  // 随机消息
+  const randomMessages = [
+    "……你真喜欢点我。",
+    "再点我我就假装死机了。",
+    "？？？ 你是来玩 Echo 的，还是来玩我的？"
+  ];
 
   const shouldForceOnboarding = () => {
     if (typeof window === 'undefined') {
@@ -603,6 +582,15 @@ export default function Home() {
     } catch (error) {
       console.error('首页自动更新 onboarding 状态失败:', error);
     }
+  };
+
+  // 显示小精灵消息
+  const showMessage = (message: string, duration: number = 5000) => {
+    setSpiritMessage(message);
+    setShowSpiritMessage(true);
+    setTimeout(() => {
+      setShowSpiritMessage(false);
+    }, duration);
   };
 
   useEffect(() => {
@@ -634,6 +622,20 @@ export default function Home() {
     return () => {
       timers.forEach((timer) => clearTimeout(timer));
     };
+  }, [isTransitioning]);
+
+  // 自动显示开场白
+  useEffect(() => {
+    if (!isTransitioning && !hasShownWelcome.current) {
+      hasShownWelcome.current = true;
+      setTimeout(() => {
+        setSpiritMessage("嘿，你来了。\n\n从这里开始，你的时间会慢慢有重量。");
+        setShowSpiritMessage(true);
+        setTimeout(() => {
+          setShowSpiritMessage(false);
+        }, 5000);
+      }, 500); // 延迟500ms显示，确保页面已加载
+    }
   }, [isTransitioning]);
 
   const checkAuthAndRedirect = async () => {
@@ -755,6 +757,36 @@ export default function Home() {
       ? LOADING_STEPS[currentStepIndex].message
       : 'Connected. Preparing Echo...';
 
+  // 处理小精灵点击
+  const handleSpiritClick = () => {
+    const count = spiritClickCount + 1;
+    setSpiritClickCount(count);
+
+    if (count === 1) {
+      showMessage("我是 Lumi。\n\n从现在起，我会和你一起守住那些真正属于你的时间。\n\n你不是一个人。", 6000);
+    } else if (count === 2) {
+      showMessage("咳，欢迎仪式到这就够啦。\n\n走吧，让我们开始专注吧。", 5000);
+    } else if (count === 3) {
+      showMessage("好了，欢迎环节就到这。\n\n剩下的时间，我们拿去专注。", 5000);
+    } else {
+      // 随机显示消息
+      const randomMessage = randomMessages[Math.floor(Math.random() * randomMessages.length)];
+      showMessage(randomMessage, 4000);
+    }
+  };
+
+  const handlePrimaryAction = (email?: string) => {
+    if (email) {
+      // 如果有邮箱，跳转到登录页并传递邮箱参数
+      router.push(`/auth/signin?email=${encodeURIComponent(email)}`);
+    } else {
+      // 如果没有邮箱，直接跳转
+      router.push('/auth/signin');
+    }
+  };
+  const handleSecondaryAction = () => router.push('/auth/signin');
+
+  // 早期返回：loading状态时显示加载界面（必须在所有hooks之后）
   if (isTransitioning) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-teal-600 via-cyan-600 to-sky-500 text-white flex flex-col items-center justify-center relative overflow-hidden">
@@ -795,20 +827,9 @@ export default function Home() {
     );
   }
 
-  const handlePrimaryAction = (email?: string) => {
-    if (email) {
-      // 如果有邮箱，跳转到登录页并传递邮箱参数
-      router.push(`/auth/signin?email=${encodeURIComponent(email)}`);
-    } else {
-      // 如果没有邮箱，直接跳转
-      router.push('/auth/signin');
-    }
-  };
-  const handleSecondaryAction = () => router.push('/auth/signin');
-
   // 未登录时显示欢迎界面
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 relative">
       <LandingNavbar onPrimaryAction={handlePrimaryAction} onSecondaryAction={handleSecondaryAction} />
       <main>
         <LandingHero
@@ -819,6 +840,48 @@ export default function Home() {
         <LandingCTA onPrimaryAction={handlePrimaryAction} />
       </main>
       <LandingFooter />
+      
+      {/* 小精灵 */}
+      {!isTransitioning && (
+        <div className="fixed bottom-8 right-8 z-50">
+          <EchoSpirit
+            state="idle"
+            onClick={handleSpiritClick}
+          />
+        </div>
+      )}
+      
+      {/* 小精灵消息气泡 - 位于小精灵上方 */}
+      {showSpiritMessage && (
+        <div className="fixed bottom-48 right-8 z-50 max-w-xs animate-slide-up">
+          <div className="bg-white rounded-2xl p-4 shadow-2xl border border-teal-100 relative">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">✨</span>
+              <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">
+                {spiritMessage}
+              </p>
+            </div>
+            {/* 气泡小三角 - 指向下方的小精灵 */}
+            <div className="absolute -bottom-2 right-12 w-4 h-4 bg-white border-r border-b border-teal-100 transform rotate-45"></div>
+          </div>
+        </div>
+      )}
+      
+      <style jsx>{`
+        @keyframes slide-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

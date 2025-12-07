@@ -6,6 +6,7 @@ import BottomNavigation from './BottomNavigation';
 import UserMenu from './UserMenu';
 import PrimaryPlanCard from './PrimaryPlanCard';
 import AchievementPanel from './AchievementPanel';
+import TodaySummaryCard from './TodaySummaryCard';
 import QuickSearchGuide from './QuickSearchGuide';
 import SecurityGuideCard from './SecurityGuideCard';
 import EchoSpirit from './EchoSpirit';
@@ -396,7 +397,7 @@ export default function Dashboard() {
   const [confirmMilestoneId, setConfirmMilestoneId] = useState<string | null>(null);
   const [completingMilestoneId, setCompletingMilestoneId] = useState<string | null>(null); // 正在完成的小目标ID（用于动画）
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
-  const [showTotalInfo, setShowTotalInfo] = useState(false);
+  const [showStreakInfo, setShowStreakInfo] = useState(false);
 
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
@@ -1295,17 +1296,17 @@ export default function Dashboard() {
       const target = event.target as HTMLElement;
       if (!target.closest('[data-tooltip-trigger]')) {
         setShowWeeklyInfo(false);
-        setShowTotalInfo(false);
+        setShowStreakInfo(false);
       }
     };
 
-    if (showWeeklyInfo || showTotalInfo) {
+    if (showWeeklyInfo || showStreakInfo) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showWeeklyInfo, showTotalInfo]);
+  }, [showWeeklyInfo, showStreakInfo]);
 
   // UI 辅助函数 - 进度颜色
   const getProgressColor = (progress: number): string => {
@@ -1689,8 +1690,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              {/* 小精灵定位在卡片下方，大幅下移 */}
-              <div className="hidden lg:block absolute pointer-events-none" style={{ bottom: '-110px', left: 'calc(50% + 80px)', transform: 'translateX(-50%)' }}>
+              {/* 小精灵定位在卡片底部居中，往右上方移动 */}
+              <div className="hidden lg:block absolute pointer-events-none" style={{ bottom: '-60px', left: 'calc(50% + 50px)', transform: 'translateX(-50%)' }}>
                 <div className="pointer-events-auto">
                   <EchoSpirit
                     state="idle"
@@ -1767,13 +1768,28 @@ export default function Dashboard() {
               <div
                 className={`grid grid-cols-1 md:grid-cols-3 gap-5 ${userLevel ? 'xl:col-span-3' : 'xl:col-span-4'}`}
               >
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
                 <div className="flex items-start justify-between">
                   <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">连续专注</p>
+                  <button
+                    onClick={() => setShowStreakInfo(!showStreakInfo)}
+                    data-tooltip-trigger
+                    className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-zinc-600">!</span>
+                  </button>
                   </div>
+                  {showStreakInfo && (
+                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        最近一段连续完成专注目标时长的天数
+                      </p>
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+                    </div>
+                  )}
                   <div className="flex-1 flex items-center">
                     <div>
-                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-none">{stats.streakDays}</p>
+                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-none">{Math.max(1, stats.streakDays)}</p>
                       <p className="text-sm text-zinc-500 mt-2">天</p>
                     </div>
                   </div>
@@ -1782,7 +1798,7 @@ export default function Dashboard() {
 
                 <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
                   <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
+                    <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
                     <button
                       onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
                       data-tooltip-trigger
@@ -1794,7 +1810,7 @@ export default function Dashboard() {
                   {showWeeklyInfo && (
                     <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
                       <p className="text-xs text-zinc-600 leading-relaxed">
-                        每周一 00:00 会根据你的时区自动刷新本周专注时长，重新开始计算。
+                        本周专注时长按照时区每周一00:00刷新。
                       </p>
                       <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
                     </div>
@@ -1806,37 +1822,10 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <p className="text-xs text-zinc-400 text-center">每周一 00:00 自动刷新</p>
+                  <p className="text-xs text-zinc-400 text-center">本周累计专注时长</p>
                 </div>
 
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
-                  <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">累计专注</p>
-                    <button
-                      onClick={() => setShowTotalInfo(!showTotalInfo)}
-                      data-tooltip-trigger
-                      className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
-                    >
-                      <span className="text-xs font-bold text-zinc-600">!</span>
-                    </button>
-                  </div>
-                  {showTotalInfo && (
-                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                      <p className="text-xs text-zinc-600 leading-relaxed">
-                        累计专注时长记录了你从加入 Echo 以来的所有专注时间，这是一个永久的记录，不会重置。
-                      </p>
-                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
-                    </div>
-                  )}
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-tight">
-                        {totalFocusHours}h{totalFocusMinutesRemainder}m
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-zinc-400 text-center">从加入 Echo 以来的所有时长</p>
-                </div>
+                <TodaySummaryCard userId={session?.user?.id || ''} />
               </div>
             </div>
 

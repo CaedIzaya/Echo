@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import BottomNavigation from '../dashboard/BottomNavigation';
 import InterruptedSessionAlert from './InterruptedSessionAlert';
 
-type FocusState = 
+type FocusState =  
   | 'preparing'      // 准备中（设置时长）
   | 'starting'       // 3秒倒计时
   | 'running'        // 专注进行中
@@ -51,6 +51,7 @@ export default function Focus() {
   const [showInterruptedAlert, setShowInterruptedAlert] = useState(false);
   const [interruptedSessionData, setInterruptedSessionData] = useState<{ minutes: number; timestamp: string } | null>(null);
   
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionRef = useRef<FocusSession | null>(null);
   const isInitialLoadRef = useRef(true);
@@ -590,6 +591,20 @@ export default function Focus() {
       localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
     }
     
+    // 预生成「今日专注文案」，供 Dashboard / 小结页预填使用
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const parts: string[] = [];
+      if (sessionName) parts.push(sessionName);
+      if (selectedGoalInfo?.title) parts.push(selectedGoalInfo.title);
+      const focusText = parts.join(' · ');
+      if (focusText) {
+        localStorage.setItem('todayFocusCopy', JSON.stringify({ date: today, text: focusText }));
+      }
+    } catch (e) {
+      console.warn('保存今日专注文案失败', e);
+    }
+    
     // 清理可能存在的旧计时器
     cleanupInterval();
     
@@ -827,6 +842,7 @@ export default function Focus() {
       setTimeout(() => setShowConfetti(false), 5000);
     }
     
+
     // 显示结束选项界面
     setState(finalState);
     setShowEndOptions(false);
@@ -1517,6 +1533,19 @@ export default function Focus() {
             
             <div className="space-y-3 mt-8">
               <button
+                onClick={() => {
+                  const minutes = Math.floor(elapsedTime / 60);
+                  router.push(`/daily-summary?focusDuration=${minutes}`);
+                }}
+                className="w-full rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold px-4 py-4 text-lg hover:shadow-lg shadow-teal-300/50 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                写今日小结
+              </button>
+              
+              <button
                 onClick={goToDashboard}
                 className="w-full rounded-xl bg-white px-4 py-4 text-teal-600 font-semibold text-lg hover:bg-gray-100 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
               >
@@ -1586,6 +1615,7 @@ export default function Focus() {
       </>
     );
   }
+
 
   return null;
 }

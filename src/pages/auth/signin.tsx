@@ -333,7 +333,12 @@ export default function SignIn() {
               <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 bg-clip-text text-transparent mb-3 tracking-tight">Echo</h1>
+          <h1 className="text-5xl font-bold text-emerald-700 mb-3 tracking-tight flex items-center justify-center gap-1">
+            <span className="echo-letter echo-letter-1">E</span>
+            <span className="echo-letter echo-letter-2">c</span>
+            <span className="echo-letter echo-letter-3">h</span>
+            <span className="echo-letter echo-letter-4">o</span>
+          </h1>
           <div className="w-16 h-px bg-gray-300 mx-auto mb-3"></div>
           <p className="text-gray-900 text-base font-medium">开启你的专注之旅</p>
         </div>
@@ -614,6 +619,47 @@ export default function SignIn() {
         
         .animate-signin-wave-3 {
           animation: signin-wave-flow 25s linear infinite;
+        }
+        
+        /* ECHO字母跳动动画 - 优雅现代化，只播放一次 */
+        .echo-letter {
+          display: inline-block;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          animation: echo-bounce 0.6s ease-out forwards;
+          opacity: 0;
+        }
+        
+        .echo-letter-1 {
+          animation-delay: 0s;
+        }
+        
+        .echo-letter-2 {
+          animation-delay: 0.1s;
+        }
+        
+        .echo-letter-3 {
+          animation-delay: 0.2s;
+        }
+        
+        .echo-letter-4 {
+          animation-delay: 0.3s;
+        }
+        
+        @keyframes echo-bounce {
+          0% {
+            transform: translateY(0) scale(1);
+            opacity: 0;
+          }
+          50% {
+            transform: translateY(-12px) scale(1.05);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+          }
         }
       `}</style>
     </div>
