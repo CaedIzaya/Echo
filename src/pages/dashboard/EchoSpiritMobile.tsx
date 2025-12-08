@@ -206,6 +206,10 @@ export default function EchoSpiritMobile({
         {/* 身体圆形 */}
         <circle cx="60" cy="60" r="32" fill={colors.body} />
         
+        {/* 腮红 - 新增，位于身体和眼睛之间 */}
+        <ellipse cx="40" cy="62" rx="5" ry="3" fill="#FFAB91" opacity="0.5" />
+        <ellipse cx="80" cy="62" rx="5" ry="3" fill="#FFAB91" opacity="0.5" />
+        
         {/* 眼睛组 - 用于动画 */}
         <g className="eyes-group">
           {/* 眼睛（偏上，大间距） */}

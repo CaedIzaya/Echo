@@ -71,7 +71,7 @@ export default function PlanCard({
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-lg font-semibold text-gray-700">
-                {plan.focusBranch || plan.name}
+                {plan.name || plan.focusBranch}
               </h3>
               <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
                 已完成
@@ -124,7 +124,7 @@ export default function PlanCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xl font-bold text-gray-900">
-                {plan.focusBranch || plan.name}
+                {plan.name || plan.focusBranch}
               </h3>
               {/* 编辑按钮 - 位置与计划名称平行 */}
               {onEdit && (

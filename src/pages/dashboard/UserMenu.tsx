@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import localforage from 'localforage';
 
 interface UserMenuProps {
   userInitial: string;
@@ -11,7 +12,24 @@ interface UserMenuProps {
 export default function UserMenu({ userInitial }: UserMenuProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load local avatar
+    const loadAvatar = async () => {
+      try {
+        const avatar = await localforage.getItem<string>('echo-avatar-v1');
+        if (avatar) {
+          setLocalAvatar(avatar);
+        }
+      } catch (error) {
+        console.error('Failed to load local avatar:', error);
+      }
+    };
+    
+    loadAvatar();
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -98,9 +116,13 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center text-white font-medium text-sm hover:bg-teal-600 transition shadow-sm hover:shadow-md"
+        className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden bg-teal-500 text-white font-medium text-sm hover:bg-teal-600 transition shadow-sm hover:shadow-md border border-white/20"
       >
-        {userInitial}
+        {localAvatar ? (
+          <img src={localAvatar} alt="User Avatar" className="w-full h-full object-cover" />
+        ) : (
+          userInitial
+        )}
       </button>
 
       {isOpen && (

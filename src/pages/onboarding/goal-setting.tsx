@@ -12,6 +12,7 @@ interface Interest {
 
 enum FormStep {
   Branch = 'BRANCH',
+  DetailBranch = 'DETAIL_BRANCH',
   Milestone = 'MILESTONE',
   Name = 'NAME',
   Time = 'TIME',
@@ -40,6 +41,7 @@ export default function GoalSetting() {
   const [currentStep, setCurrentStep] = useState<FormStep>(FormStep.Branch);
   const [formData, setFormData] = useState({
     focusBranch: '',
+    focusDetail: '',
     firstMilestone: '',
     projectName: '',
     dailyMinTime: 30,
@@ -146,13 +148,23 @@ export default function GoalSetting() {
   const handleNext = () => {
     // 验证当前步骤
     if (currentStep === FormStep.Branch && !formData.focusBranch.trim()) return;
+    if (currentStep === FormStep.DetailBranch && !formData.focusDetail.trim()) return;
     if (currentStep === FormStep.Milestone && !formData.firstMilestone.trim()) return;
     if (currentStep === FormStep.Name && !formData.projectName.trim()) return;
     if (currentStep === FormStep.Time && !formData.dailyMinTime) return;
     
     // 移动到下一步
-    const steps = [FormStep.Branch, FormStep.Milestone, FormStep.Name, FormStep.Time, FormStep.Date];
+    const steps = [FormStep.Branch, FormStep.DetailBranch, FormStep.Milestone, FormStep.Name, FormStep.Time, FormStep.Date];
     const currentIndex = steps.indexOf(currentStep);
+    
+    // 如果下一步是 Name，自动生成计划名称
+    if (steps[currentIndex + 1] === FormStep.Name) {
+      setFormData(prev => ({
+        ...prev,
+        projectName: `${prev.focusBranch} 专注计划：${prev.focusDetail}`
+      }));
+    }
+
     if (currentIndex < steps.length - 1) {
       setCurrentStep(steps[currentIndex + 1]);
     } else {
@@ -166,7 +178,7 @@ export default function GoalSetting() {
       return;
     }
     
-    const steps = [FormStep.Branch, FormStep.Milestone, FormStep.Name, FormStep.Time, FormStep.Date];
+    const steps = [FormStep.Branch, FormStep.DetailBranch, FormStep.Milestone, FormStep.Name, FormStep.Time, FormStep.Date];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]);
@@ -213,6 +225,8 @@ export default function GoalSetting() {
         id: Date.now().toString(),
         name: formData.projectName,
         focusBranch: formData.focusBranch || focusedInterest?.name || '',
+        // 注意：这里没有保存 focusDetail 到数据库，因为它被合并到了 projectName 中
+        // 或者我们可以考虑拼接到 focusBranch 中，例如： `${formData.focusBranch} - ${formData.focusDetail}`
         icon: focusedInterest?.icon || '📝',
         dailyGoalMinutes: formData.dailyMinTime,
         milestones: isEditMode ? [] : [{
@@ -503,6 +517,110 @@ export default function GoalSetting() {
     );
   };
 
+  // 渲染详细分支选择页面 (页面B)
+  const renderDetailBranch = () => {
+    // 复用气泡布局
+    const bubbleLayouts = [
+      { index: 0, side: 'left', offsetX: -35, offsetY: -110 },
+      { index: 1, side: 'left', offsetX: 12, offsetY: -10 },
+      { index: 2, side: 'left', offsetX: -28, offsetY: 130 },
+      { index: 3, side: 'right', offsetX: 28, offsetY: -80 },
+      { index: 4, side: 'right', offsetX: -8, offsetY: 145 },
+    ];
+
+    const leftBubbles = bubbleLayouts.filter(b => b.side === 'left');
+    const rightBubbles = bubbleLayouts.filter(b => b.side === 'right');
+
+    return (
+      <div className="relative w-full max-w-6xl mx-auto flex flex-col items-center">
+        <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
+          具体精进于哪个分支呢？
+        </h2>
+
+        {/* 桌面端布局 */}
+        <div className="hidden md:flex relative w-full items-center justify-center gap-8 lg:gap-12 min-h-[450px]">
+          {/* 左侧3个泡泡 - 装饰用，不可点击 */}
+          <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
+            {leftBubbles.map((layout) => (
+              <div
+                key={layout.index}
+                style={{
+                  position: 'absolute',
+                  transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
+                  animationDelay: `${layout.index * 0.15}s`,
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                }}
+                className="bubble-branch group flex flex-col items-center justify-center
+                  w-28 h-28 lg:w-32 lg:h-32 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm"
+              >
+                <span className="text-2xl relative z-10 text-white/30">●</span>
+              </div>
+            ))}
+          </div>
+
+          {/* 中间输入框 */}
+          <div className="flex-shrink-0 w-full max-w-md relative z-10">
+            <input
+              type="text"
+              value={formData.focusDetail}
+              onChange={(e) => handleInputChange('focusDetail', e.target.value)}
+              placeholder="输入你的具体分支..."
+              className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl lg:text-2xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
+              autoFocus
+            />
+          </div>
+
+          {/* 右侧2个泡泡 - 装饰用 */}
+          <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
+            {rightBubbles.map((layout) => (
+              <div
+                key={layout.index}
+                style={{
+                  position: 'absolute',
+                  transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
+                  animationDelay: `${layout.index * 0.15}s`,
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                }}
+                className="bubble-branch group flex flex-col items-center justify-center
+                  w-28 h-28 lg:w-32 lg:h-32 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm"
+              >
+                <span className="text-2xl relative z-10 text-white/30">●</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 移动端布局 */}
+        <div className="md:hidden w-full flex flex-col items-center">
+          {/* 移动端气泡装饰 - 可选 */}
+          <div className="flex flex-wrap justify-center gap-4 mb-8 opacity-50 pointer-events-none">
+            {[1, 2, 3].map((_, i) => (
+               <div
+                  key={i}
+                  style={{ animationDelay: `${i * 0.1}s` }}
+                  className="bubble-branch w-16 h-16 rounded-full border border-white/10 bg-white/5 flex items-center justify-center"
+               >
+                  <span className="text-white/20">●</span>
+               </div>
+            ))}
+          </div>
+
+          {/* 输入框 */}
+          <div className="w-full max-w-md">
+            <input
+              type="text"
+              value={formData.focusDetail}
+              onChange={(e) => handleInputChange('focusDetail', e.target.value)}
+              placeholder="输入你的具体分支..."
+              className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
+              autoFocus
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // 渲染里程碑页面
   const renderMilestone = () => {
     return (
@@ -707,6 +825,8 @@ export default function GoalSetting() {
     switch (currentStep) {
       case FormStep.Branch:
         return renderBranch();
+      case FormStep.DetailBranch:
+        return renderDetailBranch();
       case FormStep.Milestone:
         return renderMilestone();
       case FormStep.Name:
@@ -724,6 +844,8 @@ export default function GoalSetting() {
     switch (currentStep) {
       case FormStep.Branch:
         return formData.focusBranch.trim().length > 0;
+      case FormStep.DetailBranch:
+        return formData.focusDetail.trim().length > 0;
       case FormStep.Milestone:
         return formData.firstMilestone.trim().length > 0;
       case FormStep.Name:
