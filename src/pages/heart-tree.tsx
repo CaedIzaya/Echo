@@ -3,14 +3,12 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import BottomNavigation from './dashboard/BottomNavigation';
 import { HeartTree } from '@/components/heart-tree/HeartTree';
-import { HeartTreeSeedling } from '@/components/heart-tree/HeartTreeSeedling';
 import HeartTreeControls from '@/components/heart-tree/HeartTreeControls';
 
 export default function HeartTreePage() {
   const { status } = useSession();
   const router = useRouter();
   const [animState, setAnimState] = useState<'idle' | 'watering' | 'fertilizing'>('idle');
-  const [treeStage, setTreeStage] = useState<'seedling' | 'growing'>('seedling');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -39,45 +37,11 @@ export default function HeartTreePage() {
       <div className="absolute top-20 left-10 w-32 h-12 bg-white/40 rounded-full blur-xl animate-pulse" style={{ animationDuration: '8s' }}></div>
       <div className="absolute top-40 right-20 w-40 h-16 bg-white/30 rounded-full blur-xl animate-pulse" style={{ animationDuration: '12s', animationDelay: '2s' }}></div>
 
-      <div className="relative w-full max-w-[480px] flex flex-col items-center justify-center h-[60vh]">
-        {/* 阶段切换按钮 */}
-        <div className="mb-4 flex gap-3 z-20 relative">
-          <button
-            onClick={() => {
-              setTreeStage('seedling');
-              setAnimState('idle'); // 切换时重置动画状态
-            }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              treeStage === 'seedling'
-                ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30'
-                : 'bg-white/80 text-gray-600 hover:bg-white/90'
-            }`}
-          >
-            🌱 幼苗
-          </button>
-          <button
-            onClick={() => {
-              setTreeStage('growing');
-              setAnimState('idle'); // 切换时重置动画状态
-            }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              treeStage === 'growing'
-                ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30'
-                : 'bg-white/80 text-gray-600 hover:bg-white/90'
-            }`}
-          >
-            🌳 成长期
-          </button>
-        </div>
-        
-        <div className="w-full h-full flex flex-col items-center justify-center transform scale-150 relative">
+      <div className="relative w-full max-w-[600px] flex flex-col items-center justify-center h-[70vh]">
+        <div className="w-full h-full flex flex-col items-center justify-center transform scale-[1.8] relative">
           <div className="relative">
-            {/* 根据阶段显示不同的树 */}
-            {treeStage === 'seedling' ? (
-              <HeartTreeSeedling animState={animState} />
-            ) : (
-              <HeartTree animState={animState} />
-            )}
+            {/* 只显示成长期的心树 */}
+            <HeartTree animState={animState} />
             {/* 动画效果层 - 通过data属性控制 */}
             <div className="heart-tree-animations" data-state={animState}>
               {/* 浇水效果：水滴 */}
@@ -110,16 +74,16 @@ export default function HeartTreePage() {
         }
 
         /* ==============================
-           WATERING ANIMATION
+           WATERING ANIMATION - 适配成长期
            ============================== */
         
-        /* 水滴 - 适配幼苗阶段 */
+        /* 水滴 - 从树冠上方落下 */
         .water-drop {
           position: absolute;
-          top: 15%;
+          top: 20%;
           left: 50%;
-          width: 12px;
-          height: 20px;
+          width: 16px;
+          height: 24px;
           background: radial-gradient(circle, #E0F7FA 0%, #29B6F6 100%);
           border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
           opacity: 0;
@@ -137,26 +101,26 @@ export default function HeartTreePage() {
           }
           80% { 
             opacity: 1; 
-            transform: translateX(-50%) translateY(60px) scaleY(1.2); 
+            transform: translateX(-50%) translateY(100px) scaleY(1.2); 
           }
           90% { 
             opacity: 0; 
-            transform: translateX(-50%) translateY(70px) scaleY(0.5); 
+            transform: translateX(-50%) translateY(120px) scaleY(0.5); 
           }
           100% { 
             opacity: 0; 
-            transform: translateX(-50%) translateY(70px); 
+            transform: translateX(-50%) translateY(120px); 
           }
         }
 
-        /* 涟漪 - 适配幼苗阶段 */
+        /* 涟漪 - 在树冠位置 */
         .water-ripple {
           position: absolute;
-          top: 35%;
+          top: 30%;
           left: 50%;
-          width: 20px;
-          height: 10px;
-          border: 3px solid #29B6F6;
+          width: 30px;
+          height: 15px;
+          border: 4px solid #29B6F6;
           border-radius: 50%;
           opacity: 0;
           transform: translateX(-50%) translateY(-50%);
@@ -175,36 +139,36 @@ export default function HeartTreePage() {
           }
           100% { 
             opacity: 0; 
-            transform: translateX(-50%) translateY(-50%) scale(3);
+            transform: translateX(-50%) translateY(-50%) scale(4);
             border-width: 0;
           }
         }
 
         /* ==============================
-           FERTILIZING ANIMATION - 适配幼苗阶段
+           FERTILIZING ANIMATION - 适配成长期
            ============================== */
         
         .fert-particle {
           position: absolute;
-          width: 8px;
-          height: 8px;
+          width: 12px;
+          height: 12px;
           background: radial-gradient(circle, #FFF8E1 0%, #FFB300 100%);
           border-radius: 50%;
           opacity: 0;
         }
 
         .fert-p1 {
-          bottom: 25%;
-          left: 43%;
+          bottom: 30%;
+          left: 45%;
         }
 
         .fert-p2 {
-          bottom: 27%;
-          left: 57%;
+          bottom: 32%;
+          left: 55%;
         }
 
         .fert-p3 {
-          bottom: 23%;
+          bottom: 28%;
           left: 50%;
         }
 

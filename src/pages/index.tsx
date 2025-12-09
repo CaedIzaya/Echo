@@ -244,7 +244,7 @@ const LandingHero = ({
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
-          算法之外
+          在这里,
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400">
             重遇自我
@@ -276,7 +276,7 @@ const LandingHero = ({
         </div>
 
           <div className="relative hidden md:flex items-center justify-center">
-              <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-emerald-50 p-6 z-10 transform rotate-2 hover:rotate-0 transition-transform duration-500">
+              <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-emerald-50 p-6 z-10 transform rotate-2 hover:rotate-0 transition-transform duration-500 scale-90">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">投资自己</h3>
@@ -369,9 +369,45 @@ const LandingHero = ({
           </div>
         </div>
       </div>
+
+      {/* 新增：你是否？.. 模块移入 Hero Section */}
+      <div className="max-w-7xl mx-auto px-6 mt-4 pb-12">
+        <div className="text-center max-w-3xl mx-auto mb-8">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900/80 mb-2 tracking-widest">
+            你是否？..
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {/* 卡片 1 */}
+          <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
+            <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            <p className="text-base font-light leading-relaxed text-slate-700">
+              意识到自己的注意力常被无形牵引？
+            </p>
+          </div>
+
+          {/* 卡片 2 */}
+          <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
+            <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-teal-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            <p className="text-base font-light leading-relaxed text-slate-700">
+              想把精力花在真正值得的人与事上？
+            </p>
+          </div>
+
+          {/* 卡片 3 */}
+          <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
+            <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            <p className="text-base font-light leading-relaxed text-slate-700">
+              渴望重新掌握自己的节奏与生活？
+            </p>
+          </div>
+        </div>
+      </div>
     </section>
   );
 };
+
 
 const FeatureGrid = () => (
   <section id="features" className="pt-8 pb-24 bg-white">
@@ -789,7 +825,7 @@ export default function Home() {
   // 早期返回：loading状态时显示加载界面（必须在所有hooks之后）
   if (isTransitioning) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-600 via-cyan-600 to-sky-500 text-white flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-teal-600 via-cyan-600 to-sky-500 text-white flex flex-col items-center justify-center relative overflow-hidden font-sans">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.12),transparent_60%)]" />
         <div className="relative z-10 flex flex-col items-center gap-10 px-6 text-center">
           <p className="text-xs tracking-[0.4em] uppercase text-white/70">Echo Focus</p>
@@ -803,7 +839,7 @@ export default function Home() {
               />
             ))}
           </div>
-          <p className="text-sm font-mono tracking-[0.3em] uppercase text-white/70">
+          <p className="text-sm tracking-[0.3em] uppercase text-white/70">
             {loadingMessage}
           </p>
         </div>
@@ -829,7 +865,7 @@ export default function Home() {
 
   // 未登录时显示欢迎界面
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 relative">
+    <div className="min-h-screen bg-slate-50 text-slate-900 relative font-sans">
       <LandingNavbar onPrimaryAction={handlePrimaryAction} onSecondaryAction={handleSecondaryAction} />
       <main>
         <LandingHero

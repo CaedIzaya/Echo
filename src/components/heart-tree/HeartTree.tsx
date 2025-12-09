@@ -12,8 +12,8 @@ interface HeartTreeProps {
 
 export const HeartTree: React.FC<HeartTreeProps & { animState?: 'idle' | 'watering' | 'fertilizing' }> = ({ animState = 'idle' }) => {
   return (
-    <div className="w-full h-full max-w-[460px] max-h-[460px] select-none flex items-center justify-center relative">
-      <svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl heart-tree-svg" data-anim-state={animState}>
+    <div className="w-full h-full max-w-[600px] max-h-[600px] select-none flex items-center justify-center relative">
+      <svg width="400" height="400" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl heart-tree-svg" data-anim-state={animState}>
         <defs>
           {/* Existing Foliage Gradient */}
           <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">

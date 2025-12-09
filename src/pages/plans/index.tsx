@@ -6,6 +6,7 @@ import PlanManagement from './PlanManagement';
 import CompletionDialog from './CompletionDialog';
 import AddMilestoneModal from './AddMilestoneModal';
 import EditPlanModal from './EditPlanModal';
+import MilestoneManager, { FinalGoal } from '~/components/milestone/MilestoneManager';
 import BottomNavigation from '../dashboard/BottomNavigation';
 
 interface Project {
@@ -15,6 +16,7 @@ interface Project {
   icon: string;
   dailyGoalMinutes: number;
   milestones: Milestone[];
+  finalGoal?: FinalGoal;
   isActive: boolean;
   isPrimary?: boolean;
   isCompleted?: boolean;
@@ -41,6 +43,8 @@ export default function PlansPage() {
   const [showAddMilestone, setShowAddMilestone] = useState(false);
   const [milestoneTargetPlanId, setMilestoneTargetPlanId] = useState<string | null>(null);
   const [showEditPlanModal, setShowEditPlanModal] = useState(false);
+  const [showMilestoneManager, setShowMilestoneManager] = useState(false);
+  const [managingMilestonePlanId, setManagingMilestonePlanId] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Project | null>(null);
 
   // 从localStorage加载计划数据
@@ -258,6 +262,32 @@ export default function PlansPage() {
     }
   };
 
+  // 管理里程碑
+  const handleManageMilestone = (planId: string) => {
+    setManagingMilestonePlanId(planId);
+    setShowMilestoneManager(true);
+  };
+
+  // 保存里程碑
+  const handleSaveMilestone = (goal: FinalGoal | undefined) => {
+    if (!managingMilestonePlanId) return;
+
+    const updatedPlans = plans.map(plan => {
+      if (plan.id === managingMilestonePlanId) {
+        return {
+          ...plan,
+          finalGoal: goal
+        };
+      }
+      return plan;
+    });
+
+    setPlans(updatedPlans);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+    }
+  };
+
   // 添加小目标
   const handleAddMilestone = (title: string) => {
     if (!milestoneTargetPlanId) return;
@@ -387,6 +417,7 @@ export default function PlansPage() {
                 onSelect={handleSelectPlan}
                 onAddMilestone={handleOpenAddMilestone}
                 onEdit={handleEditPlan}
+                onManageMilestone={handleManageMilestone}
               />
             ))}
           </div>
@@ -466,6 +497,18 @@ export default function PlansPage() {
           setEditingPlan(null);
         }}
         onSave={handleSavePlan}
+      />
+
+      {/* 里程碑管理弹窗 */}
+      <MilestoneManager
+        isOpen={showMilestoneManager}
+        onClose={() => {
+          setShowMilestoneManager(false);
+          setManagingMilestonePlanId(null);
+        }}
+        onSave={handleSaveMilestone}
+        initialGoal={plans.find(p => p.id === managingMilestonePlanId)?.finalGoal}
+        planName={plans.find(p => p.id === managingMilestonePlanId)?.name}
       />
 
       <BottomNavigation active="plans" />

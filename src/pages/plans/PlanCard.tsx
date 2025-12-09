@@ -7,6 +7,13 @@ interface Milestone {
   order: number;
 }
 
+interface FinalGoal {
+  content: string;
+  createdAt: string;
+  isCompleted: boolean;
+  completedAt?: string;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -14,6 +21,7 @@ interface Project {
   icon: string;
   dailyGoalMinutes: number;
   milestones: Milestone[];
+  finalGoal?: FinalGoal; // 计划的里程碑（终极目标）
   isActive: boolean;
   isPrimary?: boolean;
   isCompleted?: boolean;
@@ -29,6 +37,7 @@ interface PlanCardProps {
   onSelect?: (planId: string) => void;
   onAddMilestone?: (planId: string) => void;
   onEdit?: (planId: string) => void; // 编辑回调
+  onManageMilestone?: (planId: string) => void; // 管理里程碑回调
 }
 
 export default function PlanCard({
@@ -40,6 +49,7 @@ export default function PlanCard({
   onSelect,
   onAddMilestone,
   onEdit,
+  onManageMilestone,
 }: PlanCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -195,17 +205,40 @@ export default function PlanCard({
                 );
               })()}
 
-              {/* 快速添加小目标 */}
-              {canAddMilestone && !plan.isBlank && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddMilestone?.(plan.id);
-                  }}
-                  className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1 mt-2"
-                >
-                  ➕ 添加小目标
-                </button>
+              {/* 快速添加小目标 & 管理里程碑 */}
+              {!plan.isBlank && (
+                <div className="flex flex-wrap gap-4 mt-2">
+                  {canAddMilestone && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddMilestone?.(plan.id);
+                      }}
+                      className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
+                    >
+                      ➕ 添加小目标
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onManageMilestone?.(plan.id);
+                    }}
+                    className={`text-sm font-medium flex items-center gap-1 ${
+                      plan.finalGoal 
+                        ? plan.finalGoal.isCompleted 
+                          ? 'text-green-600' // 已完成
+                          : 'text-amber-600 hover:text-amber-700' // 进行中
+                        : 'text-gray-400 hover:text-gray-500' // 未设置
+                    }`}
+                  >
+                    {plan.finalGoal 
+                      ? plan.finalGoal.isCompleted 
+                        ? '👑 里程碑已达成'
+                        : '🏆 管理里程碑'
+                      : '🏁 设置里程碑'}
+                  </button>
+                </div>
               )}
             </div>
           </div>

@@ -1669,271 +1669,49 @@ export default function Dashboard() {
       )}
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-10 space-y-10">
-        
-        {/* =========================================================
-            MOBILE LAYOUT (lg:hidden) - 手机端专属布局
-           ========================================================= */}
-        <div className="lg:hidden space-y-6">
-          {/* 1. 今日节奏卡片 (Mobile) */}
-          <div className="bg-white/80 border border-white/60 rounded-3xl p-6 shadow-sm relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">今日节奏</p>
-                
-                {/* 移动端环形图 - 今日专注时长进度 */}
-                <div className="flex items-center gap-3 mt-2">
-                  <div className="relative w-12 h-12">
-                    <svg className="transform -rotate-90 w-full h-full">
-                      <circle
-                        stroke="#e4e4e7"
-                        strokeWidth="4"
-                        fill="transparent"
-                        r="20"
-                        cx="24"
-                        cy="24"
-                      />
-                      <circle
-                        stroke={progressColor}
-                        strokeWidth="4"
-                        fill="transparent"
-                        strokeDasharray={`${2 * Math.PI * 20} ${2 * Math.PI * 20}`}
-                        strokeDashoffset={2 * Math.PI * 20 * (1 - Math.min(1, progress))}
-                        strokeLinecap="round"
-                        r="20"
-                        cx="24"
-                        cy="24"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[10px] font-bold text-zinc-700">{Math.round(progress * 100)}%</span>
+        <section className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-8">
+          <div className="space-y-6">
+            <div className="bg-white/80 border border-white/60 rounded-3xl p-6 shadow-sm hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="space-y-4 w-full">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">今日节奏</p>
+                    <div className="block xl:hidden">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400">{progress >= 1 ? '100%' : `${Math.round(progress * 100)}%`}</span>
+                        <div className="w-16 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-teal-500 to-cyan-500 transition-all duration-500"
+                            style={{ width: `${Math.min(100, progress * 100)}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-xs text-zinc-400">今日目标</span>
-                </div>
-              </div>
-            </div>
-            
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 mb-2">
-              {progress >= 1 ? '今天的时间，已经被你夺回。' : '准备好专注于真正重要的事了吗？'}
-            </h1>
-            <p className="text-sm text-zinc-500 mb-6">
-              今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
-            </p>
-            
-            <button
-              onClick={handleStartFocus}
-              className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30"
-            >
-              开始专注
-            </button>
-          </div>
-
-          {/* 2. 计划 Check 卡片 (Mobile) */}
-          <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex flex-col gap-1">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-teal-500">当前计划</p>
-                  <h3 className="text-xl font-semibold text-zinc-900 mt-1">
-                    {primaryPlan ? primaryPlan.name : '暂无主要计划'}
-                  </h3>
-                </div>
-              </div>
-              <span className="text-xs text-zinc-400">{planProgressPercent}%</span>
-            </div>
-            
-            {primaryPlan ? (
-              <>
-                <div className="space-y-3 mb-4">
-                  {activeMilestones.length === 0 && planMilestones.length === 0 && (
-                    <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
-                  )}
-                  {activeMilestones.length === 0 && planMilestones.length > 0 && (
-                    <p className="text-sm text-emerald-600 font-medium">🎉 所有小目标已完成！</p>
-                  )}
-                  {activeMilestones.slice(0, 3).map((milestone) => {
-                    const isSelected = selectedMilestoneIds.has(milestone.id);
-                    const isCompleting = completingMilestoneId === milestone.id;
-                    return (
+                  
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <h1 className="text-2xl md:text-4xl font-semibold tracking-tight text-zinc-900 mb-2">
+                        {progress >= 1 ? '今天的时间，已经被你夺回。' : '准备好专注于真正重要的事了吗？'}
+                      </h1>
+                      <p className="text-sm text-zinc-500">
+                        今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
                       <button
-                        key={milestone.id}
-                        onClick={() => handleMilestoneToggle(milestone.id)}
-                        disabled={isCompleting}
-                        className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
-                          isCompleting
-                            ? 'bg-emerald-50 border-emerald-200'
-                            : isSelected
-                            ? 'bg-emerald-50 border-emerald-300'
-                            : 'bg-white border-zinc-100'
-                        }`}
+                        onClick={handleStartFocus}
+                        className="flex-1 sm:flex-none px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
                       >
-                        <span className={`text-sm font-medium ${
-                          isCompleting ? 'text-emerald-700 line-through' : isSelected ? 'text-emerald-700' : 'text-zinc-700'
-                        }`}>
-                          {milestone.title}
-                        </span>
-                        <span className={`w-6 h-6 rounded-full border flex items-center justify-center ${
-                          isSelected || isCompleting ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-zinc-50 border-zinc-200'
-                        }`}>
-                          {isSelected || isCompleting ? '✓' : ''}
-                        </span>
+                        开始专注
                       </button>
-                    );
-                  })}
-                  {activeMilestones.length > 3 && (
-                    <p className="text-xs text-center text-zinc-400">还有 {activeMilestones.length - 3} 个小目标</p>
-                  )}
-                </div>
-                
-                {selectedMilestoneIds.size > 0 && (
-                  <div className="flex gap-2 mb-4 animate-fade-in">
-                    <button
-                      onClick={confirmMilestoneComplete}
-                      className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium shadow-lg shadow-teal-500/30"
-                    >
-                      完成 ({selectedMilestoneIds.size})
-                    </button>
-                    <button
-                      onClick={cancelMilestoneSelection}
-                      className="flex-1 px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 text-sm font-medium"
-                    >
-                      取消
-                    </button>
-                  </div>
-                )}
-
-                {primaryPlan.finalGoal && (
-                  /* 移动端里程碑信息已移动到独立卡片 */
-                  null
-                )}
-              </>
-            ) : (
-              <button
-                onClick={() => router.push('/plans')}
-                className="w-full px-5 py-3 rounded-2xl bg-zinc-900 text-white font-medium"
-              >
-                新建计划
-              </button>
-            )}
-          </div>
-
-          {/* 3. 数据统计行 (Mobile) */}
-          <div className="space-y-4">
-            {/* 第一行：等级 & 本周 */}
-            <div className="flex gap-4">
-              {userLevel && (
-                <div className="flex-1 bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 rounded-[2rem] p-5 text-white shadow-lg flex flex-col justify-between aspect-[4/3]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xl animate-pulse">⭐</span>
-                    <p className="text-2xl font-bold">LV.{userLevel.currentLevel}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs text-white/90 leading-tight line-clamp-1">{userLevel.title}</p>
-                    <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-white transition-all duration-700 ease-out"
-                        style={{ width: `${userLevel.progress}%` }}
-                      />
                     </div>
                   </div>
                 </div>
-              )}
-              
-              <div className="flex-1 bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-5 shadow-lg flex flex-col justify-between aspect-[4/3]">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">本周</p>
-                </div>
-                <div className="flex-1 flex items-center justify-center">
-                  <p className="text-2xl font-bold text-zinc-900 leading-none">
-                    {weeklyHours}h<span className="text-sm font-medium text-zinc-400">{weeklyMinutesRemainder}m</span>
-                  </p>
-                </div>
               </div>
-            </div>
-
-            {/* 第二行：连续 & 今日小结 */}
-            <div className="flex gap-4">
-              <div className="flex-[2] bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-5 shadow-lg flex flex-col justify-between aspect-[4/3]">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">连续</p>
-                </div>
-                <div className="flex-1 flex items-center justify-center">
-                  <p className="text-3xl font-bold text-zinc-900 leading-none">{Math.max(1, stats.streakDays)}<span className="text-sm text-zinc-500 ml-1">天</span></p>
-                </div>
-                <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden mt-auto">
-                  <div className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full w-1/2"></div>
-                </div>
-              </div>
-
-              <div className="flex-[3]">
-                <TodaySummaryCard userId={session?.user?.id || ''} />
-              </div>
-            </div>
-          </div>
-
-          {/* 4. 心流 & 成就 (Mobile) */}
-          <div className="space-y-6">
-            {/* 移动端里程碑卡片 */}
-            <div 
-              onClick={() => router.push('/plans')}
-              className="bg-gradient-to-br from-[#fff7da] via-[#f3c575] to-[#d88b3b] rounded-3xl p-6 shadow-lg shadow-amber-200/60 text-[#4f2a07] active:scale-[0.98] transition-all duration-300 cursor-pointer relative overflow-hidden"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-[#4f2a07]/70 font-medium">里程碑</p>
-                <span className="text-2xl">🏔️</span>
-              </div>
-              
-              {primaryPlan?.finalGoal ? (
-                <div className="space-y-2">
-                  <p className="text-lg font-bold line-clamp-2 leading-tight">
-                    {primaryPlan.finalGoal.content}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-[#4f2a07]/60 font-medium">
-                    <span>{primaryPlan.finalGoal.isCompleted ? '✨ 已达成' : '🚀 进行中'}</span>
-                    <span>•</span>
-                    <span>点击管理</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold">暂无里程碑</p>
-                  <span className="text-xs bg-white/30 px-3 py-1 rounded-full">去设置</span>
-                </div>
-              )}
-            </div>
-
-            <FlowCard />
-            <AchievementsSection />
-          </div>
-        </div>
-
-
-        {/* =========================================================
-            DESKTOP LAYOUT (hidden lg:block) - PC端恢复原版布局
-           ========================================================= */}
-        <div className="hidden lg:grid grid-cols-[320px_1fr] gap-8">
-          {/* PC - 左侧栏 */}
-          <div className="space-y-6">
-            <div className="bg-white/80 border border-white/60 rounded-3xl p-6 pb-32 shadow-sm hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
-              <div className="space-y-4">
-                <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">今日节奏</p>
-                <h1 className="text-4xl font-semibold tracking-tight text-zinc-900">
-                  {progress >= 1 ? '今天的时间，已经被你夺回。' : '准备好专注于真正重要的事了吗？'}
-                </h1>
-                <p className="text-sm text-zinc-500">
-                  今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
-                </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={handleStartFocus}
-                    className="px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
-                  >
-                    开始专注
-                  </button>
-                </div>
-              </div>
-              {/* 小精灵 */}
-              <div className="absolute pointer-events-none" style={{ bottom: '-60px', left: 'calc(50% + 50px)', transform: 'translateX(-50%)' }}>
+              {/* 小精灵定位调整 */}
+              <div className="hidden lg:block absolute pointer-events-none" style={{ bottom: '-60px', left: 'calc(50% + 50px)', transform: 'translateX(-50%)' }}>
                 <div className="pointer-events-auto">
                   <EchoSpirit
                     state="idle"
@@ -1961,23 +1739,158 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <FlowCard />
-            <MilestoneCard />
+
+            {/* 移动端显示的计划卡片 - 保持全尺寸 */}
+            <div className="xl:hidden bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-teal-500">当前计划</p>
+                  <h3 className="text-xl font-semibold text-zinc-900 mt-1">
+                    {primaryPlan ? primaryPlan.name : '暂无主要计划'}
+                  </h3>
+                </div>
+                <span className="text-xs text-zinc-400">{planProgressPercent}%</span>
+              </div>
+              
+              {primaryPlan ? (
+                <>
+                  <div className="space-y-3 mb-4">
+                    {activeMilestones.length === 0 && planMilestones.length === 0 && (
+                      <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
+                    )}
+                    {activeMilestones.length === 0 && planMilestones.length > 0 && (
+                      <p className="text-sm text-emerald-600 font-medium">🎉 所有小目标已完成！</p>
+                    )}
+                    {activeMilestones.slice(0, 3).map((milestone) => {
+                      const isSelected = selectedMilestoneIds.has(milestone.id);
+                      const isCompleting = completingMilestoneId === milestone.id;
+                      return (
+                        <button
+                          key={milestone.id}
+                          onClick={() => handleMilestoneToggle(milestone.id)}
+                          disabled={isCompleting}
+                          className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
+                            isCompleting
+                              ? 'bg-emerald-50 border-emerald-200'
+                              : isSelected
+                              ? 'bg-emerald-50 border-emerald-300'
+                              : 'bg-white border-zinc-100'
+                          }`}
+                        >
+                          <span className={`text-sm font-medium ${
+                            isCompleting ? 'text-emerald-700 line-through' : isSelected ? 'text-emerald-700' : 'text-zinc-700'
+                          }`}>
+                            {milestone.title}
+                          </span>
+                          <span className={`w-6 h-6 rounded-full border flex items-center justify-center ${
+                            isSelected || isCompleting ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-zinc-50 border-zinc-200'
+                          }`}>
+                            {isSelected || isCompleting ? '✓' : ''}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {activeMilestones.length > 3 && (
+                      <p className="text-xs text-center text-zinc-400">还有 {activeMilestones.length - 3} 个小目标</p>
+                    )}
+                  </div>
+                  
+                  {selectedMilestoneIds.size > 0 && (
+                    <div className="flex gap-2 mb-4 animate-fade-in">
+                      <button
+                        onClick={confirmMilestoneComplete}
+                        className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium shadow-lg shadow-teal-500/30"
+                      >
+                        完成 ({selectedMilestoneIds.size})
+                      </button>
+                      <button
+                        onClick={cancelMilestoneSelection}
+                        className="flex-1 px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 text-sm font-medium"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 移动端显示的里程碑信息 */}
+                  {primaryPlan.finalGoal && (
+                    <div className="mt-4 pt-4 border-t border-zinc-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">🏔️</span>
+                        <p className="text-xs uppercase tracking-[0.2em] text-amber-600/70 font-medium">里程碑</p>
+                      </div>
+                      <p className="text-sm font-medium text-zinc-800 line-clamp-2">
+                        {primaryPlan.finalGoal.content}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={() => router.push('/plans')}
+                  className="w-full px-5 py-3 rounded-2xl bg-zinc-900 text-white font-medium"
+                >
+                  新建计划
+                </button>
+              )}
+            </div>
+
+            <div className="hidden xl:block space-y-6">
+              <FlowCard />
+              <MilestoneCard />
+            </div>
           </div>
 
-          {/* PC - 右侧内容区 */}
           <div className="flex flex-col gap-6">
-            {/* 顶部：数据网格 (4列) */}
-            <div className="grid gap-5 grid-cols-4">
-              {/* 1. 等级卡片 */}
+            {/* 移动端：等级卡片和本周专注放在同一行 */}
+            <div className="order-2 xl:order-1 xl:grid xl:gap-5 xl:grid-cols-4 flex flex-col gap-4">
+              <div className="flex flex-row gap-4 xl:hidden">
+                {userLevel && (
+                  <div className="flex-1 bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 rounded-[2rem] p-5 text-white shadow-lg shadow-purple-500/20 flex flex-col justify-between aspect-[4/3] hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xl animate-pulse">⭐</span>
+                      <p className="text-2xl font-bold">LV.{userLevel.currentLevel}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs text-white/90 leading-tight line-clamp-1">{userLevel.title}</p>
+                      <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-white transition-all duration-700 ease-out"
+                          style={{ width: `${userLevel.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex-1 bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-5 shadow-lg shadow-emerald-100/30 flex flex-col justify-between aspect-[4/3] relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">本周</p>
+                    <button
+                      onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
+                      data-tooltip-trigger
+                      className="w-5 h-5 rounded-full bg-zinc-100 flex items-center justify-center"
+                    >
+                      <span className="text-[10px] font-bold text-zinc-500">!</span>
+                    </button>
+                  </div>
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-2xl font-bold text-zinc-900 leading-none">
+                      {weeklyHours}h<span className="text-sm font-medium text-zinc-400">{weeklyMinutesRemainder}m</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* PC端：保持原有布局 */}
               {userLevel && (
-                <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 rounded-[2rem] p-9 text-white shadow-2xl shadow-purple-500/30 flex flex-col justify-between hover:scale-[1.02] transition-all duration-300 hover:shadow-purple-500/50 cursor-pointer aspect-square">
+                <div className="hidden xl:flex bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 rounded-[2rem] p-8 md:p-9 text-white shadow-2xl shadow-purple-500/30 flex-col justify-between aspect-square md:aspect-auto hover:scale-[1.02] transition-all duration-300 hover:shadow-purple-500/50 cursor-pointer">
                   <div className="flex items-start justify-between">
                     <p className="text-xs uppercase tracking-[0.4em] text-white/70 font-medium">当前等级</p>
                     <span className="text-3xl animate-pulse">⭐</span>
                   </div>
                   <div className="flex-1 flex items-center justify-center">
-                    <p className="text-5xl font-bold">LV.{userLevel.currentLevel}</p>
+                    <p className="text-4xl md:text-5xl font-bold">LV.{userLevel.currentLevel}</p>
                   </div>
                   <div className="space-y-3">
                     <p className="text-sm text-white/90 leading-tight">{userLevel.title}</p>
@@ -1994,8 +1907,10 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* 2. 连续专注 */}
-              <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
+              <div
+                className={`hidden xl:grid grid-cols-1 md:grid-cols-3 gap-5 ${userLevel ? 'xl:col-span-3' : 'xl:col-span-4'}`}
+              >
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
                 <div className="flex items-start justify-between">
                   <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">连续专注</p>
                   <button
@@ -2005,75 +1920,99 @@ export default function Dashboard() {
                   >
                     <span className="text-xs font-bold text-zinc-600">!</span>
                   </button>
-                </div>
-                {showStreakInfo && (
-                  <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                    <p className="text-xs text-zinc-600 leading-relaxed">
-                      最近一段连续完成专注目标时长的天数
-                    </p>
-                    <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
                   </div>
-                )}
-                <div className="flex-1 flex items-center">
-                  <div>
-                    <p className="text-4xl font-bold text-zinc-900 leading-none">{Math.max(1, stats.streakDays)}</p>
-                    <p className="text-sm text-zinc-500 mt-2">天</p>
+                  {showStreakInfo && (
+                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        最近一段连续完成专注目标时长的天数
+                      </p>
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+                    </div>
+                  )}
+                  <div className="flex-1 flex items-center">
+                    <div>
+                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-none">{Math.max(1, stats.streakDays)}</p>
+                      <p className="text-sm text-zinc-500 mt-2">天</p>
+                    </div>
                   </div>
+                  <div className="h-1 w-12 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full"></div>
                 </div>
-                <div className="h-1 w-12 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full"></div>
+
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+                  <div className="flex items-start justify-between">
+                    <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
+                    <button
+                      onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
+                      data-tooltip-trigger
+                      className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-zinc-600">!</span>
+                    </button>
+                  </div>
+                  {showWeeklyInfo && (
+                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        本周专注时长按照时区每周一00:00刷新。
+                      </p>
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+                    </div>
+                  )}
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-tight">
+                        {weeklyHours}h{weeklyMinutesRemainder}m
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-400 text-center">本周累计专注时长</p>
+                </div>
+
+                <TodaySummaryCard userId={session?.user?.id || ''} />
               </div>
 
-              {/* 3. 本周专注 */}
-              <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
-                  <button
-                    onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
-                    data-tooltip-trigger
-                    className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <span className="text-xs font-bold text-zinc-600">!</span>
-                  </button>
-                </div>
-                {showWeeklyInfo && (
-                  <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                    <p className="text-xs text-zinc-600 leading-relaxed">
-                      本周专注时长按照时区每周一00:00刷新。
-                    </p>
-                    <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+              {/* 移动端：连续专注和今日总结放在同一行 */}
+              <div className="flex flex-row gap-4 xl:hidden">
+                <div className="flex-[2] bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-5 shadow-lg shadow-emerald-100/30 flex flex-col justify-between aspect-[4/3] hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">连续</p>
+                    <button
+                      onClick={() => setShowStreakInfo(!showStreakInfo)}
+                      data-tooltip-trigger
+                      className="w-5 h-5 rounded-full bg-zinc-100 flex items-center justify-center"
+                    >
+                      <span className="text-[10px] font-bold text-zinc-500">!</span>
+                    </button>
                   </div>
-                )}
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-4xl font-bold text-zinc-900 leading-tight">
-                      {weeklyHours}h{weeklyMinutesRemainder}m
-                    </p>
+                  {showStreakInfo && (
+                    <div data-tooltip-trigger className="absolute top-10 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 w-[150px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        最近一段连续完成专注目标时长的天数
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-3xl font-bold text-zinc-900 leading-none">{Math.max(1, stats.streakDays)}<span className="text-sm text-zinc-500 ml-1">天</span></p>
+                  </div>
+                  <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden mt-auto">
+                    <div className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full w-1/2"></div>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-400 text-center">本周累计专注时长</p>
-              </div>
 
-              {/* 4. 今日小结 */}
-              <TodaySummaryCard userId={session?.user?.id || ''} />
+                <div className="flex-[3]">
+                  <TodaySummaryCard userId={session?.user?.id || ''} />
+                </div>
+              </div>
             </div>
 
-            {/* 底部：计划详情大卡片 */}
-            <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40 hover:scale-[1.02] transition-all duration-300 cursor-pointer">
-              <div className="flex flex-row gap-8">
-                <div className="flex flex-col items-center justify-center">
-                  <FocusDial size={200} />
-                  <p className="mt-4 text-xs uppercase tracking-[0.35em] text-teal-500">完成进度</p>
-                </div>
-                <div className="flex-1 space-y-4">
-                  {renderPlanDetails()}
-                </div>
-              </div>
+            <div className="xl:hidden order-3">
+              <FlowCard />
             </div>
 
-            {/* 成就部分 */}
-            <AchievementsSection />
+            <div className="order-4 xl:order-3">
+              <AchievementsSection />
+            </div>
           </div>
-        </div>
+        </section>
       </main>
 
       <div className="sm:hidden fixed bottom-28 right-6 z-20">

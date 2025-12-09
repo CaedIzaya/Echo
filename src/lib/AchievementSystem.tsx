@@ -138,6 +138,7 @@ export class AchievementManager {
       'milestone_created': 'first_milestone_created',
       'plan_created': 'first_plan_created',
       'plan_completed': 'first_plan_completed',
+      'milestone_completed': 'milestone_first',
     };
 
     const achievementId = firstTimeMap[type];
