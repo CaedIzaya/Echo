@@ -130,7 +130,9 @@ export class AchievementManager {
     return newAchievements;
   }
 
-  checkFirstTimeAchievements(type: 'focus' | 'milestone_created' | 'plan_created' | 'plan_completed'): Achievement[] {
+  checkFirstTimeAchievements(
+    type: 'focus' | 'milestone_created' | 'plan_created' | 'plan_completed' | 'milestone_completed',
+  ): Achievement[] {
     const newAchievements: Achievement[] = [];
     
     const firstTimeMap: Record<string, string> = {
