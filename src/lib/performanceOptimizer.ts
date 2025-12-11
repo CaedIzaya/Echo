@@ -85,10 +85,10 @@ export class AnimationThrottler {
 // ==================== 3. 页面可见性检测 ====================
 export class VisibilityManager {
   private callbacks: Set<(visible: boolean) => void> = new Set();
-  private isVisible = !document.hidden;
+  private isVisible = typeof document !== 'undefined' ? !document.hidden : true;
 
   constructor() {
-    if (typeof document !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleVisibilityChange);
     }
   }
@@ -115,7 +115,22 @@ export class VisibilityManager {
   }
 }
 
-export const globalVisibilityManager = new VisibilityManager();
+// 延迟初始化，避免 SSR 时访问 document
+let _globalVisibilityManager: VisibilityManager | null = null;
+export const globalVisibilityManager = (() => {
+  if (typeof window === 'undefined') {
+    // 服务端渲染时返回一个安全的 mock 对象
+    return {
+      onVisibilityChange: () => () => {},
+      isPageVisible: () => true,
+      destroy: () => {},
+    } as VisibilityManager;
+  }
+  if (!_globalVisibilityManager) {
+    _globalVisibilityManager = new VisibilityManager();
+  }
+  return _globalVisibilityManager;
+})();
 
 // ==================== 4. 内存监控 ====================
 export function getMemoryUsage() {
