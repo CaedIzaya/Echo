@@ -111,7 +111,7 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
     );
   }
 
-  // State 3: 今天已写小结 —— 展示预览 + 鼓励文案
+  // State 3: 今天已写小结 —— 展示预览 + 继续书写入口
   return (
     <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 h-full flex flex-col justify-between group hover:shadow-md transition-shadow">
       <div>
@@ -119,7 +119,9 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
           <div className="flex-1">
             <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium mb-1">今日小结</p>
           </div>
-          <span className="bg-teal-100 text-teal-600 text-xs px-2 py-0.5 rounded-full font-medium">✓</span>
+          <span className="bg-teal-100 text-teal-600 text-xs px-2 py-0.5 rounded-full font-medium">
+            已保存
+          </span>
         </div>
         
         <div className="bg-gray-50 rounded-xl p-4 mb-2 relative">
@@ -127,13 +129,17 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
              "{data?.todaySummary?.text}"
            </p>
         </div>
+
+        <p className="text-[11px] text-gray-400 mt-1">
+          今天的小结已经有了一点雏形，随时都可以再回来多写几句、改一改。
+        </p>
       </div>
 
       <a
         href="/daily-summary"
-        className="w-full bg-white border border-gray-200 text-gray-600 font-medium py-2.5 rounded-xl hover:bg-gray-50 hover:text-teal-600 transition-colors text-sm text-center block"
+        className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-2.5 rounded-xl hover:bg-gray-50 hover:text-teal-600 transition-colors text-sm text-center block"
       >
-        查看
+        继续写 / 修改今日小结
       </a>
     </div>
   );

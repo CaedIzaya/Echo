@@ -6,6 +6,7 @@ import BottomNavigation from './BottomNavigation';
 import UserMenu from './UserMenu';
 import PrimaryPlanCard from './PrimaryPlanCard';
 import AchievementPanel from './AchievementPanel';
+import MailPanel from './MailPanel';
 import TodaySummaryCard from './TodaySummaryCard';
 import QuickSearchGuide from './QuickSearchGuide';
 import SecurityGuideCard from './SecurityGuideCard';
@@ -13,7 +14,26 @@ import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
+import { useMailSystem } from '~/lib/MailSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
+import { 
+  pickHomeSentence, 
+  pickUniversalSentence, 
+  pickEventSentence, 
+  EchoHomeStatus 
+} from '~/lib/echoSpiritDialogueV2';
+import { HeartTreeManager } from '~/lib/HeartTreeSystem';
+import { handleAwarenessEvent, AwarenessContext } from '~/awareness';
+import {
+  gainHeartTreeExp,
+  grantFertilizerBuff,
+  loadHeartTreeExpState,
+  EXP_FOCUS_COMPLETED,
+  EXP_FOCUS_BASIC,
+  EXP_GOAL_CHECKED,
+  EXP_MILESTONE,
+  EXP_STREAK_DAY,
+} from '~/lib/HeartTreeExpSystem';
 import {
   FlowMetrics,
   FlowUpdateContext,
@@ -54,6 +74,8 @@ interface Milestone {
   isCompleted: boolean;
   order: number;
 }
+
+const MIN_FOCUS_MINUTES = 25; // 用于判断“达到最小专注时长”的日级阈值（可按需调整）
 
 // 分离的数据结构 - 今日数据和累计数据独立
 interface TodayStats {
@@ -129,15 +151,24 @@ function AchievementsSection() {
     const allAchievements = manager.getAllAchievements();
 
     // 过滤出已解锁的成就，并按类别排序以获得更好的显示顺序
+    // 确保里程碑成就优先显示（至少显示2个）
     const unlockedAchievements = allAchievements
-      .filter(a => manager.isAchievementUnlocked(a.id))
-      .sort((a, b) => {
-        // 按类别优先级排序
+      .filter(a => manager.isAchievementUnlocked(a.id));
+    
+    const milestoneAchievements = unlockedAchievements.filter(a => a.category === 'milestone');
+    const otherAchievements = unlockedAchievements.filter(a => a.category !== 'milestone');
+    
+    // 优先显示里程碑成就（至少2个），然后显示其他成就
+    const sortedAchievements = [
+      ...milestoneAchievements.slice(0, 2), // 至少显示2个里程碑成就
+      ...otherAchievements.sort((a, b) => {
         const order = { 'first': 0, 'flow': 1, 'time': 2, 'daily': 3, 'milestone': 4 };
         return (order[a.category] || 5) - (order[b.category] || 5);
-      });
+      }),
+      ...milestoneAchievements.slice(2) // 剩余的里程碑成就
+    ];
     
-    setAchievements(unlockedAchievements);
+    setAchievements(sortedAchievements);
   }, [refreshKey]);
   
   // 获取成就背景渐变色
@@ -383,6 +414,9 @@ export default function Dashboard() {
     };
   });
 
+  // 记录近10分钟内的小精灵点击，用于觉察规则6
+  const [lumiClickEvents, setLumiClickEvents] = useState<number[]>([]);
+
   // 主要计划状态 - 从localStorage加载
   const [primaryPlan, setPrimaryPlan] = useState<Project | null>(() => {
     if (typeof window !== 'undefined') {
@@ -396,6 +430,108 @@ export default function Dashboard() {
   // 成就系统相关 - 必须在所有条件返回之前声明
   const [achievementManager, setAchievementManager] = useState<AchievementManager | null>(null);
   const [showAchievementPanel, setShowAchievementPanel] = useState(false);
+  const [showMailPanel, setShowMailPanel] = useState(false);
+  const { unreadCount } = useMailSystem();
+
+  // 构建小精灵点击的觉察上下文（仅用于规则6）
+  const buildLumiClickAwarenessContext = (clicks: number[]): AwarenessContext => {
+    const now = Date.now();
+    const today = getTodayDate();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai';
+      // 从本地存储读取心树命名状态（供觉察与文案个性化使用）
+      let hasNamedHeartTree = false;
+      let heartTreeName: string | undefined = undefined;
+      if (typeof window !== 'undefined') {
+        const storedName = localStorage.getItem('heartTreeNameV1');
+        if (storedName && storedName.trim().length > 0) {
+          hasNamedHeartTree = true;
+          heartTreeName = storedName.trim();
+        }
+      }
+
+      const userState = {
+      userId: userId || 'local_user',
+      currentStreak: Math.max(1, stats.streakDays || 1),
+      streakStableDays: Math.max(0, stats.streakDays || 0),
+      lastActiveDate: today,
+      timezone,
+        hasNamedHeartTree,
+        heartTreeName,
+    };
+
+    const dayStats = {
+      date: today,
+      appForegroundMinutes: 0,
+      homeStayMinutes: 0,
+      focusTotalMinutes: todayStats.minutes || 0,
+      focusGoalMinutes: undefined,
+      focusSessionCount: 0,
+      focusShortSessionCount: 0,
+      focusTimerOpenCountNoStart: 0,
+      lumiClickCount: clicks.length,
+    };
+
+    const recentEvents = clicks.map((ts) => ({
+      userId: userState.userId,
+      type: 'LUMI_CLICK' as const,
+      ts,
+    }));
+
+    return {
+      userState,
+      today: dayStats,
+      lastNDays: [dayStats],
+      nowTs: now,
+      nowLocalHour: new Date(now).getHours(),
+      recentEvents,
+    };
+  };
+
+  // 处理规则6（多次点击小精灵）觉察触发
+  const handleLumiClickAwareness = (clicks: number[]): boolean => {
+    try {
+      const ctx = buildLumiClickAwarenessContext(clicks);
+      const response = handleAwarenessEvent(ctx);
+      if (response && response.match.ruleId === 'SCENE6_LUMI_CLICK_MANY') {
+        spiritDialogRef.current?.showAwarenessMessage?.(response.copy, 10000);
+        return true;
+      }
+    } catch (err) {
+      console.warn('触发觉察机制时出现问题（LUMI_CLICK）:', err);
+    }
+    return false;
+  };
+
+  // 小精灵点击统一处理：经验值 + 觉察检查 + 文案展示
+  const handleSpiritClick = () => {
+    const today = getTodayDate();
+    if (typeof window !== 'undefined') {
+      const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
+      if (lastSpiritInteractionDate !== today) {
+        const spiritExp = LevelManager.calculateSpiritInteractionExp();
+        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+        const newExp = currentExp + spiritExp;
+        localStorage.setItem('userExp', newExp.toString());
+        localStorage.setItem('lastSpiritInteractionDate', today);
+        setUserLevel(LevelManager.calculateLevel(newExp));
+      }
+    }
+
+    // 记录点击并检查觉察
+    const now = Date.now();
+    let handledAwareness = false;
+    setLumiClickEvents((prev) => {
+      const recent = prev.filter((ts) => now - ts <= 10 * 60 * 1000);
+      const updated = [...recent, now];
+      handledAwareness = handleLumiClickAwareness(updated);
+      return updated;
+    });
+
+    // 若未触发觉察，回退到普通气泡
+    if (!handledAwareness && spiritDialogRef.current) {
+      spiritDialogRef.current.showMessage();
+    }
+  };
   const [newAchievements, setNewAchievements] = useState<any[]>([]);
   const [unviewedAchievements, setUnviewedAchievements] = useState<any[]>([]);
   const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
@@ -541,11 +677,15 @@ export default function Dashboard() {
             console.log('🎉 等级提升！（批量完成小目标触发）', newLevel);
           }
           
-          // 心树功能暂时屏蔽
-          // 增加浇水机会（批量完成小目标）
-          // const completedCount = updatedMilestones.filter((m: Milestone) => m.isCompleted).length;
-          // const { HeartTreeManager } = require('./HeartTreeSystem');
-          // HeartTreeManager.addWaterOpportunityOnMilestoneComplete(completedCount);
+          // 心树 EXP 系统：小目标完成事件
+          try {
+            // 每个里程碑 30 EXP
+            const baseExp = EXP_MILESTONE * milestoneIds.length;
+            gainHeartTreeExp(baseExp);
+            console.log('🌳 心树 EXP +', baseExp, '（完成', milestoneIds.length, '个小目标）');
+          } catch (e) {
+            console.error('小目标完成时更新心树 EXP 失败:', e);
+          }
         }
 
         return updatedPlan;
@@ -700,6 +840,24 @@ export default function Dashboard() {
       const newStreakDays = stats.streakDays + (yesterdayMinutes > 0 ? 1 : 0);
       updateStats({ streakDays: newStreakDays });
       
+      // 心树 EXP 系统：连续天数事件
+      if (yesterdayMinutes > 0 && typeof window !== 'undefined') {
+        try {
+          // 昨日有专注 → streak+1，给 10 EXP
+          gainHeartTreeExp(EXP_STREAK_DAY);
+          console.log('🌳 心树 EXP +', EXP_STREAK_DAY, '（连续专注', newStreakDays, '天）');
+          
+          // 关键节点：7 / 14 / 30 天 → 授予一次施肥 Buff（7天，+30% EXP）
+          if ([7, 14, 30].includes(newStreakDays)) {
+            const state = loadHeartTreeExpState();
+            grantFertilizerBuff(state);
+            console.log('🌱 心树获得施肥 Buff！（连续', newStreakDays, '天）');
+          }
+        } catch (e) {
+          console.error('连续天数时更新心树 EXP 失败:', e);
+        }
+      }
+      
       // 保存今日日期标记
       localStorage.setItem('lastFocusDate', today);
       
@@ -777,12 +935,27 @@ export default function Dashboard() {
       localStorage.setItem('firstFocusCompleted', 'true');
     }
     
-    // 心树功能暂时屏蔽
-    // 增加浇水机会（每次专注完成）
-    // if (completed && typeof window !== 'undefined') {
-    //   const { HeartTreeManager } = require('./HeartTreeSystem');
-    //   HeartTreeManager.addWaterOpportunityOnFocusComplete();
-    // }
+    // 心树机会：专注完成事件（不自动加经验，只发放机会）
+    if (completed && minutes > 0 && typeof window !== 'undefined') {
+      try {
+        // 1）每次完成专注，累积一次浇水机会（可屯着不用）
+        HeartTreeManager.addWaterOpportunityOnFocusComplete();
+        console.log('🌳 心树浇水机会 +1');
+
+        // 2）当今日总专注时长首次达到 / 超过每日目标时，额外给一次奖励机会（浇水 + 施肥）
+        if (completedDailyGoal) {
+          const today = getTodayDate();
+          const rewarded = localStorage.getItem(`heartTreeDailyGoalReward_${today}`) === 'true';
+          if (!rewarded) {
+            HeartTreeManager.addRewardOnGoalComplete();
+            localStorage.setItem(`heartTreeDailyGoalReward_${today}`, 'true');
+            console.log('🌳 心树每日目标达成奖励：浇水 + 施肥 各 +1');
+          }
+        }
+      } catch (e) {
+        console.error('更新心树机会失败:', e);
+      }
+    }
     
     console.log('✅ 统计数据已更新完成');
   };
@@ -995,16 +1168,14 @@ export default function Dashboard() {
       
       // 延迟一会确保页面已渲染完成
       setTimeout(() => {
-        // 先检查专注完成标记，如果有则优先播放祝贺气泡
+        // 先检查专注完成标记，如果有则优先播放祝贺气泡（暂时仍使用旧池）
         const focusCompleted = localStorage.getItem('focusCompleted');
         if (focusCompleted === 'true') {
-          // 显示专注祝贺信息
           if (spiritDialogRef.current) {
             spiritDialogRef.current.showCompletionMessage();
-            // 播放完后清除标记，避免重复显示
             localStorage.removeItem('focusCompleted');
           }
-          return; // 播完祝贺信息后就不再显示欢迎信息
+          return;
         }
         
         // 检查每日登录经验值奖励（每天只奖励一次）
@@ -1021,17 +1192,65 @@ export default function Dashboard() {
           setUserLevel(LevelManager.calculateLevel(newExp));
         }
         
-        // 如果没有专注完成，再检查是否需要首次欢迎
-        // 通过 localStorage 判断欢迎信息是否已显示
+        // 如果没有专注完成，再根据 V2 语境 + 频率逻辑决定是否播放首页文案
         const lastWelcomeDate = localStorage.getItem('lastWelcomeDate');
-        
-        // 如果是当天第一次进入主页，则播放欢迎信息
-        if (lastWelcomeDate !== today) {
-          if (spiritDialogRef.current) {
-            spiritDialogRef.current.showWelcomeMessage();
-            // 记录今天已经显示过欢迎信息
-            localStorage.setItem('lastWelcomeDate', today);
+
+        // 构造首页状态快照（EchoHomeStatus）
+        const hasFocusToday = todayStats.minutes > 0;
+        const minFocusReachedToday = todayStats.minutes >= MIN_FOCUS_MINUTES;
+        const hasCompletedSessionToday = minFocusReachedToday; // 暂以达标视为“至少完成一次完整专注”
+
+        const status: EchoHomeStatus = {
+          hasFocusToday,
+          minFocusReachedToday,
+          hasCompletedSessionToday,
+          isFirstVisitToday: lastWelcomeDate !== today,
+          hasShownMinFocusFirstToday:
+            localStorage.getItem('minFocusFirstShownDate') === today,
+          hasShownAfterFocusFirstToday:
+            localStorage.getItem('afterFocusFirstShownDate') === today,
+          hasShownIdleFirstToday: lastWelcomeDate === today ? true : false,
+          streakDays: stats.streakDays,
+          isStreak7Today:
+            stats.streakDays === 7 &&
+            localStorage.getItem('streak7ShownDate') !== today,
+        };
+
+        const hasAnyEventOrFirstVisit =
+          status.isFirstVisitToday || status.isStreak7Today;
+
+        // ① 今日首次进入主页：按照语境必说话
+        if (hasAnyEventOrFirstVisit) {
+          const { text, pool } = pickHomeSentence({ status });
+          if (spiritDialogRef.current && text) {
+            // 使用通用 cute 样式展示首页欢迎/语境文案
+            // @ts-ignore: 扩展的 ref 方法在运行时已存在
+            spiritDialogRef.current.showTypedMessage?.(text, 'cute');
+
+            // 根据实际使用的语境池记录当日标记，避免重复触发“首次”类文案
+            if (pool === 'idle_first') {
+              localStorage.setItem('lastWelcomeDate', today);
+            }
+            if (pool === 'min_focus_first') {
+              localStorage.setItem('minFocusFirstShownDate', today);
+            }
+            if (pool === 'after_focus_first') {
+              localStorage.setItem('afterFocusFirstShownDate', today);
+            }
+            if (pool === 'streak7_event') {
+              localStorage.setItem('streak7ShownDate', today);
+              localStorage.setItem('lastWelcomeDate', today);
+            }
           }
+          return;
+        }
+
+        // ② 非首次进入主页：25% 频率层逻辑（无事件时）
+        const r = Math.random();
+        if (r < 0.25 && spiritDialogRef.current) {
+          const { text } = pickUniversalSentence();
+          // @ts-ignore
+          spiritDialogRef.current.showTypedMessage?.(text, 'cute');
         }
       }, 800); // 延迟800ms确保页面渲染完成
     }
@@ -1164,6 +1383,8 @@ export default function Dashboard() {
         localStorage.setItem('unviewedAchievements', JSON.stringify(allNew));
       }
       
+      //  });
+      
       // 成就解锁获得经验值（每个成就20 EXP）
       if (typeof window !== 'undefined') {
         const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
@@ -1181,10 +1402,14 @@ export default function Dashboard() {
           console.log('🎉 等级提升！（成就解锁触发）', newLevel);
         }
         
-        // 心树功能暂时屏蔽
-        // 增加施肥机会（成就解锁）
-        // const { HeartTreeManager } = require('./HeartTreeSystem');
-        // HeartTreeManager.addFertilizeOpportunityOnAchievementUnlock(allNew.length);
+        // 心树 EXP 系统：成就解锁 → 授予施肥 Buff
+        try {
+          const state = loadHeartTreeExpState();
+          grantFertilizerBuff(state);
+          console.log('🌱 心树获得施肥 Buff！（成就解锁）');
+        } catch (e) {
+          console.error('成就解锁时授予心树施肥 Buff 失败:', e);
+        }
       }
       
       // 3秒后自动清空，以便再次触发
@@ -1462,13 +1687,10 @@ export default function Dashboard() {
           {finalGoal ? (
             <>
               <div className="flex items-baseline gap-2">
-                <p className="text-xl font-bold line-clamp-2 leading-tight">
+                <p className="text-2xl font-bold line-clamp-2 leading-tight">
                   {finalGoal.content}
                 </p>
               </div>
-              <p className="text-xs text-[#4f2a07]/60 font-medium">
-                {finalGoal.isCompleted ? '已达成！点击回顾' : '点击前往计划管理'}
-              </p>
             </>
           ) : (
             <>
@@ -1657,6 +1879,18 @@ export default function Dashboard() {
               {unviewedAchievements.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center text-white">
                   {unviewedAchievements.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowMailPanel(true)}
+              className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 transition"
+              title="收件箱"
+            >
+              <span className="text-2xl">📬</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center text-white ring-2 ring-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
@@ -1885,14 +2119,9 @@ export default function Dashboard() {
               
               {primaryPlan?.finalGoal ? (
                 <div className="space-y-2">
-                  <p className="text-lg font-bold line-clamp-2 leading-tight">
+                  <p className="text-xl font-bold line-clamp-2 leading-tight">
                     {primaryPlan.finalGoal.content}
                   </p>
-                  <div className="flex items-center gap-2 text-xs text-[#4f2a07]/60 font-medium">
-                    <span>{primaryPlan.finalGoal.isCompleted ? '✨ 已达成' : '🚀 进行中'}</span>
-                    <span>•</span>
-                    <span>点击管理</span>
-                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
@@ -1942,27 +2171,13 @@ export default function Dashboard() {
                         setCurrentSpiritState(newState as 'idle' | 'happy' | 'excited');
                       }
                     }}
-                    onClick={() => {
-                      const today = getTodayDate();
-                      const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
-                      if (lastSpiritInteractionDate !== today) {
-                        const spiritExp = LevelManager.calculateSpiritInteractionExp();
-                        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-                        const newExp = currentExp + spiritExp;
-                        localStorage.setItem('userExp', newExp.toString());
-                        localStorage.setItem('lastSpiritInteractionDate', today);
-                        setUserLevel(LevelManager.calculateLevel(newExp));
-                      }
-                      if (spiritDialogRef.current) {
-                        spiritDialogRef.current.showMessage();
-                      }
-                    }}
+                    onClick={handleSpiritClick}
                   />
                 </div>
               </div>
             </div>
-            <FlowCard />
             <MilestoneCard />
+            <FlowCard />
           </div>
 
           {/* PC - 右侧内容区 */}
@@ -2088,24 +2303,7 @@ export default function Dashboard() {
               setCurrentSpiritState(newState);
             }
           }}
-          onClick={() => {
-            // 小精灵互动经验值奖励（每天只奖励一次）
-            const today = getTodayDate();
-            const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
-            if (lastSpiritInteractionDate !== today) {
-              const spiritExp = LevelManager.calculateSpiritInteractionExp();
-              const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-              const newExp = currentExp + spiritExp;
-              localStorage.setItem('userExp', newExp.toString());
-              localStorage.setItem('lastSpiritInteractionDate', today);
-              console.log('📈 小精灵互动经验值奖励', { exp: spiritExp, total: newExp });
-              setUserLevel(LevelManager.calculateLevel(newExp));
-            }
-            
-            if (spiritDialogRef.current) {
-              spiritDialogRef.current.showMessage();
-            }
-          }}
+          onClick={handleSpiritClick}
         />
       </div>
 
@@ -2123,6 +2321,11 @@ export default function Dashboard() {
             setShowAchievementPanel(false);
           }} 
         />
+      )}
+
+      {/* 邮件面板 */}
+      {showMailPanel && (
+        <MailPanel onClose={() => setShowMailPanel(false)} />
       )}
       
       {/* 快速查找指南 */}

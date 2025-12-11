@@ -1,9 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   HeartTreeManager,
   HeartTree,
   GROWTH_THRESHOLDS
 } from '~/lib/HeartTreeSystem';
+import {
+  HeartTreeExpState,
+  loadHeartTreeExpState,
+  waterTree,
+  grantFertilizerBuff,
+  getHeartTreeLevelView,
+  getFertilizerMultiplier,
+  canWaterToday,
+  WATER_BASE_EXP,
+} from '~/lib/HeartTreeExpSystem';
+import { HeartTree as BigHeartTree } from '~/components/heart-tree/HeartTree';
+import {
+  getRandomHeartTreeMessage,
+  getRandomWaterMessage,
+  getRandomFertilizeMessage,
+} from '~/lib/heartTreeDialogue';
 
 interface HeartTreeProps {
   flowIndex?: number;
@@ -20,6 +36,7 @@ interface HeartTreeProps {
 
 export default function HeartTreeComponent(props: HeartTreeProps) {
   const [tree, setTree] = useState<HeartTree>(HeartTreeManager.initialize());
+  const [expState, setExpState] = useState<HeartTreeExpState>(loadHeartTreeExpState());
   const [showMessage, setShowMessage] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
   const [flowers, setFlowers] = useState<Array<{ id: number; x: number; y: number; content?: string }>>([]);
@@ -28,11 +45,16 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
   const [waterOpportunities, setWaterOpportunities] = useState(props.completedMilestonesToday || 0);
   const [fertilizeOpportunities, setFertilizeOpportunities] = useState(props.newAchievementsToday || 0);
   const flowerIdRef = React.useRef(0);
+  const treeMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 加载心树数据
   useEffect(() => {
     const loadedTree = HeartTreeManager.getTree();
     setTree(loadedTree);
+    
+    // 加载 EXP 状态
+    const loadedExpState = loadHeartTreeExpState();
+    setExpState(loadedExpState);
     
     // 从localStorage获取累积的机会数量
     const updateOpportunities = () => {
@@ -112,28 +134,48 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
 
   // 浇水
   const handleWater = () => {
-    if (waterOpportunities <= 0) return;
+    // 检查今天是否可以浇水（需要完成至少一次专注）
+    const today = new Date().toISOString().split('T')[0];
+    const hasCompletedFocusToday = (props.todaySessions || 0) > 0;
+    
+    if (!canWaterToday(expState, today, hasCompletedFocusToday)) {
+      showTreeMessage('今天已经浇过水了，或者还没有完成专注哦~');
+      return;
+    }
     
     setIsWatering(true);
+    
+    // 使用新的 EXP 系统浇水
+    const updatedExpState = waterTree(expState);
+    setExpState(updatedExpState);
+    
+    // 同时更新旧的心树系统（保持兼容）
     const updated = HeartTreeManager.waterTree(tree, 1);
     setTree(updated);
     
-    // 使用一次浇水机会
-    HeartTreeManager.useWaterOpportunity();
-    const newOps = HeartTreeManager.getWaterOpportunities();
-    setWaterOpportunities(newOps);
-    
-    // 显示消息
-    showTreeMessage(HeartTreeManager.getRandomMessage(updated));
+    // 显示浇水文案（情绪文案 + 经验信息）
+    const levelView = getHeartTreeLevelView(updatedExpState);
+    const emotional = getRandomWaterMessage();
+    showTreeMessage(`${emotional}\n（浇水成功，获得 ${WATER_BASE_EXP} EXP · 当前 Lv.${levelView.level}）`);
     
     setTimeout(() => setIsWatering(false), 1000);
   };
 
   // 施肥
   const handleFertilize = () => {
-    if (fertilizeOpportunities <= 0) return;
+    // 检查是否有施肥机会（通过成就、等级提升、连续天数等触发）
+    if (fertilizeOpportunities <= 0) {
+      showTreeMessage('还没有施肥机会哦~ 完成成就或达到关键节点可以获得！');
+      return;
+    }
     
     setIsFertilizing(true);
+    
+    // 使用新的 EXP 系统施肥
+    const updatedExpState = grantFertilizerBuff(expState);
+    setExpState(updatedExpState);
+    
+    // 同时更新旧的心树系统（保持兼容）
     const updated = HeartTreeManager.fertilizeTree(tree, 1);
     setTree(updated);
     
@@ -142,22 +184,31 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
     const newOps = HeartTreeManager.getFertilizeOpportunities();
     setFertilizeOpportunities(newOps);
     
-    // 显示消息
-    showTreeMessage(HeartTreeManager.getRandomMessage(updated));
+    // 显示施肥文案
+    const emotional = getRandomFertilizeMessage();
+    showTreeMessage(`${emotional}\n（施肥成功，未来 7 天 EXP +30%）`);
     
     setTimeout(() => setIsFertilizing(false), 1000);
   };
 
-  // 显示小树消息
+  // 显示小树消息（统一 5 秒，防止被旧定时器提前打断）
   const showTreeMessage = (message: string) => {
     setCurrentMessage(message);
     setShowMessage(true);
-    setTimeout(() => setShowMessage(false), 4000);
+    if (treeMessageTimerRef.current) {
+      clearTimeout(treeMessageTimerRef.current);
+      treeMessageTimerRef.current = null;
+    }
+    treeMessageTimerRef.current = setTimeout(() => {
+      setShowMessage(false);
+      treeMessageTimerRef.current = null;
+    }, 5000);
   };
 
   // 点击树显示消息
   const handleTreeClick = () => {
-    showTreeMessage(HeartTreeManager.getRandomMessage(tree));
+    // 使用心树基础文案池（绿色文案框）
+    showTreeMessage(getRandomHeartTreeMessage());
   };
 
   // 计算成长进度百分比
@@ -180,6 +231,19 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
 
   // 渲染树的SVG（根据阶段和开花状态）- 改进版
   const renderTree = () => {
+    // 使用精美 HeartTree 组件渲染（旧的多阶段 SVG 树代码保留在下面，暂未使用）
+    const animState: 'idle' | 'watering' | 'fertilizing' =
+      isWatering ? 'watering' : isFertilizing ? 'fertilizing' : 'idle';
+
+    return (
+      <div
+        className="w-full h-auto max-w-md mx-auto cursor-pointer"
+        onClick={handleTreeClick}
+      >
+        <BigHeartTree animState={animState} />
+      </div>
+    );
+
     // 幼苗阶段 - 使用新的幼苗SVG图标
     if (tree.stage === 'seedling') {
       return (
@@ -578,46 +642,55 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 pb-20">
-      <div className="p-6 pt-20">
-        {/* 头部信息 */}
-        <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">🌳 心树回忆</h1>
-          <p className="text-gray-600">你的专注让心树茁壮成长</p>
-        </div>
+      <div className="p-6 pt-4">
+        {/* 头部信息（按需求去除文案） */}
+        <div className="mb-0 text-center" />
 
-        {/* 成长信息卡片 */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 shadow-lg">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">成长阶段</p>
-              <p className="text-lg font-bold text-gray-900">{getStageName()}</p>
-              {getBloomStateName() && (
-                <p className="text-xs text-pink-500 mt-1">🌸 {getBloomStateName()}</p>
-              )}
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">成长值</p>
-              <p className="text-lg font-bold text-teal-600">{tree.growthPoints}</p>
-              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                <div
-                  className="bg-gradient-to-r from-teal-400 to-green-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${getGrowthProgress()}%` }}
-                />
+        {/* 树名 + 等级 & EXP 卡片（精简版） */}
+        {(() => {
+          const levelView = getHeartTreeLevelView(expState);
+          const hasBuff = getFertilizerMultiplier(expState) > 1;
+          return (
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 mb-6 shadow-md border border-teal-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">🌳</div>
+                  <div>
+                    <p className="text-sm font-semibold text-teal-700 mb-0.5">
+                      {typeof window !== 'undefined'
+                        ? (window.localStorage.getItem('heartTreeNameV1') || '心树')
+                        : '心树'}
+                    </p>
+                    <p className="text-xs text-gray-500">Lv.{levelView.level}</p>
+                  </div>
+                </div>
+                {hasBuff && (
+                  <div className="px-3 py-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full text-white text-xs font-semibold shadow-sm">
+                    ⚡ 经验加速中
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600">下一等级</span>
+                  <span className="font-semibold text-gray-900">
+                    {levelView.currentExp} / {Number.isFinite(levelView.expToNext) ? levelView.expToNext : 'MAX'} EXP
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-teal-400 via-teal-500 to-green-500 h-2.5 rounded-full transition-all duration-500"
+                    style={{ width: `${levelView.progress}%` }}
+                  />
+                </div>
               </div>
             </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">等级</p>
-              <p className="text-lg font-bold text-indigo-600">LV.{tree.level}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">明日加成</p>
-              <p className="text-lg font-bold text-yellow-600">+{tree.growthBoost}%</p>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* 树容器 */}
-        <div className="relative mb-6 flex items-center justify-center min-h-[300px]">
+        <div className="relative mb-6 flex items-center justify-center min-h-[320px]">
         {/* 落花效果（静止在小树旁） */}
         {flowers.map(flower => (
           <div
@@ -638,28 +711,32 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
         ))}
           
           {/* 树 */}
-          <div className="relative z-0">
+          <div className="relative z-0 w-full max-w-lg">
             {renderTree()}
           </div>
         </div>
 
-        {/* 小树消息 */}
+        {/* 小树消息（绿色渐变文案框） */}
         {showMessage && (
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl p-4 shadow-2xl z-50 max-w-xs animate-slide-down">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">🌳</span>
-              <p className="text-sm text-gray-800 leading-relaxed">{currentMessage}</p>
+          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-xs animate-slide-down pointer-events-none">
+            <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-green-100 border border-emerald-200 rounded-2xl p-4 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🌳</span>
+                <p className="text-sm text-emerald-900 leading-relaxed whitespace-pre-line">
+                  {currentMessage}
+                </p>
+              </div>
             </div>
           </div>
         )}
 
         {/* 操作按钮 */}
-        <div className="space-y-3">
+        <div className="flex flex-row gap-3">
           {/* 浇水按钮 */}
           <button
             onClick={handleWater}
             disabled={waterOpportunities <= 0 || isWatering}
-            className={`w-full px-6 py-4 rounded-2xl font-semibold text-white transition-all shadow-lg ${
+            className={`flex-1 px-6 py-4 rounded-2xl font-semibold text-white transition-all shadow-lg ${
               waterOpportunities > 0 && !isWatering
                 ? 'bg-gradient-to-r from-blue-400 to-cyan-500 hover:from-blue-500 hover:to-cyan-600 active:scale-95'
                 : 'bg-gray-300 cursor-not-allowed'
@@ -670,7 +747,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
               <div className="text-left">
                 <div>浇水</div>
                 <div className="text-xs opacity-90">
-                  {waterOpportunities > 0 ? `还有 ${waterOpportunities} 次机会` : '今日已用完'}
+                  可用：{waterOpportunities}
                 </div>
               </div>
             </div>
@@ -680,7 +757,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
           <button
             onClick={handleFertilize}
             disabled={fertilizeOpportunities <= 0 || isFertilizing}
-            className={`w-full px-6 py-4 rounded-2xl font-semibold text-white transition-all shadow-lg ${
+            className={`flex-1 px-6 py-4 rounded-2xl font-semibold text-white transition-all shadow-lg ${
               fertilizeOpportunities > 0 && !isFertilizing
                 ? 'bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 active:scale-95'
                 : 'bg-gray-300 cursor-not-allowed'
@@ -691,26 +768,13 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
               <div className="text-left">
                 <div>施肥</div>
                 <div className="text-xs opacity-90">
-                  {fertilizeOpportunities > 0 ? `还有 ${fertilizeOpportunities} 次机会` : '今日已用完'}
+                  可用：{fertilizeOpportunities}
                 </div>
               </div>
             </div>
           </button>
         </div>
 
-        {/* 统计信息 */}
-        <div className="mt-6 bg-white/60 backdrop-blur-sm rounded-xl p-4">
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">总浇水次数</p>
-              <p className="text-lg font-bold text-blue-600">{tree.totalWatered}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">总施肥次数</p>
-              <p className="text-lg font-bold text-green-600">{tree.totalFertilized}</p>
-            </div>
-          </div>
-        </div>
 
         {/* CSS 动画 */}
         <style jsx>{`

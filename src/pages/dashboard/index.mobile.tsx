@@ -31,6 +31,7 @@ import {
   MAX_TEMP_FLOW,
   clamp
 } from '~/lib/flowEngine';
+import { HeartTreeManager } from '~/lib/HeartTreeSystem';
 
 interface Project {
   id: string;
@@ -777,12 +778,27 @@ export default function Dashboard() {
       localStorage.setItem('firstFocusCompleted', 'true');
     }
     
-    // 心树功能暂时屏蔽
-    // 增加浇水机会（每次专注完成）
-    // if (completed && typeof window !== 'undefined') {
-    //   const { HeartTreeManager } = require('./HeartTreeSystem');
-    //   HeartTreeManager.addWaterOpportunityOnFocusComplete();
-    // }
+    // 心树机会：专注完成事件（移动端，同样不自动加经验）
+    if (completed && minutes > 0 && typeof window !== 'undefined') {
+      try {
+        // 1）每次完成专注，累积一次浇水机会
+        HeartTreeManager.addWaterOpportunityOnFocusComplete();
+        console.log('🌳(M) 心树浇水机会 +1');
+
+        // 2）当今日总专注时长首次达到 / 超过每日目标时，额外给一次奖励机会（浇水 + 施肥）
+        if (completedDailyGoal) {
+          const today = new Date().toISOString().split('T')[0];
+          const rewarded = localStorage.getItem(`heartTreeDailyGoalReward_${today}`) === 'true';
+          if (!rewarded) {
+            HeartTreeManager.addRewardOnGoalComplete();
+            localStorage.setItem(`heartTreeDailyGoalReward_${today}`, 'true');
+            console.log('🌳(M) 心树每日目标达成奖励：浇水 + 施肥 各 +1');
+          }
+        }
+      } catch (e) {
+        console.error('更新心树机会失败（移动端）:', e);
+      }
+    }
     
     console.log('✅ 统计数据已更新完成');
   };

@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallback, CSSProperties } from 'react';
+import { pickUniversalSentence } from '~/lib/echoSpiritDialogueV2';
 
-// 文案数据
+// 文案数据（欢迎 / 完成 / 定时陪伴仍沿用原有池；
+// 日常点击小精灵时的随机文案改由通用人格池驱动）
 const spiritMessages = {
   // ① 可爱轻松款
   cute: [
@@ -186,6 +188,8 @@ export interface SpiritDialogRef {
   showMessage: () => void;
   showWelcomeMessage: () => void; // 显示欢迎文案
   showCompletionMessage: () => void; // 显示专注完成祝贺文案
+  showTypedMessage: (text: string, tone?: 'cute' | 'chuunibyou' | 'philosophical' | 'awareness') => void; // 显示指定文案（用于首页语境/事件层）
+  showAwarenessMessage?: (text: string, durationMs?: number) => void; // 觉察机制文案，默认10秒
 }
 
 // 随机选择一条文案（移到组件外部，避免依赖问题）
@@ -204,7 +208,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   ({ spiritState, onStateChange, mobileContainerClassName, mobileContainerStyle }, ref) => {
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [isVisible, setIsVisible] = useState(false);
-  const [messageType, setMessageType] = useState<'cute' | 'chuunibyou' | 'philosophical'>('cute');
+  const [messageType, setMessageType] = useState<'cute' | 'chuunibyou' | 'philosophical' | 'awareness'>('cute');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const messageStartTimeRef = useRef<number>(0); // 记录文案开始显示的时间
   const periodicTimerRef = useRef<NodeJS.Timeout | null>(null); // 定时触发文案的定时器
@@ -219,10 +223,11 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       timerRef.current = null;
     }
 
-    // 每次调用都刷新文案（无论是首次显示还是2s后的刷新）
-    const { message, type } = getRandomMessage();
-    setCurrentMessage(message);
-    setMessageType(type);
+    // 每次点击都从通用人格池（universal_pool）抽一句
+    const { text } = pickUniversalSentence();
+    setCurrentMessage(text);
+    // 通用人格默认使用 cute 渐变风格，后续如需区分 A/B/C 可在 EchoSentenceResult 中扩展元信息
+    setMessageType('cute');
     setIsVisible(true);
     
     // 记录文案开始显示的时间
@@ -271,6 +276,63 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       timerRef.current = null;
     }, 8000);
   }, [onStateChange, spiritState]);
+
+  // 显示指定文案的函数（首页语境 / 事件层使用）
+  const showTypedMessage = useCallback(
+    (text: string, tone: 'cute' | 'chuunibyou' | 'philosophical' | 'awareness' = 'cute') => {
+      if (!text) return;
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setCurrentMessage(text);
+      setMessageType(tone);
+      setIsVisible(true);
+      messageStartTimeRef.current = Date.now();
+
+      if (onStateChange) {
+        onStateChange(spiritState);
+      }
+
+      // 统一采用 8 秒可见时长，和欢迎/完成/定时文案保持一致
+      timerRef.current = setTimeout(() => {
+        setIsVisible(false);
+        setCurrentMessage('');
+        timerRef.current = null;
+      }, 8000);
+    },
+    [onStateChange, spiritState],
+  );
+
+  // 显示觉察机制文案（默认 10 秒）
+  const showAwarenessMessage = useCallback(
+    (text: string, durationMs: number = 10000) => {
+      if (!text) return;
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setCurrentMessage(text);
+      setMessageType('awareness');
+      setIsVisible(true);
+      messageStartTimeRef.current = Date.now();
+
+      if (onStateChange) {
+        onStateChange(spiritState);
+      }
+
+      timerRef.current = setTimeout(() => {
+        setIsVisible(false);
+        setCurrentMessage('');
+        timerRef.current = null;
+      }, durationMs);
+    },
+    [onStateChange, spiritState],
+  );
 
   // 显示专注完成祝贺文案的函数（非交互触发，8秒后自动隐藏）
   const showCompletionMessage = useCallback(() => {
@@ -342,7 +404,9 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     showMessage,
     showWelcomeMessage,
     showCompletionMessage,
-  }), [showMessage, showWelcomeMessage, showCompletionMessage]);
+    showTypedMessage,
+    showAwarenessMessage,
+  }), [showMessage, showWelcomeMessage, showCompletionMessage, showTypedMessage, showAwarenessMessage]);
 
   // 定时触发文案（每20分钟）
   useEffect(() => {
@@ -424,6 +488,12 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
           border: 'border-teal-300',
           arrowBg: 'from-teal-100 to-cyan-100',
         };
+      case 'awareness':
+        return {
+          bg: 'bg-gradient-to-br from-amber-100 via-orange-100 to-amber-200',
+          border: 'border-amber-300',
+          arrowBg: 'from-amber-100 via-orange-100 to-amber-200',
+        };
       default:
         return {
           bg: 'bg-gradient-to-br from-gray-100 to-gray-200',
@@ -473,7 +543,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
 
       {/* 手机端对话框 - 可自定义锚点 */}
       <div
-        className={mobileContainerClassName ?? 'sm:hidden fixed bottom-44 right-6 z-50 pointer-events-none max-w-[280px]'}
+        className={mobileContainerClassName ?? 'sm:hidden fixed bottom-44 right-10 z-50 pointer-events-none max-w-[280px]'}
         style={mobileContainerStyle}
       >
         <div

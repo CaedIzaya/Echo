@@ -14,24 +14,20 @@ export default function SignIn() {
     name: ""
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [authStatus, setAuthStatus] = useState("未检测");
-  const [hasRedirected, setHasRedirected] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [authStatus, setAuthStatus] = useState("未检测");
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   const shouldForceOnboarding = () => {
-    if (typeof window === "undefined") {
-      return false;
-    }
+    if (typeof window === "undefined") return false;
     return sessionStorage.getItem("forceOnboarding") === "true";
   };
 
   const markOnboardingCompleteSilently = async () => {
     try {
-      await fetch("/api/user/complete-onboarding", {
-        method: "POST",
-      });
+      await fetch("/api/user/complete-onboarding", { method: "POST" });
     } catch (error) {
       console.error("自动更新 onboarding 状态失败:", error);
     }
@@ -39,7 +35,6 @@ export default function SignIn() {
 
   // 检查认证状态的替代方法
   const checkAuthStatus = async () => {
-    // 防止重复跳转
     if (hasRedirected) {
       console.log("已经跳转过，跳过检查");
       return;
@@ -52,8 +47,6 @@ export default function SignIn() {
       if (session?.user) {
         setAuthStatus(`已登录: ${session.user.email}`);
         console.log("检测到已登录用户:", session.user);
-        
-        // 标记已跳转，防止重复跳转
         setHasRedirected(true);
         
         const forceOnboarding = shouldForceOnboarding();
@@ -89,23 +82,19 @@ export default function SignIn() {
   useEffect(() => {
     const emailParam = router.query.email;
     if (emailParam) {
-      // 处理 Next.js router.query 可能返回字符串或数组的情况
       let emailStr: string;
       if (Array.isArray(emailParam)) {
         emailStr = emailParam[0] || '';
       } else if (typeof emailParam === 'string') {
         emailStr = emailParam;
       } else {
-        // 如果是对象或其他类型，跳过
         return;
       }
       
-      // 验证是有效的字符串且包含 @ 符号（基本邮箱格式验证）
       if (emailStr && typeof emailStr === 'string' && emailStr.includes('@')) {
         try {
           const decodedEmail = decodeURIComponent(emailStr);
           setFormData(prev => ({ ...prev, email: decodedEmail }));
-          // 清除 URL 参数，避免刷新后重复填充
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, '', '/auth/signin');
           }
@@ -138,46 +127,30 @@ export default function SignIn() {
       }
     } catch (error) {
       console.error("跳转逻辑出错:", error);
-      // 备用方案
       router.push("/dashboard");
     }
   };
 
-  // 验证密码
   const validatePassword = (password: string): string => {
-    if (password.length < 8) {
-      return "密码至少需要8位字符";
-    }
+    if (password.length < 8) return "密码至少需要8位字符";
     return "";
   };
 
-  // 验证确认密码
   const validateConfirmPassword = (password: string, confirmPassword: string): string => {
-    if (!confirmPassword) {
-      return "请再次输入密码";
-    }
-    if (password !== confirmPassword) {
-      return "两次输入的密码不一致";
-    }
+    if (!confirmPassword) return "请再次输入密码";
+    if (password !== confirmPassword) return "两次输入的密码不一致";
     return "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 如果是注册模式，先验证密码和条款同意
     if (!isLogin) {
       const pwdError = validatePassword(formData.password);
       const confirmPwdError = validateConfirmPassword(formData.password, formData.confirmPassword);
-      
       setPasswordError(pwdError);
       setConfirmPasswordError(confirmPwdError);
-      
-      if (pwdError || confirmPwdError) {
-        return; // 验证失败，不提交
-      }
-
-      // 检查是否同意条款
+      if (pwdError || confirmPwdError) return;
       if (!agreedToTerms) {
         alert('请先阅读并同意用户协议和隐私政策');
         return;
@@ -187,9 +160,6 @@ export default function SignIn() {
     setIsLoading(true);
     
     if (isLogin) {
-      // 登录逻辑
-      console.log("开始登录:", formData.email);
-      
       try {
         const result = await signIn("credentials", {
           email: formData.email,
@@ -197,16 +167,11 @@ export default function SignIn() {
           redirect: false,
         });
         
-        console.log("登录 API 响应:", result);
-        
         if (result?.ok) {
           console.log("登录成功，准备跳转...");
-          
-          // 等待 session 更新
           setTimeout(async () => {
             await handlePostLoginRedirect();
           }, 1000);
-          
         } else {
           let errorMessage = "登录失败，请检查邮箱和密码";
           if (result?.error) {
@@ -215,30 +180,19 @@ export default function SignIn() {
           alert(errorMessage);
         }
       } catch (error) {
-        console.error("登录过程出错:", error);
         alert("登录过程出现异常，请重试");
       }
     } else {
-      // 注册逻辑
-      console.log("开始注册:", formData);
-      
-      // 只发送必要的字段到后端
       const { confirmPassword, ...registerData } = formData;
-      
       try {
         const response = await fetch("/api/auth/register", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(registerData),
         });
         
         const result = await response.json();
-        console.log("注册 API 响应:", result);
-        
         if (response.ok) {
-          // 注册成功后自动登录
           const loginResult = await signIn("credentials", {
             email: formData.email,
             password: formData.password,
@@ -246,28 +200,22 @@ export default function SignIn() {
           });
           
           if (loginResult?.ok) {
-            console.log("注册后自动登录成功");
-            // 新注册用户直接进入 onboarding
             if (typeof window !== "undefined") {
               sessionStorage.setItem("forceOnboarding", "true");
             }
             router.push("/onboarding");
           } else {
-            alert("注册成功，但自动登录失败，请手动登录");
-            setIsLogin(true); // 切换到登录标签
+            setIsLogin(true);
           }
         } else {
           alert(result.error || "注册失败，请重试");
         }
       } catch (error) {
-        console.error("注册过程出错:", error);
         alert("注册过程出现异常，请重试");
       }
     }
-    
     setIsLoading(false);
   };
-
 
   return (
     <div className="flex min-h-screen items-center justify-center relative overflow-hidden bg-gradient-to-br from-teal-50/40 via-cyan-50/30 to-blue-50/40 px-4 py-8">
@@ -324,7 +272,7 @@ export default function SignIn() {
       {/* 网格背景 - 更淡 */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808006_1px,transparent_1px),linear-gradient(to_bottom,#80808006_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"></div>
 
-      <div className="relative z-10 w-full max-w-md">
+      <div className="relative z-10 w-full max-w-sm md:max-w-md">
         {/* Logo 和品牌区域 */}
         <div className="text-center mb-10 animate-fade-in-up">
           <div className="inline-flex items-center justify-center w-16 h-16 mb-6 relative group">
@@ -333,11 +281,11 @@ export default function SignIn() {
               <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold text-emerald-700 mb-3 tracking-tight flex items-center justify-center gap-1">
-            <span className="echo-letter echo-letter-1">E</span>
-            <span className="echo-letter echo-letter-2">c</span>
-            <span className="echo-letter echo-letter-3">h</span>
-            <span className="echo-letter echo-letter-4">o</span>
+          <h1 className="text-5xl font-medium mb-4 flex items-center justify-center gap-1 select-none">
+            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">E</span>
+            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">c</span>
+            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">h</span>
+            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">o</span>
           </h1>
           <div className="w-16 h-px bg-gray-300 mx-auto mb-3"></div>
           <p className="text-gray-900 text-base font-medium">开启你的专注之旅</p>
@@ -349,10 +297,8 @@ export default function SignIn() {
             <button
               onClick={() => {
                 setIsLogin(true);
-                // 切换时清除错误信息
                 setPasswordError("");
                 setConfirmPasswordError("");
-                // 清除确认密码字段
                 setFormData({...formData, confirmPassword: ""});
               }}
               disabled={isLoading}
@@ -367,11 +313,9 @@ export default function SignIn() {
             <button
               onClick={() => {
                 setIsLogin(false);
-                // 切换时清除错误信息和状态
                 setPasswordError("");
                 setConfirmPasswordError("");
                 setAgreedToTerms(false);
-                // 清除确认密码字段
                 setFormData({...formData, confirmPassword: ""});
               }}
               disabled={isLoading}
@@ -427,11 +371,9 @@ export default function SignIn() {
                 value={formData.password}
                 onChange={(e) => {
                   setFormData({...formData, password: e.target.value});
-                  // 实时验证密码
                   if (!isLogin) {
                     const error = validatePassword(e.target.value);
                     setPasswordError(error);
-                    // 如果确认密码已输入，也验证确认密码
                     if (formData.confirmPassword) {
                       setConfirmPasswordError(validateConfirmPassword(e.target.value, formData.confirmPassword));
                     }
@@ -460,7 +402,7 @@ export default function SignIn() {
               )}
             </div>
 
-            {/* 忘记密码链接 - 仅在登录模式显示，位于密码框和登录按钮之间 */}
+            {/* 忘记密码链接 - 仅在登录模式显示 */}
             {isLogin && (
               <div className="text-right -mt-2">
                 <button
@@ -483,7 +425,6 @@ export default function SignIn() {
                   value={formData.confirmPassword}
                   onChange={(e) => {
                     setFormData({...formData, confirmPassword: e.target.value});
-                    // 实时验证确认密码
                     setConfirmPasswordError(validateConfirmPassword(formData.password, e.target.value));
                   }}
                   onBlur={() => {
@@ -569,7 +510,6 @@ export default function SignIn() {
             </button>
           </form>
 
-
           {/* 返回到欢迎页 */}
           <div className="mt-6 text-center">
             <button
@@ -619,47 +559,6 @@ export default function SignIn() {
         
         .animate-signin-wave-3 {
           animation: signin-wave-flow 25s linear infinite;
-        }
-        
-        /* ECHO字母跳动动画 - 优雅现代化，只播放一次 */
-        .echo-letter {
-          display: inline-block;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-          font-weight: 700;
-          letter-spacing: 0.05em;
-          animation: echo-bounce 0.6s ease-out forwards;
-          opacity: 0;
-        }
-        
-        .echo-letter-1 {
-          animation-delay: 0s;
-        }
-        
-        .echo-letter-2 {
-          animation-delay: 0.1s;
-        }
-        
-        .echo-letter-3 {
-          animation-delay: 0.2s;
-        }
-        
-        .echo-letter-4 {
-          animation-delay: 0.3s;
-        }
-        
-        @keyframes echo-bounce {
-          0% {
-            transform: translateY(0) scale(1);
-            opacity: 0;
-          }
-          50% {
-            transform: translateY(-12px) scale(1.05);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-          }
         }
       `}</style>
     </div>

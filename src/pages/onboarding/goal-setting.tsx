@@ -1,14 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import {
+  interestConfig,
+  getDomainByKey,
+  InterestDomain,
+  InterestCategory,
+  InterestItem,
+} from '~/lib/interestConfig';
 
 interface Interest {
   id: string;
   name: string;
   icon: string;
 }
+
+// 顶层兴趣名称 -> interestConfig 域 key 的映射
+const INTEREST_NAME_TO_DOMAIN_KEY: Record<string, string> = {
+  游戏: 'game',
+  阅读: 'reading',
+  绘画: 'drawing',
+  音乐: 'music',
+  编程: 'coding',
+  语言: 'language',
+  运动: 'sports',
+  美食: 'food',
+  职业: 'career',
+  学术: 'academic',
+  观影: 'movie',
+  写作: 'writing',
+};
 
 enum FormStep {
   Branch = 'BRANCH',
@@ -51,9 +74,32 @@ export default function GoalSetting() {
   const [editPlanId, setEditPlanId] = useState<string | null>(null);
   const [selectedBranchFromBubble, setSelectedBranchFromBubble] = useState(false); // 跟踪是否从泡泡选择
   const [customTimeInput, setCustomTimeInput] = useState(''); // 自定义时间输入
+  const [selectedBranchCategoryKey, setSelectedBranchCategoryKey] = useState<string | null>(null);
+  const [selectedDetailItemId, setSelectedDetailItemId] = useState<string | null>(null);
+  const [selectedDetailFromBubble, setSelectedDetailFromBubble] = useState(false);
 
   const { isReady, query } = router;
   const allowReturn = isReady && (query.from === 'plans' || query.allowReturn === '1');
+
+  // 根据当前聚焦兴趣，解析对应的兴趣域（如「游戏」「音乐」等）
+  const interestDomain: InterestDomain | undefined = useMemo(() => {
+    if (!focusedInterest) return undefined;
+    const domainKey = INTEREST_NAME_TO_DOMAIN_KEY[focusedInterest.name];
+    if (!domainKey) return undefined;
+    return getDomainByKey(interestConfig, domainKey);
+  }, [focusedInterest]);
+
+  // 当前选择的一级方向（Category）
+  const selectedCategory: InterestCategory | undefined = useMemo(() => {
+    if (!interestDomain || !selectedBranchCategoryKey) return undefined;
+    return interestDomain.categories.find((c) => c.key === selectedBranchCategoryKey);
+  }, [interestDomain, selectedBranchCategoryKey]);
+
+  // 当前选择的具体分支（Item）
+  const selectedDetailItem: InterestItem | undefined = useMemo(() => {
+    if (!selectedCategory || !selectedDetailItemId) return undefined;
+    return selectedCategory.items.find((i) => i.id === selectedDetailItemId);
+  }, [selectedCategory, selectedDetailItemId]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -131,18 +177,35 @@ export default function GoalSetting() {
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // 如果是 focusBranch 字段，且是手动输入（不是从泡泡选择），清除泡泡高亮状态
+    // 如果是 focusBranch 字段，且是手动输入（不是从泡泡选择），清除泡泡高亮状态和已选方向
     if (field === 'focusBranch') {
       setSelectedBranchFromBubble(false);
+      setSelectedBranchCategoryKey(null);
+    }
+    // 如果是 focusDetail 字段，且是手动输入（不是从泡泡选择），清除分支高亮和已选分支
+    if (field === 'focusDetail') {
+      setSelectedDetailFromBubble(false);
+      setSelectedDetailItemId(null);
     }
   };
 
-  // 处理从泡泡选择分支
-  const handleBranchSelectFromBubble = (suggestion: string) => {
-    if (suggestion) {
-      setFormData(prev => ({ ...prev, focusBranch: suggestion }));
-      setSelectedBranchFromBubble(true);
-    }
+  // 处理从泡泡选择一级方向（Category）
+  const handleBranchSelectFromBubble = (category: InterestCategory) => {
+    if (!category) return;
+    setFormData(prev => ({ ...prev, focusBranch: category.label }));
+    setSelectedBranchFromBubble(true);
+    setSelectedBranchCategoryKey(category.key);
+    // 切换一级方向时，重置详细分支与里程碑占位
+    setSelectedDetailFromBubble(false);
+    setSelectedDetailItemId(null);
+  };
+
+  // 处理从泡泡选择具体分支（Item）
+  const handleDetailSelectFromBubble = (item: InterestItem) => {
+    if (!item) return;
+    setFormData(prev => ({ ...prev, focusDetail: item.name }));
+    setSelectedDetailFromBubble(true);
+    setSelectedDetailItemId(item.id);
   };
 
   const handleNext = () => {
@@ -319,6 +382,9 @@ export default function GoalSetting() {
 
   // 渲染分支选择页面
   const renderBranch = () => {
+    // 从 interestConfig 中读取当前兴趣域下的 5 个方向（Category）
+    const branchCategories: InterestCategory[] = interestDomain?.categories ?? [];
+
     // 非规则但仍保持平衡的布局：左3右2，带有横纵双向位移
     const bubbleLayouts = [
       { index: 0, side: 'left', offsetX: -35, offsetY: -110 }, // 左上外扩
@@ -342,15 +408,17 @@ export default function GoalSetting() {
           {/* 左侧3个泡泡 - 非规则排列 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {leftBubbles.map((layout) => {
-              const suggestion = BRANCH_SUGGESTIONS[layout.index] || '';
+              const category = branchCategories[layout.index];
+              const suggestion = category?.label || '';
               // 只有当从泡泡选择且值匹配时才高亮
-              const isSelected = selectedBranchFromBubble && formData.focusBranch === suggestion;
+              const isSelected =
+                !!category && selectedBranchFromBubble && selectedBranchCategoryKey === category.key;
               
               return (
                 <button
                   key={layout.index}
-                  onClick={() => suggestion && handleBranchSelectFromBubble(suggestion)}
-                  disabled={!suggestion}
+                  onClick={() => category && handleBranchSelectFromBubble(category)}
+                  disabled={!category}
                   style={{
                     position: 'absolute',
                     transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
@@ -364,7 +432,7 @@ export default function GoalSetting() {
                     w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
                     ${isSelected
                       ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
-                      : suggestion
+                      : category
                         ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
                         : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
                   `}
@@ -407,15 +475,17 @@ export default function GoalSetting() {
           {/* 右侧2个泡泡 - 非规则排列 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {rightBubbles.map((layout) => {
-              const suggestion = BRANCH_SUGGESTIONS[layout.index] || '';
+              const category = branchCategories[layout.index];
+              const suggestion = category?.label || '';
               // 只有当从泡泡选择且值匹配时才高亮
-              const isSelected = selectedBranchFromBubble && formData.focusBranch === suggestion;
+              const isSelected =
+                !!category && selectedBranchFromBubble && selectedBranchCategoryKey === category.key;
               
               return (
                 <button
                   key={layout.index}
-                  onClick={() => suggestion && handleBranchSelectFromBubble(suggestion)}
-                  disabled={!suggestion}
+                  onClick={() => category && handleBranchSelectFromBubble(category)}
+                  disabled={!category}
                   style={{
                     position: 'absolute',
                     transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
@@ -429,7 +499,7 @@ export default function GoalSetting() {
                     w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
                     ${isSelected
                       ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
-                      : suggestion
+                      : category
                         ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
                         : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
                   `}
@@ -461,15 +531,17 @@ export default function GoalSetting() {
         {/* 移动端布局 */}
         <div className="md:hidden w-full flex flex-col items-center">
           {/* 移动端选项列表 */}
-          {BRANCH_SUGGESTIONS.length > 0 && (
+          {branchCategories.length > 0 && (
             <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {BRANCH_SUGGESTIONS.map((suggestion, i) => {
+              {branchCategories.map((category, i) => {
+                const suggestion = category.label;
                 // 只有当从泡泡选择且值匹配时才高亮
-                const isSelected = selectedBranchFromBubble && formData.focusBranch === suggestion;
+                const isSelected =
+                  selectedBranchFromBubble && selectedBranchCategoryKey === category.key;
                 return (
                   <button
                     key={i}
-                    onClick={() => handleBranchSelectFromBubble(suggestion)}
+                    onClick={() => handleBranchSelectFromBubble(category)}
                     style={{
                       animationDelay: `${i * 0.1}s`,
                       boxShadow: isSelected
@@ -519,6 +591,9 @@ export default function GoalSetting() {
 
   // 渲染详细分支选择页面 (页面B)
   const renderDetailBranch = () => {
+    // 在已选方向下，从 interestConfig 中读取 5 个具体分支（Item）
+    const detailItems: InterestItem[] = selectedCategory?.items ?? [];
+
     // 复用气泡布局
     const bubbleLayouts = [
       { index: 0, side: 'left', offsetX: -35, offsetY: -110 },
@@ -539,23 +614,47 @@ export default function GoalSetting() {
 
         {/* 桌面端布局 */}
         <div className="hidden md:flex relative w-full items-center justify-center gap-8 lg:gap-12 min-h-[450px]">
-          {/* 左侧3个泡泡 - 装饰用，不可点击 */}
+          {/* 左侧3个泡泡 - 使用配置的具体分支 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
-            {leftBubbles.map((layout) => (
-              <div
-                key={layout.index}
-                style={{
-                  position: 'absolute',
-                  transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
-                  animationDelay: `${layout.index * 0.15}s`,
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
-                }}
-                className="bubble-branch group flex flex-col items-center justify-center
-                  w-28 h-28 lg:w-32 lg:h-32 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm"
-              >
-                <span className="text-2xl relative z-10 text-white/30">●</span>
-              </div>
-            ))}
+            {leftBubbles.map((layout) => {
+              const item = detailItems[layout.index];
+              const label = item?.name || '';
+              const isSelected =
+                !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
+
+              return (
+                <button
+                  key={layout.index}
+                  onClick={() => item && handleDetailSelectFromBubble(item)}
+                  disabled={!item}
+                  style={{
+                    position: 'absolute',
+                    transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
+                    animationDelay: `${layout.index * 0.15}s`,
+                    boxShadow: isSelected
+                      ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                      : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                  }}
+                  className={`
+                    bubble-branch group flex flex-col items-center justify-center
+                    w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                    ${isSelected
+                      ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
+                      : item
+                        ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
+                        : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
+                  `}
+                >
+                  {label ? (
+                    <span className="text-sm lg:text-base font-medium text-center px-2 relative z-10">
+                      {label}
+                    </span>
+                  ) : (
+                    <span className="text-2xl relative z-10 text-white/30">●</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* 中间输入框 */}
@@ -570,40 +669,84 @@ export default function GoalSetting() {
             />
           </div>
 
-          {/* 右侧2个泡泡 - 装饰用 */}
+          {/* 右侧2个泡泡 - 使用配置的具体分支 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
-            {rightBubbles.map((layout) => (
-              <div
-                key={layout.index}
-                style={{
-                  position: 'absolute',
-                  transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
-                  animationDelay: `${layout.index * 0.15}s`,
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
-                }}
-                className="bubble-branch group flex flex-col items-center justify-center
-                  w-28 h-28 lg:w-32 lg:h-32 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm"
-              >
-                <span className="text-2xl relative z-10 text-white/30">●</span>
-              </div>
-            ))}
+            {rightBubbles.map((layout) => {
+              const item = detailItems[layout.index];
+              const label = item?.name || '';
+              const isSelected =
+                !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
+
+              return (
+                <button
+                  key={layout.index}
+                  onClick={() => item && handleDetailSelectFromBubble(item)}
+                  disabled={!item}
+                  style={{
+                    position: 'absolute',
+                    transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
+                    animationDelay: `${layout.index * 0.15}s`,
+                    boxShadow: isSelected
+                      ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                      : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                  }}
+                  className={`
+                    bubble-branch group flex flex-col items-center justify-center
+                    w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                    ${isSelected
+                      ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
+                      : item
+                        ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
+                        : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
+                  `}
+                >
+                  {label ? (
+                    <span className="text-sm lg:text-base font-medium text-center px-2 relative z-10">
+                      {label}
+                    </span>
+                  ) : (
+                    <span className="text-2xl relative z-10 text-white/30">●</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* 移动端布局 */}
         <div className="md:hidden w-full flex flex-col items-center">
-          {/* 移动端气泡装饰 - 可选 */}
-          <div className="flex flex-wrap justify-center gap-4 mb-8 opacity-50 pointer-events-none">
-            {[1, 2, 3].map((_, i) => (
-               <div
-                  key={i}
-                  style={{ animationDelay: `${i * 0.1}s` }}
-                  className="bubble-branch w-16 h-16 rounded-full border border-white/10 bg-white/5 flex items-center justify-center"
-               >
-                  <span className="text-white/20">●</span>
-               </div>
-            ))}
-          </div>
+          {/* 移动端：如果配置了分支，则用点击泡泡形式展示 */}
+          {detailItems.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-4 mb-8">
+              {detailItems.map((item, i) => {
+                const isSelected =
+                  selectedDetailFromBubble && selectedDetailItemId === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleDetailSelectFromBubble(item)}
+                    style={{
+                      animationDelay: `${i * 0.1}s`,
+                      boxShadow: isSelected
+                        ? '0 0 50px rgba(255,255,255,0.4), inset 0 0 30px rgba(255,255,255,0.2), 0 8px 32px rgba(0,0,0,0.15)'
+                        : '0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.08)'
+                    }}
+                    className={`
+                      bubble-branch relative group flex items-center justify-center
+                      w-24 h-24 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
+                      ${isSelected
+                        ? 'bg-white text-slate-900 border-transparent scale-110'
+                        : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40'}
+                    `}
+                  >
+                    <span className="text-sm font-medium relative z-10 px-3">
+                      {item.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* 输入框 */}
           <div className="w-full max-w-md">
@@ -623,6 +766,9 @@ export default function GoalSetting() {
 
   // 渲染里程碑页面
   const renderMilestone = () => {
+    const milestonePlaceholder =
+      selectedDetailItem?.milestone.description || '例如：完成第一幅画';
+
     return (
       <div className="relative w-full max-w-5xl mx-auto flex flex-col items-center">
         <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
@@ -662,7 +808,7 @@ export default function GoalSetting() {
               type="text"
               value={formData.firstMilestone}
               onChange={(e) => handleInputChange('firstMilestone', e.target.value)}
-              placeholder="例如：完成第一幅画"
+              placeholder={milestonePlaceholder}
               className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl md:text-2xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
               autoFocus
             />

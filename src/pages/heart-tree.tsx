@@ -1,206 +1,177 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import HeartTreeComponent from './dashboard/HeartTree';
 import BottomNavigation from './dashboard/BottomNavigation';
-import { HeartTree } from '@/components/heart-tree/HeartTree';
-import HeartTreeControls from '@/components/heart-tree/HeartTreeControls';
+import { getNamingGuideText, getFirstMeetingText } from '~/awareness/heart-tree-naming';
 
 export default function HeartTreePage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
-  const [animState, setAnimState] = useState<'idle' | 'watering' | 'fertilizing'>('idle');
+  const [hasCompletedFocusToday, setHasCompletedFocusToday] = useState(false);
+  const [heartTreeName, setHeartTreeName] = useState<string | null>(null);
+  const [isNaming, setIsNaming] = useState(false);
+  const [namingInput, setNamingInput] = useState('');
+  const [hasJustNamed, setHasJustNamed] = useState(false);
 
+  // 检查今天是否完成过专注 & 加载心树名字 / 命名状态
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/auth/signin');
-    }
-  }, [status, router]);
+    if (typeof window === 'undefined') return;
+    
+    const checkTodayAndName = () => {
+      try {
+        // 1）检查今天是否有完成的专注（>= 25分钟）
+        const todayStats = localStorage.getItem('todayStats');
+        if (todayStats) {
+          const stats = JSON.parse(todayStats);
+          const today = new Date().toISOString().split('T')[0];
+          const todayData = stats[today];
+          const hasFocus = todayData && todayData.minutes >= 25;
+          setHasCompletedFocusToday(!!hasFocus);
+        } else {
+          setHasCompletedFocusToday(false);
+        }
 
+        // 2）加载心树名字
+        const storedName = localStorage.getItem('heartTreeNameV1');
+        if (storedName && storedName.trim().length > 0) {
+          setHeartTreeName(storedName.trim());
+          setIsNaming(false);
+        } else {
+          setHeartTreeName(null);
+          setIsNaming(true);
+        }
+      } catch {
+        setHasCompletedFocusToday(false);
+        setHeartTreeName(null);
+        setIsNaming(true);
+      }
+    };
+    
+    checkTodayAndName();
+    const interval = setInterval(checkTodayAndName, 5000); // 每5秒检查一次
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleConfirmName = () => {
+    const trimmed = namingInput.trim();
+    if (!trimmed) return;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('heartTreeNameV1', trimmed);
+    }
+    setHeartTreeName(trimmed);
+    setHasJustNamed(true);
+  };
+
+  const handleFinishWelcome = () => {
+    setIsNaming(false);
+    setHasJustNamed(false);
+    setNamingInput('');
+  };
+
+  // 未登录时重定向
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-teal-100 flex flex-col items-center justify-center gap-4">
-        <div className="h-12 w-12 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm tracking-wide text-teal-700">心树加载中...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">加载中...</div>
       </div>
     );
   }
 
   if (status === 'unauthenticated') {
+    router.push('/auth/signin');
     return null;
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-[#87CEEB] to-[#E0F7FA] flex flex-col items-center justify-center pb-28 px-4 overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.4),rgba(255,255,255,0))]" />
-
-      {/* 飘动的云朵背景效果 - 可选 */}
-      <div className="absolute top-20 left-10 w-32 h-12 bg-white/40 rounded-full blur-xl animate-pulse" style={{ animationDuration: '8s' }}></div>
-      <div className="absolute top-40 right-20 w-40 h-16 bg-white/30 rounded-full blur-xl animate-pulse" style={{ animationDuration: '12s', animationDelay: '2s' }}></div>
-
-      <div className="relative w-full max-w-[600px] flex flex-col items-center justify-center h-[70vh]">
-        <div className="w-full h-full flex flex-col items-center justify-center transform scale-[1.8] relative">
-          <div className="relative">
-            {/* 只显示成长期的心树 */}
-            <HeartTree animState={animState} />
-            {/* 动画效果层 - 通过data属性控制 */}
-            <div className="heart-tree-animations" data-state={animState}>
-              {/* 浇水效果：水滴 */}
-              <div className="water-drop"></div>
-              <div className="water-ripple"></div>
-              
-              {/* 施肥效果：粒子 */}
-              <div className="fert-particle fert-p1"></div>
-              <div className="fert-particle fert-p2"></div>
-              <div className="fert-particle fert-p3"></div>
-            </div>
-          </div>
-          <HeartTreeControls 
-            onWatering={() => setAnimState('watering')}
-            onFertilizing={() => setAnimState('fertilizing')}
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 pb-20">
+        <div className="max-w-4xl mx-auto">
+          <HeartTreeComponent
+            todaySessions={hasCompletedFocusToday ? 1 : 0}
+            completedMilestonesToday={0}
+            newAchievementsToday={1}
           />
         </div>
+
+        {/* 新用户：心树命名流程 */}
+        {isNaming && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-6">
+              {!heartTreeName && !hasJustNamed && (
+                <>
+                  <div className="mb-4">
+                    <p className="text-xs uppercase tracking-[0.35em] text-emerald-500 font-medium mb-2">
+                      心树初次见面
+                    </p>
+                    <p className="text-gray-800 text-sm leading-relaxed">
+                      {getNamingGuideText()}
+                    </p>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-xs text-gray-500 mb-1">
+                      给心树起一个名字（2-6 个字）
+                    </label>
+                    <input
+                      type="text"
+                      value={namingInput}
+                      maxLength={6}
+                      onChange={(e) => setNamingInput(e.target.value)}
+                      className="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                      placeholder="比如：年轮、阿树、小年轮…"
+                    />
+                  </div>
+                  <div className="mt-6 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                      onClick={() => setIsNaming(false)}
+                    >
+                      稍后再说
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmName}
+                      disabled={!namingInput.trim()}
+                      className={`px-4 py-2 rounded-xl text-xs font-semibold text-white transition
+                        ${namingInput.trim()
+                          ? 'bg-emerald-500 hover:bg-emerald-600'
+                          : 'bg-emerald-200 cursor-not-allowed'
+                        }`}
+                    >
+                      完成命名
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* 命名完成后的首次见面文案 */}
+              {heartTreeName && hasJustNamed && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.35em] text-emerald-500 font-medium mb-2">
+                      初次相遇
+                    </p>
+                    <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">
+                      {getFirstMeetingText(heartTreeName)}
+                    </p>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleFinishWelcome}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition"
+                    >
+                      开始一起长年轮
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-      
-      <style jsx>{`
-        /* 动画容器 */
-        .heart-tree-animations {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-          z-index: 10;
-        }
-
-        /* ==============================
-           WATERING ANIMATION - 适配成长期
-           ============================== */
-        
-        /* 水滴 - 从树冠上方落下 */
-        .water-drop {
-          position: absolute;
-          top: 20%;
-          left: 50%;
-          width: 16px;
-          height: 24px;
-          background: radial-gradient(circle, #E0F7FA 0%, #29B6F6 100%);
-          border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-          opacity: 0;
-          transform: translateX(-50%);
-        }
-
-        .heart-tree-animations[data-state="watering"] .water-drop {
-          animation: dropFall 0.6s cubic-bezier(0.5, 0, 1, 1) forwards;
-        }
-
-        @keyframes dropFall {
-          0% { 
-            opacity: 1; 
-            transform: translateX(-50%) translateY(0) scaleY(1); 
-          }
-          80% { 
-            opacity: 1; 
-            transform: translateX(-50%) translateY(100px) scaleY(1.2); 
-          }
-          90% { 
-            opacity: 0; 
-            transform: translateX(-50%) translateY(120px) scaleY(0.5); 
-          }
-          100% { 
-            opacity: 0; 
-            transform: translateX(-50%) translateY(120px); 
-          }
-        }
-
-        /* 涟漪 - 在树冠位置 */
-        .water-ripple {
-          position: absolute;
-          top: 30%;
-          left: 50%;
-          width: 30px;
-          height: 15px;
-          border: 4px solid #29B6F6;
-          border-radius: 50%;
-          opacity: 0;
-          transform: translateX(-50%) translateY(-50%);
-        }
-
-        .heart-tree-animations[data-state="watering"] .water-ripple {
-          animation: rippleExpand 0.6s ease-out forwards;
-          animation-delay: 0.5s;
-        }
-
-        @keyframes rippleExpand {
-          0% { 
-            opacity: 0.8; 
-            transform: translateX(-50%) translateY(-50%) scale(0);
-            border-width: 4px;
-          }
-          100% { 
-            opacity: 0; 
-            transform: translateX(-50%) translateY(-50%) scale(4);
-            border-width: 0;
-          }
-        }
-
-        /* ==============================
-           FERTILIZING ANIMATION - 适配成长期
-           ============================== */
-        
-        .fert-particle {
-          position: absolute;
-          width: 12px;
-          height: 12px;
-          background: radial-gradient(circle, #FFF8E1 0%, #FFB300 100%);
-          border-radius: 50%;
-          opacity: 0;
-        }
-
-        .fert-p1 {
-          bottom: 30%;
-          left: 45%;
-        }
-
-        .fert-p2 {
-          bottom: 32%;
-          left: 55%;
-        }
-
-        .fert-p3 {
-          bottom: 28%;
-          left: 50%;
-        }
-
-        .heart-tree-animations[data-state="fertilizing"] .fert-p1 {
-          animation: sinkIn 0.6s ease-in forwards;
-        }
-
-        .heart-tree-animations[data-state="fertilizing"] .fert-p2 {
-          animation: sinkIn 0.6s ease-in forwards 0.1s;
-        }
-
-        .heart-tree-animations[data-state="fertilizing"] .fert-p3 {
-          animation: sinkIn 0.6s ease-in forwards 0.05s;
-        }
-
-        @keyframes sinkIn {
-          0% { 
-            opacity: 0; 
-            transform: translateY(-20px) scale(0.5); 
-          }
-          30% { 
-            opacity: 1; 
-            transform: translateY(0px) scale(1); 
-          }
-          100% { 
-            opacity: 0; 
-            transform: translateY(15px) scale(0.2); 
-          }
-        }
-      `}</style>
-      <BottomNavigation active="heart-tree" />
-    </div>
+      <BottomNavigation />
+    </>
   );
 }
-

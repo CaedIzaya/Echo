@@ -25,11 +25,11 @@ const INTERESTS: Interest[] = [
   { id: '5', name: '编程', icon: '💻', color: 'bg-gradient-to-br from-teal-50 to-emerald-100 border-teal-200 text-teal-700' },
   { id: '6', name: '语言', icon: '🗣️', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
   { id: '7', name: '运动', icon: '🏃', color: 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200 text-teal-700' },
-  { id: '8', name: '厨艺', icon: '🍳', color: 'bg-gradient-to-br from-sky-50 to-emerald-100 border-sky-200 text-teal-700' },
+  { id: '8', name: '美食', icon: '🍳', color: 'bg-gradient-to-br from-sky-50 to-emerald-100 border-sky-200 text-teal-700' },
   
   // 第三行 - 生活探索
-  { id: '9', name: '社交', icon: '🤝', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
-  { id: '10', name: '自学', icon: '🎓', color: 'bg-gradient-to-br from-teal-50 to-sky-100 border-teal-200 text-teal-700' },
+  { id: '9', name: '职业', icon: '💼', color: 'bg-gradient-to-br from-emerald-50 to-cyan-100 border-emerald-200 text-teal-700' },
+  { id: '10', name: '学术', icon: '🎓', color: 'bg-gradient-to-br from-teal-50 to-sky-100 border-teal-200 text-teal-700' },
   { id: '11', name: '观影', icon: '🎬', color: 'bg-gradient-to-br from-cyan-50 to-emerald-100 border-cyan-200 text-teal-700' },
   { id: '12', name: '写作', icon: '✍️', color: 'bg-gradient-to-br from-emerald-50 via-white to-cyan-100 border-emerald-200 text-teal-700' }
 ];

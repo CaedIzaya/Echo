@@ -21,37 +21,15 @@ export const GROWTH_THRESHOLDS = {
   adult: 500       // 成年树: 500+
 };
 
-// 小树名言库
+// 小树名言库（旧版占位，实际文案统一由 heartTreeDialogue 接管）
 export const treeMessages = {
-  seedling: [
-    "每一棵参天大树都始于一颗小小的种子 🌱",
-    "成长需要耐心，就像我慢慢长出第一片叶子",
-    "今天的专注，是明天茂盛的基础",
-    "小小的开始，大大的未来",
-    "每一滴水，都在滋养我的根"
-  ],
-  sapling: [
-    "看到我的新叶子了吗？你的努力让我茁壮成长 🍃",
-    "风雨让我更坚强，专注让你更强大",
-    "枝繁叶茂不是一朝一夕，卓越需要日积月累",
-    "我感受到了你的专注，这让我充满力量",
-    "每一片新叶，都是你努力的见证"
-  ],
-  adult: [
-    "我已亭亭如盖，你亦在专注中枝繁叶茂 🌳",
-    "时间是最好的园丁，专注是最肥沃的土壤",
-    "在这数字喧嚣中，你为我创造了一片宁静",
-    "你的坚持让我变得如此茂盛",
-    "我们一起成长，共同见证时间的价值"
-  ],
-  blooming: [
-    "花开有时，你的专注让我在这个季节绽放 🌸",
-    "每一朵花都是你心流时刻的见证",
-    "在专注的滋养下，美丽自然绽放",
-    "感谢你的努力，让我如此美丽",
-    "心流如花，在专注中盛开"
-  ]
+  seedling: [] as string[],
+  sapling: [] as string[],
+  adult: [] as string[],
+  blooming: [] as string[],
 };
+
+import { getRandomHeartTreeMessage } from './heartTreeDialogue';
 
 // 心树管理器
 export class HeartTreeManager {
@@ -208,34 +186,15 @@ export class HeartTreeManager {
     return Math.random() < probability;
   }
   
-  // 获取落花内容
+  // 获取落花内容（改为使用新的心树文案池）
   static getFlowerContent(userData: {
     weeklyLongestSession?: number;
     monthlyStreak?: number;
     weeklyNewAchievements?: string[];
     currentFlowIndex?: number;
   }): string {
-    const contents: string[] = [];
-    
-    if (userData.weeklyLongestSession !== undefined) {
-      contents.push(`本周最长专注: ${userData.weeklyLongestSession}分钟 ⏱️`);
-    }
-    if (userData.monthlyStreak !== undefined) {
-      contents.push(`本月连续专注: ${userData.monthlyStreak}天 🔥`);
-    }
-    if (userData.weeklyNewAchievements && userData.weeklyNewAchievements.length > 0) {
-      contents.push(`本周新成就: ${userData.weeklyNewAchievements.join(', ')} 🏆`);
-    }
-    if (userData.currentFlowIndex !== undefined) {
-      contents.push(`心流指数: ${userData.currentFlowIndex} 🌟`);
-    }
-    
-    // 如果没有数据，返回默认消息
-    if (contents.length === 0) {
-      return '今天又是专注的一天 🌸';
-    }
-    
-    return contents[Math.floor(Math.random() * contents.length)];
+    // 花瓣落下时的文案也统一走心树深度文案库，避免旧版“今天很好”占位感
+    return getRandomHeartTreeMessage();
   }
   
   // 获取随机消息
@@ -425,6 +384,11 @@ export class HeartTreeManager {
     }
   }
 }
+
+
+
+
+
 
 
 

@@ -595,6 +595,7 @@ export default function Home() {
   const [spiritMessage, setSpiritMessage] = useState('');
   const [spiritClickCount, setSpiritClickCount] = useState(0);
   const hasShownWelcome = useRef(false);
+  const spiritMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // 随机消息
   const randomMessages = [
@@ -620,12 +621,20 @@ export default function Home() {
     }
   };
 
-  // 显示小精灵消息
+  // 显示小精灵消息（使用统一计时器，防止高优先级文案被旧定时器抢先关闭）
   const showMessage = (message: string, duration: number = 5000) => {
     setSpiritMessage(message);
     setShowSpiritMessage(true);
-    setTimeout(() => {
+
+    // 清除上一条消息的隐藏定时器
+    if (spiritMessageTimerRef.current) {
+      clearTimeout(spiritMessageTimerRef.current);
+      spiritMessageTimerRef.current = null;
+    }
+
+    spiritMessageTimerRef.current = setTimeout(() => {
       setShowSpiritMessage(false);
+      spiritMessageTimerRef.current = null;
     }, duration);
   };
 
@@ -660,16 +669,12 @@ export default function Home() {
     };
   }, [isTransitioning]);
 
-  // 自动显示开场白
+  // 自动显示开场白（用统一的 showMessage，避免出现“一闪而过”）
   useEffect(() => {
     if (!isTransitioning && !hasShownWelcome.current) {
       hasShownWelcome.current = true;
       setTimeout(() => {
-        setSpiritMessage("嘿，你来了。\n\n从这里开始，你的时间会慢慢有重量。");
-        setShowSpiritMessage(true);
-        setTimeout(() => {
-          setShowSpiritMessage(false);
-        }, 5000);
+        showMessage("嘿，你来了。\n\n从这里开始，你的时间会慢慢有重量。", 5000);
       }, 500); // 延迟500ms显示，确保页面已加载
     }
   }, [isTransitioning]);
@@ -770,6 +775,35 @@ export default function Home() {
 
       if (forceOnboarding) {
         router.push('/onboarding');
+        return;
+      }
+
+      // 对于从未完成 Onboarding 的全新用户，先在首页播放一次最高优先级的 Lumi 欢迎，再进入 onboarding/dashboard
+      const hasCompletedOnboarding = !!session.user.hasCompletedOnboarding;
+      const firstWelcomeKey = 'firstEchoWelcomeShown';
+      const hasShownFirstWelcome =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem(firstWelcomeKey) === 'true'
+          : false;
+
+      if (!hasCompletedOnboarding && !hasShownFirstWelcome) {
+        // 在当前首页播放一次 Lumi 的特别欢迎语（禁止其他语句插队）
+        showMessage(
+          '你来了。我在这里等你很久了。\n\n我是 Lumi，你的光精灵。\n\n从现在开始，这里叫 Echo——一个只属于你的安静之地。',
+          8000,
+        );
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(firstWelcomeKey, 'true');
+        }
+
+        // 欢迎语播完后再决定去 onboarding / dashboard
+        setTimeout(() => {
+          if (session.user.hasCompletedOnboarding) {
+            router.push('/dashboard');
+          } else {
+            router.push('/onboarding');
+          }
+        }, 8200);
         return;
       }
 
