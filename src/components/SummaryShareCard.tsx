@@ -218,7 +218,7 @@ export default function SummaryShareCard({
             {/* Echo Logo 在右下角 */}
             <div className="flex items-center gap-1.5 md:gap-2 opacity-80">
                <div className="w-5 h-5 md:w-7 md:h-7">
-                  <img src="/Echo Icon.png" alt="Lumi" className="w-full h-full object-contain" />
+                  <img src="/Echo Icon2.png" alt="Echo" className="w-full h-full object-contain" />
                </div>
                <span className="text-xs md:text-base font-bold tracking-widest uppercase" style={{ color: currentStyle.textSecondary }}>
                  Echo

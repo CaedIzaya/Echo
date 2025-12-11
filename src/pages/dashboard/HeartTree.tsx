@@ -20,7 +20,7 @@ import {
   getRandomWaterMessage,
   getRandomFertilizeMessage,
 } from '~/lib/heartTreeDialogue';
-import { useSafeTimeout, useSmartPoller } from '~/hooks/usePerformance';
+import { useSafeTimeout } from '~/hooks/usePerformance';
 
 interface HeartTreeProps {
   flowIndex?: number;
@@ -70,13 +70,17 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
     }
   }, [props.flowIndex, props.flowIndexIncrease]);
 
-  // 使用智能轮询刷新浇水/施肥机会数量（页面不可见时自动暂停）
-  useSmartPoller(() => {
-    const waterOps = HeartTreeManager.getWaterOpportunities();
-    const fertilizeOps = HeartTreeManager.getFertilizeOpportunities();
-    setWaterOpportunities(waterOps);
-    setFertilizeOpportunities(fertilizeOps);
-  }, 2000);
+  // 定期刷新浇水/施肥机会数量
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const waterOps = HeartTreeManager.getWaterOpportunities();
+      const fertilizeOps = HeartTreeManager.getFertilizeOpportunities();
+      setWaterOpportunities(waterOps);
+      setFertilizeOpportunities(fertilizeOps);
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // 浇水
   const handleWater = () => {

@@ -110,3 +110,4 @@ export function selectCopy(ruleId: string, responder: 'LUMI' | 'HEART_TREE'): st
   return pool[index];
 }
 
+

@@ -106,7 +106,14 @@ export default function DailySummaryPage() {
           if (data.todaySummary) {
             setSummaryId(data.todaySummary.id);
             setSummary(data.todaySummary.text);
-            setFocusDuration(data.todaySummary.totalFocusMinutes);
+            
+            // 关键修复：对比实时数据和保存的数据，取较大值
+            // 这样可以确保即使之前保存过小结，也能显示最新的专注时长
+            setFocusDuration(prevDuration => {
+              const savedDuration = data.todaySummary.totalFocusMinutes;
+              return Math.max(prevDuration, savedDuration);
+            });
+            
             setCompletedTasks(Array.from({ length: data.todaySummary.completedTaskCount }, (_, i) => `任务 ${i + 1}`));
           }
         }
@@ -421,11 +428,11 @@ export default function DailySummaryPage() {
           </div>
         </div>
       ) : (
-        <div className="w-full h-screen md:min-h-screen flex flex-col items-center justify-center p-0 md:p-8 relative">
+        <div className="w-full min-h-screen flex flex-col items-center justify-center p-0 md:p-8">
           
           {/* Card Component Preview - 手机端全屏，PC端居中 */}
           <div
-            className="w-full h-full md:w-auto md:h-auto flex items-center justify-center pb-48 md:pb-0 transform scale-[0.85] md:scale-100 origin-center"
+            className="w-full flex items-center justify-center mb-6 md:mb-0 transform scale-[0.85] md:scale-100 origin-center"
             ref={cardRef}
           >
             <SummaryShareCard 
@@ -440,7 +447,7 @@ export default function DailySummaryPage() {
             />
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 md:relative md:bottom-auto md:left-auto md:right-auto flex flex-col gap-4 p-6 md:p-0 md:mt-8 w-full md:max-w-[600px] bg-white/95 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none border-t md:border-t-0 border-gray-200 md:shadow-none shadow-lg z-50 pb-safe">
+          <div className="flex flex-col gap-4 p-6 md:p-0 md:mt-8 w-full md:max-w-[600px] bg-white/95 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none border-t md:border-t-0 border-gray-200 md:shadow-none shadow-lg pb-6">
             
             {/* 主题切换器 + 导航图标 */}
             <div className="w-full flex items-center justify-center gap-3">

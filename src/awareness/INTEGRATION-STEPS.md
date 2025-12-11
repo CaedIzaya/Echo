@@ -309,3 +309,4 @@ export function LumiComponent() {
 3. 在关键事件处调用觉察检测
 4. 测试各个场景的触发
 
+
