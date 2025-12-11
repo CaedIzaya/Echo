@@ -48,9 +48,9 @@ export default function HeartTreePage() {
       }
     };
     
+    // 页面加载时检查一次今日专注状态和心树命名状态
+    // 删除轮询，避免在用户刚命名完成时意外关闭欢迎文案弹层
     checkTodayAndName();
-    const interval = setInterval(checkTodayAndName, 5000); // 每5秒检查一次
-    return () => clearInterval(interval);
   }, []);
 
   const handleConfirmName = () => {
