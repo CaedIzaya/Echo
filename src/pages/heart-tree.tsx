@@ -171,7 +171,8 @@ export default function HeartTreePage() {
           </div>
         )}
       </div>
-      <BottomNavigation />
+      {/* 移动端底部导航：当前页面为心树 */}
+      <BottomNavigation active="heart-tree" />
     </>
   );
 }
