@@ -150,13 +150,15 @@ export default function GoalSetting() {
           const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
           const planToEdit = existingPlans.find((p: any) => p.id === router.query.editPlanId);
           if (planToEdit) {
-            setFormData({
+            setFormData((prev) => ({
+              ...prev,
               focusBranch: planToEdit.focusBranch || '',
+              // 编辑模式下目前没有单独存 focusDetail，就保持原值
               firstMilestone: planToEdit.milestones?.[0]?.title || '',
               projectName: planToEdit.name || `我为${interest.name}而投资`,
               dailyMinTime: planToEdit.dailyGoalMinutes || 30,
-              targetDate: null
-            });
+              targetDate: null,
+            }));
             // 编辑模式下，即使有值也不高亮泡泡（因为是手动输入或编辑）
             setSelectedBranchFromBubble(false);
           }
