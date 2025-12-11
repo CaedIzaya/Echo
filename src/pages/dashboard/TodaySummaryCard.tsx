@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 
 interface TodaySummaryCardProps {
   userId: string;
@@ -6,7 +6,7 @@ interface TodaySummaryCardProps {
   hasFocusOverride?: boolean;
 }
 
-export default function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
+function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<{
     todayHasFocus: boolean;
@@ -62,10 +62,19 @@ export default function TodaySummaryCard({ userId, hasFocusOverride }: TodaySumm
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  const hasFocus = (data?.todayHasFocus || false) || !!hasFocusOverride;
-  const hasSummary = !!data?.todayHasSummary;
+  // 使用 useMemo 缓存状态判断，避免每次渲染都重新计算
+  const hasFocus = useMemo(
+    () => (data?.todayHasFocus || false) || !!hasFocusOverride,
+    [data?.todayHasFocus, hasFocusOverride]
+  );
+  
+  const hasSummary = useMemo(
+    () => !!data?.todayHasSummary,
+    [data?.todayHasSummary]
+  );
 
   if (loading) {
     return (
@@ -154,3 +163,5 @@ export default function TodaySummaryCard({ userId, hasFocusOverride }: TodaySumm
   );
 }
 
+// 使用 React.memo 优化渲染性能，避免父组件更新时不必要的重渲染
+export default memo(TodaySummaryCard);

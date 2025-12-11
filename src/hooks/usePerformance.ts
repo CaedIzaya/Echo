@@ -101,7 +101,10 @@ export function usePageVisibility() {
   );
 
   useEffect(() => {
-    return globalVisibilityManager.onVisibilityChange(setIsVisible);
+    const unsubscribe = globalVisibilityManager.onVisibilityChange(setIsVisible);
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   return isVisible;

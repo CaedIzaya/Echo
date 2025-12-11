@@ -20,7 +20,7 @@ import {
   getRandomWaterMessage,
   getRandomFertilizeMessage,
 } from '~/lib/heartTreeDialogue';
-import { useSafeTimeout } from '~/hooks/usePerformance';
+import { useSafeTimeout, useSmartPoller } from '~/hooks/usePerformance';
 
 interface HeartTreeProps {
   flowIndex?: number;
@@ -55,19 +55,6 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
     const loadedExpState = loadHeartTreeExpState();
     setExpState(loadedExpState);
     
-    // 从localStorage获取累积的机会数量
-    const updateOpportunities = () => {
-      const waterOps = HeartTreeManager.getWaterOpportunities();
-      const fertilizeOps = HeartTreeManager.getFertilizeOpportunities();
-      setWaterOpportunities(waterOps);
-      setFertilizeOpportunities(fertilizeOps);
-    };
-    
-    updateOpportunities();
-    
-    // 定期刷新机会数量（每2秒）
-    const interval = setInterval(updateOpportunities, 2000);
-    
     // 更新开花状态
     if (props.flowIndex !== undefined || props.flowIndexIncrease !== undefined) {
       const newBloomState = HeartTreeManager.checkBloomState(
@@ -81,9 +68,15 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
         setTree(updated);
       }
     }
-    
-    return () => clearInterval(interval);
   }, [props.flowIndex, props.flowIndexIncrease]);
+
+  // 使用智能轮询刷新浇水/施肥机会数量（页面不可见时自动暂停）
+  useSmartPoller(() => {
+    const waterOps = HeartTreeManager.getWaterOpportunities();
+    const fertilizeOps = HeartTreeManager.getFertilizeOpportunities();
+    setWaterOpportunities(waterOps);
+    setFertilizeOpportunities(fertilizeOps);
+  }, 2000);
 
   // 浇水
   const handleWater = () => {
