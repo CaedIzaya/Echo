@@ -112,7 +112,7 @@ export default function TodaySummaryCard({ userId, hasFocusOverride }: TodaySumm
         </div>
 
         <a
-          href={`/daily-summary?focusDuration=${data.totalFocusMinutes}`}
+          href={`/daily-summary?focusDuration=${data?.totalFocusMinutes ?? 0}`}
           className="relative z-10 w-full mt-4 bg-white text-teal-700 font-semibold py-3 rounded-xl shadow-lg hover:bg-teal-50 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
