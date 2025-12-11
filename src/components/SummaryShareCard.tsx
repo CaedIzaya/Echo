@@ -56,6 +56,9 @@ export default function SummaryShareCard({
       textSecondary: '#115e59', // teal-800
       divider: 'rgba(20, 184, 166, 0.2)',
       quote: 'rgba(45, 212, 191, 0.3)',
+      // 为了统一类型结构，即使 Mint 主题当前未使用装饰光斑，也提供占位颜色
+      bgDecor1: 'rgba(45, 212, 191, 0.18)',
+      bgDecor2: 'rgba(20, 184, 166, 0.16)',
       fontFamily: 'font-sans tracking-wide',
     }
   };
