@@ -117,20 +117,23 @@ export class VisibilityManager {
 
 // 延迟初始化，避免 SSR 时访问 document
 let _globalVisibilityManager: VisibilityManager | null = null;
-export const globalVisibilityManager = (() => {
+
+function getVisibilityManager(): VisibilityManager {
   if (typeof window === 'undefined') {
     // 服务端渲染时返回一个安全的 mock 对象
     return {
       onVisibilityChange: () => () => {},
       isPageVisible: () => true,
       destroy: () => {},
-    } as VisibilityManager;
+    } as any as VisibilityManager;
   }
   if (!_globalVisibilityManager) {
     _globalVisibilityManager = new VisibilityManager();
   }
   return _globalVisibilityManager;
-})();
+}
+
+export const globalVisibilityManager = getVisibilityManager();
 
 // ==================== 4. 内存监控 ====================
 export function getMemoryUsage() {
