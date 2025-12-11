@@ -212,23 +212,43 @@ export default function DailySummaryPage() {
 
     setIsGeneratingImage(true);
     try {
+      // 根据设备分辨率智能调整质量，降低内存占用
+      const scale = window.devicePixelRatio > 1 ? 2 : 1;
+      
       const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
+        scale,
         backgroundColor: null,
+        logging: false, // 关闭日志输出
+        useCORS: true,
       });
 
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      const today = new Date().toISOString().split('T')[0];
+      // 使用 Blob 而不是 DataURL，更节省内存
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          console.error('生成 Blob 失败');
+          setIsGeneratingImage(false);
+          return;
+        }
 
-      link.href = dataUrl;
-      link.download = `Echo-每日小结-${today}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const today = new Date().toISOString().split('T')[0];
+
+        link.href = url;
+        link.download = `Echo-每日小结-${today}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // 立即释放内存
+        URL.revokeObjectURL(url);
+        canvas.width = 0;
+        canvas.height = 0;
+        
+        setIsGeneratingImage(false);
+      }, 'image/png', 0.92); // 0.92 质量已经很好，且文件更小
     } catch (error) {
       console.error('生成图片失败', error);
-    } finally {
       setIsGeneratingImage(false);
     }
   };

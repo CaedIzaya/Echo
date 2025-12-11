@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallback, CSSProperties } from 'react';
 import { pickUniversalSentence } from '~/lib/echoSpiritDialogueV2';
+import { globalTimerManager } from '~/lib/performanceOptimizer';
 
 // 文案数据（欢迎 / 完成 / 定时陪伴仍沿用原有池；
 // 日常点击小精灵时的随机文案改由通用人格池驱动）
@@ -219,7 +220,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const showMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
-      clearTimeout(timerRef.current);
+      globalTimerManager.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
 
@@ -239,7 +240,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     }
 
     // 5秒后自动隐藏文案（交互后的对话框，保持5秒）
-    timerRef.current = setTimeout(() => {
+    timerRef.current = globalTimerManager.setTimeout(() => {
       setIsVisible(false);
       setCurrentMessage(''); // 清空消息，确保组件完全隐藏
       timerRef.current = null;
@@ -250,7 +251,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const showWelcomeMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
-      clearTimeout(timerRef.current);
+      globalTimerManager.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
 
@@ -269,7 +270,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     }
 
     // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
-    timerRef.current = setTimeout(() => {
+    timerRef.current = globalTimerManager.setTimeout(() => {
       console.log('⏰ 欢迎文案8秒定时器触发，隐藏对话框');
       setIsVisible(false);
       setCurrentMessage(''); // 清空消息，确保组件完全隐藏
@@ -283,7 +284,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       if (!text) return;
 
       if (timerRef.current) {
-        clearTimeout(timerRef.current);
+        globalTimerManager.clearTimeout(timerRef.current);
         timerRef.current = null;
       }
 
@@ -297,7 +298,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       }
 
       // 统一采用 8 秒可见时长，和欢迎/完成/定时文案保持一致
-      timerRef.current = setTimeout(() => {
+      timerRef.current = globalTimerManager.setTimeout(() => {
         setIsVisible(false);
         setCurrentMessage('');
         timerRef.current = null;
@@ -312,7 +313,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       if (!text) return;
 
       if (timerRef.current) {
-        clearTimeout(timerRef.current);
+        globalTimerManager.clearTimeout(timerRef.current);
         timerRef.current = null;
       }
 
@@ -325,7 +326,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
         onStateChange(spiritState);
       }
 
-      timerRef.current = setTimeout(() => {
+      timerRef.current = globalTimerManager.setTimeout(() => {
         setIsVisible(false);
         setCurrentMessage('');
         timerRef.current = null;
@@ -338,7 +339,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const showCompletionMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
-      clearTimeout(timerRef.current);
+      globalTimerManager.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
 
@@ -357,7 +358,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     }
 
     // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
-    timerRef.current = setTimeout(() => {
+    timerRef.current = globalTimerManager.setTimeout(() => {
       console.log('⏰ 完成祝贺文案8秒定时器触发，隐藏对话框');
       setIsVisible(false);
       setCurrentMessage(''); // 清空消息，确保组件完全隐藏
@@ -369,7 +370,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const showPeriodicMessage = useCallback(() => {
     // 清除之前的定时器
     if (timerRef.current) {
-      clearTimeout(timerRef.current);
+      globalTimerManager.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
 
@@ -391,7 +392,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     }
 
     // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
-    timerRef.current = setTimeout(() => {
+    timerRef.current = globalTimerManager.setTimeout(() => {
       console.log('⏰ 定时陪伴文案8秒定时器触发，隐藏对话框');
       setIsVisible(false);
       setCurrentMessage(''); // 清空消息，确保组件完全隐藏
@@ -443,7 +444,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
 
     return () => {
       if (periodicTimerRef.current) {
-        clearInterval(periodicTimerRef.current);
+        globalTimerManager.clearInterval(periodicTimerRef.current);
         periodicTimerRef.current = null;
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -454,11 +455,11 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   useEffect(() => {
     return () => {
       if (timerRef.current) {
-        clearTimeout(timerRef.current);
+        globalTimerManager.clearTimeout(timerRef.current);
         timerRef.current = null;
       }
       if (periodicTimerRef.current) {
-        clearInterval(periodicTimerRef.current);
+        globalTimerManager.clearInterval(periodicTimerRef.current);
         periodicTimerRef.current = null;
       }
       // 组件卸载时也清空消息和隐藏状态

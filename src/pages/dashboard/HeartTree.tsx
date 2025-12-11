@@ -20,6 +20,7 @@ import {
   getRandomWaterMessage,
   getRandomFertilizeMessage,
 } from '~/lib/heartTreeDialogue';
+import { useSafeTimeout } from '~/hooks/usePerformance';
 
 interface HeartTreeProps {
   flowIndex?: number;
@@ -39,13 +40,11 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
   const [expState, setExpState] = useState<HeartTreeExpState>(loadHeartTreeExpState());
   const [showMessage, setShowMessage] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
-  const [flowers, setFlowers] = useState<Array<{ id: number; x: number; y: number; content?: string }>>([]);
   const [isWatering, setIsWatering] = useState(false);
   const [isFertilizing, setIsFertilizing] = useState(false);
   const [waterOpportunities, setWaterOpportunities] = useState(props.completedMilestonesToday || 0);
   const [fertilizeOpportunities, setFertilizeOpportunities] = useState(props.newAchievementsToday || 0);
-  const flowerIdRef = React.useRef(0);
-  const treeMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { setSafeTimeout, clearSafeTimeout } = useSafeTimeout();
 
   // 加载心树数据
   useEffect(() => {
@@ -86,52 +85,6 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
     return () => clearInterval(interval);
   }, [props.flowIndex, props.flowIndexIncrease]);
 
-  // 检查落花
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const shouldDrop = HeartTreeManager.shouldDropFlower(
-        tree,
-        props.streakDays || 0,
-        (props.flowIndex || 0) >= 80
-      );
-      
-      if (shouldDrop) {
-        dropFlower();
-      }
-    }, 5000); // 每5秒检查一次
-    
-    return () => clearInterval(interval);
-  }, [tree, props.streakDays, props.flowIndex]);
-
-  // 落花动画（静止在小树旁）
-  const dropFlower = useCallback(() => {
-    const content = HeartTreeManager.getFlowerContent({
-      weeklyLongestSession: props.weeklyLongestSession,
-      monthlyStreak: props.monthlyStreak,
-      weeklyNewAchievements: props.weeklyNewAchievements,
-      currentFlowIndex: props.flowIndex
-    });
-    
-    const flowerId = flowerIdRef.current++;
-    // 在小树两侧随机位置（40-60%之间，靠近树的位置）
-    const startX = Math.random() * 20 + 40; // 40-60%
-    const startY = 60 + Math.random() * 20; // 60-80%，在树的高度范围内
-    
-    const newFlower = {
-      id: flowerId,
-      x: startX,
-      y: startY,
-      content: content
-    };
-    
-    setFlowers(prev => [...prev, newFlower]);
-    
-    // 10秒后移除花朵，让用户有足够时间看到内容
-    setTimeout(() => {
-      setFlowers(prev => prev.filter(f => f.id !== flowerId));
-    }, 10000);
-  }, [props.weeklyLongestSession, props.monthlyStreak, props.weeklyNewAchievements, props.flowIndex]);
-
   // 浇水
   const handleWater = () => {
     // 检查今天是否可以浇水（需要完成至少一次专注）
@@ -158,7 +111,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
     const emotional = getRandomWaterMessage();
     showTreeMessage(`${emotional}\n（浇水成功，获得 ${WATER_BASE_EXP} EXP · 当前 Lv.${levelView.level}）`);
     
-    setTimeout(() => setIsWatering(false), 1000);
+    setSafeTimeout(() => setIsWatering(false), 1000);
   };
 
   // 施肥
@@ -188,20 +141,16 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
     const emotional = getRandomFertilizeMessage();
     showTreeMessage(`${emotional}\n（施肥成功，未来 7 天 EXP +30%）`);
     
-    setTimeout(() => setIsFertilizing(false), 1000);
+    setSafeTimeout(() => setIsFertilizing(false), 1000);
   };
 
   // 显示小树消息（统一 5 秒，防止被旧定时器提前打断）
   const showTreeMessage = (message: string) => {
     setCurrentMessage(message);
     setShowMessage(true);
-    if (treeMessageTimerRef.current) {
-      clearTimeout(treeMessageTimerRef.current);
-      treeMessageTimerRef.current = null;
-    }
-    treeMessageTimerRef.current = setTimeout(() => {
+    clearSafeTimeout(); // 清除之前的定时器
+    setSafeTimeout(() => {
       setShowMessage(false);
-      treeMessageTimerRef.current = null;
     }, 5000);
   };
 
@@ -691,25 +640,6 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
 
         {/* 树容器 */}
         <div className="relative mb-6 flex items-center justify-center min-h-[320px]">
-        {/* 落花效果（静止在小树旁） */}
-        {flowers.map(flower => (
-          <div
-            key={flower.id}
-            className="absolute text-3xl pointer-events-none z-10 animate-fade-in-float"
-            style={{
-              left: `${flower.x}%`,
-              top: `${flower.y}%`,
-            }}
-          >
-            🌸
-            {flower.content && (
-              <div className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-2xl text-sm whitespace-nowrap text-gray-800 border-2 border-pink-200 animate-fade-in">
-                {flower.content}
-              </div>
-            )}
-          </div>
-        ))}
-          
           {/* 树 */}
           <div className="relative z-0 w-full max-w-lg">
             {renderTree()}
