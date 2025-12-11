@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 
 interface TodaySummaryCardProps {
   userId: string;
+  // 从 Dashboard 传入的「今日是否有专注」覆盖值（基于 todayStats.minutes）
+  hasFocusOverride?: boolean;
 }
 
-export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
+export default function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<{
     todayHasFocus: boolean;
@@ -32,21 +34,27 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
         const json = await res.json();
         setData(json);
       } else {
-        setData({
+        // 如果请求失败，但之前已经有数据，就保留原状态，避免界面“回退”
+        setData((prev) =>
+          prev || {
+            todayHasFocus: false,
+            todayHasSummary: false,
+            todaySummary: null,
+            totalFocusMinutes: 0,
+          },
+        );
+      }
+    } catch (error) {
+      console.error('Failed to fetch summary status', error);
+      // 同样，仅在没有任何数据时才使用降级默认值，避免覆盖用户刚看到的内容
+      setData((prev) =>
+        prev || {
           todayHasFocus: false,
           todayHasSummary: false,
           todaySummary: null,
           totalFocusMinutes: 0,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to fetch summary status', error);
-      setData({
-        todayHasFocus: false,
-        todayHasSummary: false,
-        todaySummary: null,
-        totalFocusMinutes: 0,
-      });
+        },
+      );
     } finally {
       setLoading(false);
     }
@@ -55,6 +63,9 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
   useEffect(() => {
     fetchData();
   }, [userId]);
+
+  const hasFocus = (data?.todayHasFocus || false) || !!hasFocusOverride;
+  const hasSummary = !!data?.todayHasSummary;
 
   if (loading) {
     return (
@@ -65,16 +76,18 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
   }
 
   // State 1: 今天没有专注 & 没有小结
-  if (!data?.todayHasFocus && !data?.todayHasSummary) {
+  if (!hasFocus && !hasSummary) {
     return (
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 h-full flex flex-col justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium mb-4">今日小结</p>
-          <p className="text-gray-500 text-sm">今天还没有专注记录，先完成一次专注吧。</p>
+          <p className="text-gray-600 text-sm">
+            今天还没有专注，有没有兴趣现在开始？
+          </p>
         </div>
         <a 
           href="/focus"
-          className="w-full mt-4 bg-teal-50 text-teal-600 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-teal-100 transition-colors"
+          className="w-full mt-4 bg-teal-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-teal-700 transition-colors shadow-sm"
         >
           去专注
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,7 +99,7 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
   }
 
   // State 2: 今天有专注，但还没有小结
-  if (data?.todayHasFocus && !data?.todayHasSummary) {
+  if (hasFocus && !hasSummary) {
     return (
       <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-3xl p-6 shadow-lg text-white h-full flex flex-col justify-between relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl transform translate-x-10 -translate-y-10 group-hover:bg白/20 transition-all"></div>
@@ -94,18 +107,18 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
         <div className="relative z-10">
           <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium mb-4">今日小结</p>
           <p className="text-teal-100 text-sm">
-            今日如此专注，不如写几句给自己？
+            你的专注，值得一次小结。
           </p>
         </div>
 
         <a
           href={`/daily-summary?focusDuration=${data.totalFocusMinutes}`}
-          className="relative z-10 w-full mt-4 bg白 text-teal-600 font-bold py-3 rounded-xl shadow-lg hover:bg-teal-50 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+          className="relative z-10 w-full mt-4 bg-white text-teal-700 font-semibold py-3 rounded-xl shadow-lg hover:bg-teal-50 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
-          写今日小结
+          写小结
         </a>
       </div>
     );
@@ -129,17 +142,13 @@ export default function TodaySummaryCard({ userId }: TodaySummaryCardProps) {
              "{data?.todaySummary?.text}"
            </p>
         </div>
-
-        <p className="text-[11px] text-gray-400 mt-1">
-          今天的小结已经有了一点雏形，随时都可以再回来多写几句、改一改。
-        </p>
       </div>
 
       <a
         href="/daily-summary"
-        className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-2.5 rounded-xl hover:bg-gray-50 hover:text-teal-600 transition-colors text-sm text-center block"
+        className="w-full bg-teal-600 text-white font-semibold py-2.5 rounded-xl hover:bg-teal-700 transition-colors text-sm text-center block shadow-sm"
       >
-        继续写 / 修改今日小结
+        查看小结
       </a>
     </div>
   );

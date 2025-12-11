@@ -2100,8 +2100,17 @@ export default function Dashboard() {
               </div>
 
               <div className="flex-[3]">
-                <TodaySummaryCard userId={session?.user?.id || ''} />
+                <TodaySummaryCard
+                  userId={session?.user?.id || ''}
+                  hasFocusOverride={todayStats.minutes > 0}
+                />
               </div>
+                <div className="flex-[3]">
+                  <TodaySummaryCard
+                    userId={session?.user?.id || ''}
+                    hasFocusOverride={todayStats.minutes > 0}
+                  />
+                </div>
             </div>
           </div>
 
@@ -2269,7 +2278,10 @@ export default function Dashboard() {
               </div>
 
               {/* 4. 今日小结 */}
-              <TodaySummaryCard userId={session?.user?.id || ''} />
+              <TodaySummaryCard
+                userId={session?.user?.id || ''}
+                hasFocusOverride={todayStats.minutes > 0}
+              />
             </div>
 
             {/* 底部：计划详情大卡片 */}

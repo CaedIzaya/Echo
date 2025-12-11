@@ -80,14 +80,7 @@ export default function MailPanel({ onClose }: MailPanelProps) {
               {mail.title}
             </h3>
             
-            {mail.hasAttachment && (
-               <div className="flex items-center gap-1.5 text-xs text-indigo-500 mt-2 font-medium bg-indigo-50 w-fit px-2 py-0.5 rounded-md">
-                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                 </svg>
-                 <span>包含附件</span>
-               </div>
-            )}
+            {/* 目前新手欢迎邮件不再包含任何附件，这里先隐藏附件标签 */}
           </div>
         ))}
 
@@ -162,28 +155,7 @@ export default function MailPanel({ onClose }: MailPanelProps) {
               {selectedMail.content}
             </p>
           </div>
-
-          {/* 附件区域（占位） */}
-          <div className="mt-12 pt-8 border-t border-dashed border-gray-200">
-            <h4 className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
-              附件
-            </h4>
-            <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4 group cursor-not-allowed opacity-60 hover:opacity-80 transition-opacity">
-              <div className="w-14 h-14 bg-white border border-gray-100 shadow-sm rounded-xl flex items-center justify-center text-teal-600">
-                <span className="text-2xl">📊</span>
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-800 text-sm mb-1">个人专注周报_2025_W43.pdf</p>
-                <div className="flex items-center gap-2">
-                   <span className="text-xs text-amber-500 font-medium bg-amber-50 px-2 py-0.5 rounded">未生成</span>
-                   <span className="text-[10px] text-gray-400">系统自动生成中...</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* 新手欢迎邮件当前不提供附件，附件区域暂时移除，避免造成误解 */}
         </div>
       </div>
     );

@@ -33,8 +33,7 @@ Echo 团队
 敬上`,
     date: '2025-10-24',
     isRead: false,
-    type: 'system',
-    hasAttachment: false
+    type: 'system'
   }
 ];
 

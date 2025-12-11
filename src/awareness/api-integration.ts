@@ -98,10 +98,10 @@ export async function getLumiDialogueWithAwareness(
     // 1. 构建觉察上下文
     const ctx = await buildAwarenessContext(
       session.user.id,
-      getUserData,
-      getTodayStats,
-      getLastNDaysStats,
-      getRecentEvents
+      () => getUserData(session.user.id),
+      () => getTodayStats(session.user.id),
+      (days: number) => getLastNDaysStats(session.user.id, days),
+      (minutes: number) => getRecentEvents(session.user.id, minutes)
     );
 
     // 2. 优先检查觉察引擎

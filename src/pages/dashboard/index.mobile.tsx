@@ -1983,7 +1983,10 @@ export default function Dashboard() {
                   <p className="text-xs text-zinc-400 text-center">本周累计专注时长</p>
                 </div>
 
-                <TodaySummaryCard userId={session?.user?.id || ''} />
+                <TodaySummaryCard
+                  userId={session?.user?.id || ''}
+                  hasFocusOverride={todayStats.minutes > 0}
+                />
               </div>
 
               {/* 移动端：连续专注和今日总结放在同一行 */}
@@ -2015,7 +2018,10 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex-[3]">
-                  <TodaySummaryCard userId={session?.user?.id || ''} />
+                  <TodaySummaryCard
+                    userId={session?.user?.id || ''}
+                    hasFocusOverride={todayStats.minutes > 0}
+                  />
                 </div>
               </div>
             </div>
