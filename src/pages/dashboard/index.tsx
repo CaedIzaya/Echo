@@ -540,6 +540,7 @@ export default function Dashboard() {
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<Set<string>>(new Set()); // 多选的小目标ID集合
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
   const [showStreakInfo, setShowStreakInfo] = useState(false);
+  const [showFlowInfo, setShowFlowInfo] = useState(false);
 
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
@@ -1502,16 +1503,17 @@ export default function Dashboard() {
       if (!target.closest('[data-tooltip-trigger]')) {
         setShowWeeklyInfo(false);
         setShowStreakInfo(false);
+        setShowFlowInfo(false);
       }
     };
 
-    if (showWeeklyInfo || showStreakInfo) {
+    if (showWeeklyInfo || showStreakInfo || showFlowInfo) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showWeeklyInfo, showStreakInfo]);
+  }, [showWeeklyInfo, showStreakInfo, showFlowInfo]);
 
   // UI 辅助函数 - 进度颜色
   const getProgressColor = (progress: number): string => {
@@ -1650,11 +1652,31 @@ export default function Dashboard() {
   };
 
   const FlowCard = () => (
-    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs uppercase tracking-[0.4em] text-white/80">心流指数</p>
-        <span className="text-2xl">🌀</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowFlowInfo(!showFlowInfo);
+            }}
+            data-tooltip-trigger
+            className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <span className="text-xs font-bold text-white">!</span>
+          </button>
+          <span className="text-2xl">🌀</span>
+        </div>
       </div>
+      {showFlowInfo && (
+        <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+          <p className="text-xs text-zinc-600 leading-relaxed">
+            心流指数会记得你的长期努力，也会珍惜你此刻的投入。
+          </p>
+          <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+        </div>
+      )}
       <div className="space-y-3">
         <div className="flex items-baseline gap-2">
           <p className="text-4xl font-bold">{flowIndex.score}</p>
@@ -2052,7 +2074,7 @@ export default function Dashboard() {
           </div>
 
           {/* 3. 数据统计行 (Mobile) */}
-          <div className="space-y-4">
+          <div className="xl:hidden space-y-4">
             {/* 第一行：等级 & 本周 */}
             <div className="flex gap-4">
               {userLevel && (
@@ -2105,12 +2127,6 @@ export default function Dashboard() {
                   hasFocusOverride={todayStats.minutes > 0}
                 />
               </div>
-                <div className="flex-[3]">
-                  <TodaySummaryCard
-                    userId={session?.user?.id || ''}
-                    hasFocusOverride={todayStats.minutes > 0}
-                  />
-                </div>
             </div>
           </div>
 
@@ -2190,7 +2206,7 @@ export default function Dashboard() {
           </div>
 
           {/* PC - 右侧内容区 */}
-          <div className="flex flex-col gap-6">
+          <div className="hidden xl:flex flex-col gap-6">
             {/* 顶部：数据网格 (4列) */}
             <div className="grid gap-5 grid-cols-4">
               {/* 1. 等级卡片 */}

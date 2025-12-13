@@ -405,6 +405,7 @@ export default function Dashboard() {
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<Set<string>>(new Set()); // 多选的小目标ID集合
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
   const [showStreakInfo, setShowStreakInfo] = useState(false);
+  const [showFlowInfo, setShowFlowInfo] = useState(false);
 
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
@@ -1293,16 +1294,17 @@ export default function Dashboard() {
       if (!target.closest('[data-tooltip-trigger]')) {
         setShowWeeklyInfo(false);
         setShowStreakInfo(false);
+        setShowFlowInfo(false);
       }
     };
 
-    if (showWeeklyInfo || showStreakInfo) {
+    if (showWeeklyInfo || showStreakInfo || showFlowInfo) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showWeeklyInfo, showStreakInfo]);
+  }, [showWeeklyInfo, showStreakInfo, showFlowInfo]);
 
   // UI 辅助函数 - 进度颜色
   const getProgressColor = (progress: number): string => {
@@ -1441,11 +1443,31 @@ export default function Dashboard() {
   };
 
   const FlowCard = () => (
-    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs uppercase tracking-[0.4em] text-white/80">心流指数</p>
-        <span className="text-2xl">🌀</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowFlowInfo(!showFlowInfo);
+            }}
+            data-tooltip-trigger
+            className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <span className="text-xs font-bold text-white">!</span>
+          </button>
+          <span className="text-2xl">🌀</span>
+        </div>
       </div>
+      {showFlowInfo && (
+        <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+          <p className="text-xs text-zinc-600 leading-relaxed">
+            心流指数会记得你的长期努力，也会珍惜你此刻的投入。
+          </p>
+          <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+        </div>
+      )}
       <div className="space-y-3">
         <div className="flex items-baseline gap-2">
           <p className="text-4xl font-bold">{flowIndex.score}</p>
@@ -1923,75 +1945,9 @@ export default function Dashboard() {
                 </div>
               )}
 
-              <div
-                className={`hidden xl:grid grid-cols-1 md:grid-cols-3 gap-5 ${userLevel ? 'xl:col-span-3' : 'xl:col-span-4'}`}
-              >
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">连续专注</p>
-                  <button
-                    onClick={() => setShowStreakInfo(!showStreakInfo)}
-                    data-tooltip-trigger
-                    className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <span className="text-xs font-bold text-zinc-600">!</span>
-                  </button>
-                  </div>
-                  {showStreakInfo && (
-                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                      <p className="text-xs text-zinc-600 leading-relaxed">
-                        最近一段连续完成专注目标时长的天数
-                      </p>
-                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
-                    </div>
-                  )}
-                  <div className="flex-1 flex items-center">
-                    <div>
-                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-none">{Math.max(1, stats.streakDays)}</p>
-                      <p className="text-sm text-zinc-500 mt-2">天</p>
-                    </div>
-                  </div>
-                  <div className="h-1 w-12 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full"></div>
-                </div>
-
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-6 md:p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
-                  <div className="flex items-start justify-between">
-                    <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
-                    <button
-                      onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
-                      data-tooltip-trigger
-                      className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
-                    >
-                      <span className="text-xs font-bold text-zinc-600">!</span>
-                    </button>
-                  </div>
-                  {showWeeklyInfo && (
-                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                      <p className="text-xs text-zinc-600 leading-relaxed">
-                        本周专注时长按照时区每周一00:00刷新。
-                      </p>
-                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
-                    </div>
-                  )}
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-3xl md:text-4xl font-bold text-zinc-900 leading-tight">
-                        {weeklyHours}h{weeklyMinutesRemainder}m
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-zinc-400 text-center">本周累计专注时长</p>
-                </div>
-
-                <TodaySummaryCard
-                  userId={session?.user?.id || ''}
-                  hasFocusOverride={todayStats.minutes > 0}
-                />
-              </div>
-
-              {/* 移动端：连续专注和今日总结放在同一行 */}
-              <div className="flex flex-row gap-4 xl:hidden">
-                <div className="flex-[2] bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-5 shadow-lg shadow-emerald-100/30 flex flex-col justify-between aspect-[4/3] hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
+              {/* 连续专注、本周专注和今日总结卡片 */}
+              <div className="flex flex-row gap-4">
+                <div className="flex-1 bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-5 shadow-lg shadow-emerald-100/30 flex flex-col justify-between aspect-[4/3] hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">连续</p>
                     <button
@@ -2017,7 +1973,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="flex-[3]">
+                <div className="flex-1 aspect-[4/3]">
                   <TodaySummaryCard
                     userId={session?.user?.id || ''}
                     hasFocusOverride={todayStats.minutes > 0}

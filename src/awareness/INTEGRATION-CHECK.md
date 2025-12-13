@@ -264,3 +264,5 @@ console.log('冷却状态:', status);
 **关键点**：在所有文案获取函数之前调用 `getDialogueWithPriority()`，如果返回非 null，使用觉察文案并阻止其他系统。
 
 
+
+

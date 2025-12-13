@@ -23,3 +23,5 @@ export { getDialogueWithPriority, shouldBlockOtherDialogues, getFinalDialogue, P
 export { buildAwarenessContext, adaptUserState, adaptDayStats, adaptEvent } from './database-adapter';
 
 
+
+

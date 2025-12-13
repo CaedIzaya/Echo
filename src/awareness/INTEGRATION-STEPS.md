@@ -310,3 +310,5 @@ export function LumiComponent() {
 4. 测试各个场景的触发
 
 
+
+

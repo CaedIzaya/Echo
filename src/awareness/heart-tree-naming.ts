@@ -44,11 +44,13 @@ export function getNamingGuideText(): string {
 }
 
 /**
- * 获取新用户首次见面文案（命名完成后显示）
+ * 获取新用户首次见面文案（命名完成后的第二个弹窗显示）
+ * 固定的欢迎文案
  */
 export function getFirstMeetingText(heartTreeName: string): string {
-  // 这里可以返回一条欢迎文案，或者从专门的欢迎文案池中选择
-  return `你好，我是 ${heartTreeName}。很高兴遇见你。`;
+  return '你来了，我等候多时了\n现在，让我们一起安静成长吧\n我不会枯萎，你随时都能来看我';
 }
+
+
 
 

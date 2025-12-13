@@ -446,18 +446,24 @@ export function pickHomeSentence(options: PickHomeSentenceOptions): EchoSentence
 
 /**
  * 首页文案获取（带觉察引擎优先级）
- * - 若觉察引擎命中，则直接返回觉察文案（凌驾于 Echo 文案）
+ * - 若觉察引擎命中且优先级足够高，则直接返回觉察文案
  * - 未命中时，回落到原有 Echo 逻辑
  */
 export function pickHomeSentenceWithAwareness(
   options: PickHomeSentenceOptions & { awarenessCtx?: AwarenessContext },
 ): EchoAwarenessResult {
-  const { awarenessCtx, ...rest } = options;
+  const { awarenessCtx, status, ...rest } = options;
 
-  // 先检查觉察引擎（最高优先级）
+  // 确定当前对话的优先级
+  // 如果是今日首次进入首页，则使用 DAILY_WELCOME 优先级
+  const currentDialoguePriority = status.isFirstVisitToday 
+    ? PriorityLevel.DAILY_WELCOME 
+    : PriorityLevel.AUTO_DIALOGUE;
+
+  // 先检查觉察引擎，传入当前对话优先级
   if (awarenessCtx) {
-    const awarenessDialogue = getDialogueWithPriority(awarenessCtx);
-    if (awarenessDialogue && awarenessDialogue.priority === PriorityLevel.AWARENESS) {
+    const awarenessDialogue = getDialogueWithPriority(awarenessCtx, currentDialoguePriority);
+    if (awarenessDialogue) {
       return {
         text: awarenessDialogue.copy,
         pool: 'universal_pool',
@@ -474,8 +480,8 @@ export function pickHomeSentenceWithAwareness(
     }
   }
 
-  // 未命中觉察，引导至原有逻辑
-  const result = pickHomeSentence(rest);
+  // 未命中觉察或优先级不够高，引导至原有逻辑
+  const result = pickHomeSentence({ status, ...rest });
   return { ...result, source: 'ECHO' };
 }
 
@@ -490,7 +496,8 @@ export function pickEventSentence(
 
 /**
  * 事件文案获取（带觉察优先级）
- * - 如果觉察命中，直接使用觉察文案，不再走事件池
+ * - 如果觉察命中且优先级足够高，直接使用觉察文案，不再走事件池
+ * - 事件文案优先级为 AUTO_DIALOGUE
  */
 export function pickEventSentenceWithAwareness(
   event: EchoEventKey,
@@ -498,8 +505,8 @@ export function pickEventSentenceWithAwareness(
 ): EchoAwarenessResult {
   const awarenessCtx = options?.awarenessCtx;
   if (awarenessCtx) {
-    const awarenessDialogue = getDialogueWithPriority(awarenessCtx);
-    if (awarenessDialogue && awarenessDialogue.priority === PriorityLevel.AWARENESS) {
+    const awarenessDialogue = getDialogueWithPriority(awarenessCtx, PriorityLevel.AUTO_DIALOGUE);
+    if (awarenessDialogue) {
       return {
         text: awarenessDialogue.copy,
         pool: 'universal_pool',
@@ -530,14 +537,15 @@ export function pickUniversalSentence(
 
 /**
  * 通用池获取（带觉察优先级）
+ * - 通用池为用户主动交互触发，优先级为 NORMAL
  */
 export function pickUniversalSentenceWithAwareness(
   options?: { pools?: Partial<EchoPools>; awarenessCtx?: AwarenessContext },
 ): EchoAwarenessResult {
   const awarenessCtx = options?.awarenessCtx;
   if (awarenessCtx) {
-    const awarenessDialogue = getDialogueWithPriority(awarenessCtx);
-    if (awarenessDialogue && awarenessDialogue.priority === PriorityLevel.AWARENESS) {
+    const awarenessDialogue = getDialogueWithPriority(awarenessCtx, PriorityLevel.NORMAL);
+    if (awarenessDialogue) {
       return {
         text: awarenessDialogue.copy,
         pool: 'universal_pool',
