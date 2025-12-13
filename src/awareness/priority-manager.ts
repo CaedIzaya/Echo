@@ -146,7 +146,7 @@ function getAwarenessPriorityByRule(ruleId: string, ctx: AwarenessContext): Prio
  */
 export function shouldBlockOtherDialogues(ctx: AwarenessContext): boolean {
   const response = getDialogueWithPriority(ctx);
-  return response !== null && response.priority === PriorityLevel.AWARENESS;
+  return response !== null && response.priority >= PriorityLevel.AWARENESS_LOW;
 }
 
 /**

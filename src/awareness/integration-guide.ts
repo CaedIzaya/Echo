@@ -20,7 +20,7 @@ export function integratedDialogueGetter(
   // 1. 优先检查觉察引擎
   const awarenessDialogue = getDialogueWithPriority(ctx);
   
-  if (awarenessDialogue && awarenessDialogue.priority === PriorityLevel.AWARENESS) {
+  if (awarenessDialogue && awarenessDialogue.priority >= PriorityLevel.AWARENESS_LOW) {
     // 觉察引擎匹配，返回觉察文案，阻止其他文案系统
     return awarenessDialogue.copy;
   }
@@ -100,7 +100,7 @@ export function useAwarenessDialogue(
 
   const dialogue = getDialogueWithPriority(ctx);
   
-  if (dialogue && dialogue.priority === PriorityLevel.AWARENESS) {
+  if (dialogue && dialogue.priority >= PriorityLevel.AWARENESS_LOW) {
     return {
       copy: dialogue.copy,
       source: dialogue.source,

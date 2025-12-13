@@ -61,7 +61,7 @@ export async function getAwarenessDialogueAPI(
     // 检查觉察引擎
     const awarenessDialogue = getDialogueWithPriority(ctx);
 
-    if (awarenessDialogue && awarenessDialogue.priority === PriorityLevel.AWARENESS) {
+    if (awarenessDialogue && awarenessDialogue.priority >= PriorityLevel.AWARENESS_LOW) {
       // 觉察引擎匹配，返回觉察文案
       return res.status(200).json({
         hasAwareness: true,

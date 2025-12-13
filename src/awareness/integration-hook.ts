@@ -45,7 +45,7 @@ export function useAwarenessDialogue() {
       // 检查觉察引擎
       const awarenessDialogue = getDialogueWithPriority(ctx);
       
-      if (awarenessDialogue && awarenessDialogue.priority === PriorityLevel.AWARENESS) {
+      if (awarenessDialogue && awarenessDialogue.priority >= PriorityLevel.AWARENESS_LOW) {
         setDialogue({
           copy: awarenessDialogue.copy,
           source: awarenessDialogue.source as 'LUMI' | 'HEART_TREE',

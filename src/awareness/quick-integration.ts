@@ -52,7 +52,7 @@ export async function getDialogueWithAwarenessCheck(userId: string) {
   // 2. 优先检查觉察引擎
   const awarenessDialogue = getDialogueWithPriority(ctx);
   
-  if (awarenessDialogue && awarenessDialogue.priority === PriorityLevel.AWARENESS) {
+  if (awarenessDialogue && awarenessDialogue.priority >= PriorityLevel.AWARENESS_LOW) {
     // 觉察引擎匹配，返回觉察文案，阻止其他系统
     return {
       copy: awarenessDialogue.copy,
