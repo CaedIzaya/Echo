@@ -6,6 +6,20 @@ import { useSession } from 'next-auth/react';
 import BottomNavigation from '../dashboard/BottomNavigation';
 import InterruptedSessionAlert from './InterruptedSessionAlert';
 
+// Wake Lock API 类型定义
+interface WakeLockSentinel extends EventTarget {
+  released: boolean;
+  type: 'screen';
+  release(): Promise<void>;
+  addEventListener(type: 'release', listener: () => void): void;
+}
+
+interface Navigator {
+  wakeLock?: {
+    request(type: 'screen'): Promise<WakeLockSentinel>;
+  };
+}
+
 type FocusState =  
   | 'preparing'      // 准备中（设置时长）
   | 'starting'       // 3秒倒计时
@@ -57,6 +71,7 @@ export default function Focus() {
   const isInitialLoadRef = useRef(true);
   const hasPlayedGoalSoundRef = useRef(false); // 标记是否已播放目标达成提示音
   const audioContextRef = useRef<AudioContext | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null); // Wake Lock 引用
 
   // 播放温柔的成就提示音
   const playGoalAchievementSound = () => {
@@ -527,6 +542,44 @@ export default function Focus() {
     }
   };
 
+  // 请求屏幕常亮（Wake Lock API）
+  const requestWakeLock = async () => {
+    // 检查浏览器是否支持 Wake Lock API
+    if ('wakeLock' in navigator) {
+      try {
+        // 请求屏幕常亮
+        const wakeLock = await (navigator as any).wakeLock.request('screen');
+        wakeLockRef.current = wakeLock;
+        console.log('✅ 屏幕常亮已启用');
+        
+        // 监听 Wake Lock 释放事件（比如用户切换应用或系统自动释放）
+        wakeLock.addEventListener('release', () => {
+          console.log('⚠️ 屏幕常亮已被释放');
+          wakeLockRef.current = null;
+        });
+      } catch (err: any) {
+        // 如果请求失败（比如用户拒绝或浏览器不支持），静默处理
+        console.warn('无法启用屏幕常亮:', err.message);
+        wakeLockRef.current = null;
+      }
+    } else {
+      console.log('⚠️ 浏览器不支持 Wake Lock API');
+    }
+  };
+
+  // 释放屏幕常亮
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('✅ 屏幕常亮已释放');
+      } catch (err) {
+        console.warn('释放屏幕常亮失败:', err);
+      }
+    }
+  };
+
   // 基于时间戳计算已专注时长（避免后台挂起时计时不准）
   const calculateElapsedTime = (startTimeStr: string, totalPause: number, isCurrentlyPaused: boolean, pauseStartStr?: string): number => {
     if (!startTimeStr) return 0;
@@ -654,6 +707,9 @@ export default function Focus() {
     
     setState('running');
     
+    // 请求屏幕常亮（防止手机黑屏）
+    requestWakeLock();
+    
     // 开始计时（基于时间戳的实时计算）
     if (intervalRef.current === null) {
       intervalRef.current = setInterval(() => {
@@ -688,6 +744,9 @@ export default function Focus() {
   // 暂停专注
   const pauseFocus = () => {
     if (!sessionRef.current || pauseCount >= 1) return;
+    
+    // 释放屏幕常亮（暂停时允许屏幕黑屏）
+    releaseWakeLock();
     
     // 立即停止计时器
     cleanupInterval();
@@ -741,11 +800,17 @@ export default function Focus() {
       pauseStart: undefined
     });
     
+    // 恢复时重新请求屏幕常亮
+    requestWakeLock();
+    
     beginFocus();
   };
 
   // 结束专注
   const endFocus = (completed: boolean = false) => {
+    // 释放屏幕常亮
+    releaseWakeLock();
+    
     // 立即停止所有计时器（彻底清理）
     cleanupInterval();
     
@@ -857,6 +922,9 @@ export default function Focus() {
 
   // 返回主页
   const goToDashboard = () => {
+    // 释放屏幕常亮
+    releaseWakeLock();
+    
     // 清理所有状态和标志
     localStorage.removeItem('focusSession');
     localStorage.removeItem('focusSessionEnded');
@@ -871,6 +939,9 @@ export default function Focus() {
 
   // 继续专注
   const continueFocus = () => {
+    // 释放屏幕常亮
+    releaseWakeLock();
+    
     // 重置状态
     setState('preparing');
     setShowEndOptions(false);
@@ -989,11 +1060,15 @@ export default function Focus() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handlePageHide);
+    
+    // 组件卸载时释放屏幕常亮
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handlePageHide);
       if (saveInterval) clearInterval(saveInterval);
       if (pauseSaveInterval) clearInterval(pauseSaveInterval);
+      // 确保释放屏幕常亮
+      releaseWakeLock();
     };
   }, [state, elapsedTime]);
 
