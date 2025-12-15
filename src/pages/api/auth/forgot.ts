@@ -1,6 +1,8 @@
 import { db } from "~/server/db";
 import { NextApiRequest, NextApiResponse } from "next";
 
+const ADMIN_EMAIL = "Caedmon_Izaya@outlook.com";
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -35,20 +37,29 @@ export default async function handler(
       return res.status(404).json({ error: "未找到该账户" });
     }
 
-    // TODO: 从数据库读取密保问题
-    // 这里简化处理，实际应该从user的recovery_questions字段读取
-    // 暂时返回示例问题
-    const questions = [
-      {
-        id: 'q1',
-        question: '当初点亮你专注之火的那个契机是什么？',
-        type: 'memory',
-      },
-    ];
+    const recoveryQuestions = await db.recoveryQuestion.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, question: true },
+    });
 
-    res.status(200).json({
+    if (recoveryQuestions.length === 0) {
+      return res.status(200).json({
+        success: true,
+        mode: "admin",
+        adminEmail: ADMIN_EMAIL,
+        message:
+          "该账户尚未设置密保问题。当前版本暂不支持邮箱验证码找回，请联系管理员协助。",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
-      questions,
+      mode: "questions",
+      questions: recoveryQuestions.map((q) => ({
+        id: q.id,
+        question: q.question,
+      })),
     });
   } catch (error) {
     console.error("找回密码失败:", error);

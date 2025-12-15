@@ -6,17 +6,12 @@ interface InterruptedSessionAlertProps {
   onConfirm: () => void;
 }
 
-export default function InterruptedSessionAlert({ 
-  minutes, 
-  timestamp, 
-  onConfirm 
-}: InterruptedSessionAlertProps) {
+export default function InterruptedSessionAlert({ minutes, timestamp, onConfirm }: InterruptedSessionAlertProps) {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 animate-slide-in">
-        {/* 图标 */}
+        {/* 标题（已删除 ⚠️ ） */}
         <div className="text-center mb-4">
-          <div className="text-6xl mb-2">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-900">专注意外结束</h2>
         </div>
 
@@ -31,22 +26,17 @@ export default function InterruptedSessionAlert({
                 month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
               })}
             </p>
           </div>
 
           <div className="bg-green-50 rounded-xl p-3 border border-green-100">
-            <p className="text-sm text-gray-700 flex items-center gap-2">
-              <span className="text-green-600">✓</span>
-              我们已为你记录到了个人仪表盘
-            </p>
+            <p className="text-sm text-gray-700">我们已为你记录到了个人仪表盘</p>
           </div>
 
           <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-            <p className="text-sm text-amber-700">
-              💡 提示：专注计时器将在准备状态下等待你的归来
-            </p>
+            <p className="text-sm text-amber-700">提示：专注计时器将在准备状态下等待你的归来</p>
           </div>
         </div>
 
@@ -61,50 +51,3 @@ export default function InterruptedSessionAlert({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

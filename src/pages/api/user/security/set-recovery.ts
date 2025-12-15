@@ -26,32 +26,41 @@ export default async function handler(
       return res.status(400).json({ error: "请提供至少一个问题" });
     }
 
-    // 处理每个问题：生成salt并hash答案
-    const recoveryQuestions = await Promise.all(
+    // 清理旧密保问题（当前实现：每个用户仅保留最新一组问题）
+    await db.recoveryQuestion.deleteMany({
+      where: { userId: session.user.id },
+    });
+
+    // 处理每个问题：生成salt并hash答案（统一 trim + lowercase，降低输入大小写/空格导致误判）
+    const created = await Promise.all(
       questions.map(async (q: { question: string; answer: string }) => {
-        const salt = crypto.randomBytes(16).toString('hex');
-        const answerHash = await bcrypt.hash(q.answer.trim().toLowerCase() + salt, 12);
-        
-        return {
-          question: q.question,
-          answerHash,
-          salt,
-          createdAt: new Date().toISOString(),
-        };
-      })
+        const question = String(q.question ?? "").trim();
+        const answer = String(q.answer ?? "").trim();
+
+        if (!question || !answer) {
+          throw new Error("问题或答案不能为空");
+        }
+
+        const salt = crypto.randomBytes(16).toString("hex");
+        const normalizedAnswer = answer.toLowerCase();
+        const answerHash = await bcrypt.hash(normalizedAnswer + salt, 12);
+
+        return db.recoveryQuestion.create({
+          data: {
+            userId: session.user.id,
+            question,
+            answerHash,
+            salt,
+          },
+          select: { id: true, question: true, createdAt: true },
+        });
+      }),
     );
 
-    // TODO: 更新数据库中的recovery_questions字段
-    // 这里简化处理，实际应该：
-    // await db.user.update({
-    //   where: { id: session.user.id },
-    //   data: { recoveryQuestions: JSON.stringify(recoveryQuestions) },
-    // });
-
-    // 暂时只返回成功，实际应该保存到数据库
     res.status(200).json({
       success: true,
       message: "密保问题设置成功",
+      questions: created,
     });
   } catch (error) {
     console.error("设置密保问题失败:", error);

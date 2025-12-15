@@ -281,11 +281,8 @@ export default function SignIn() {
               <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
             </div>
           </div>
-          <h1 className="text-5xl font-medium mb-4 flex items-center justify-center gap-1 select-none">
-            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">E</span>
-            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">c</span>
-            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">h</span>
-            <span className="bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 text-transparent bg-clip-text drop-shadow-sm">o</span>
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 bg-clip-text text-transparent mb-2 tracking-tight select-none">
+            Echo
           </h1>
           <div className="w-16 h-px bg-gray-300 mx-auto mb-3"></div>
           <p className="text-gray-900 text-base font-medium">开启你的专注之旅</p>

@@ -1,8 +1,7 @@
 import { db } from "~/server/db";
 import bcrypt from "bcryptjs";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "./[...nextauth]";
 import { NextApiRequest, NextApiResponse } from "next";
+import crypto from "crypto";
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,33 +26,37 @@ export default async function handler(
       return res.status(400).json({ error: "密码至少需要8位字符" });
     }
 
-    // TODO: 验证token是否有效且未过期
-    // 这里简化处理，实际应该：
-    // 1. 从数据库或Redis查找token
-    // 2. 验证token是否过期
-    // 3. 获取关联的用户ID
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const record = await db.passwordResetToken.findUnique({
+      where: { tokenHash },
+      select: { userId: true, expiresAt: true, usedAt: true },
+    });
 
-    // 暂时通过session获取用户（实际应该通过token）
-    const session = await getServerSession(req, res, authOptions);
-    if (!session?.user?.id) {
-      return res.status(401).json({ error: "未授权" });
+    if (!record) return res.status(400).json({ error: "链接无效或已过期" });
+    if (record.usedAt) return res.status(400).json({ error: "链接已使用" });
+    if (record.expiresAt.getTime() <= Date.now()) {
+      return res.status(400).json({ error: "链接已过期" });
     }
 
     // 哈希新密码
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     // 更新密码
-    await db.user.update({
-      where: { id: session.user.id },
+    const updatedUser = await db.user.update({
+      where: { id: record.userId },
       data: { password: hashedPassword },
+      select: { email: true },
     });
 
-    // TODO: 删除已使用的token
+    await db.passwordResetToken.update({
+      where: { tokenHash },
+      data: { usedAt: new Date() },
+    });
 
     res.status(200).json({
       success: true,
       message: "密码重置成功",
-      email: session.user.email,
+      email: updatedUser.email,
     });
   } catch (error) {
     console.error("重置密码失败:", error);

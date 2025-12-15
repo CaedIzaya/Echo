@@ -9,10 +9,12 @@ export default function ForgotPassword() {
   const [identifier, setIdentifier] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setAdminEmail(null);
 
     if (!identifier.trim()) {
       setError('请输入邮箱或用户名');
@@ -30,7 +32,11 @@ export default function ForgotPassword() {
       const result = await response.json();
 
       if (response.ok) {
-        // 跳转到密保问题页面
+        if (result.mode === 'admin') {
+          setAdminEmail(result.adminEmail || 'Caedmon_Izaya@outlook.com');
+          return;
+        }
+
         router.push({
           pathname: '/auth/forgot-verify',
           query: {
@@ -158,6 +164,23 @@ export default function ForgotPassword() {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
               </button>
             </form>
+
+            {adminEmail && (
+              <div className="mt-6 p-4 rounded-2xl border border-amber-200 bg-amber-50/80">
+                <p className="text-sm font-semibold text-amber-900">
+                  该账户尚未设置密保问题
+                </p>
+                <p className="mt-1 text-sm text-amber-800">
+                  当前版本暂不支持邮箱验证码找回。请联系管理员邮箱协助重置：
+                </p>
+                <a
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-amber-700 transition"
+                  href={`mailto:${adminEmail}`}
+                >
+                  {adminEmail}
+                </a>
+              </div>
+            )}
 
             {/* 返回登录 */}
             <div className="mt-6 text-center">

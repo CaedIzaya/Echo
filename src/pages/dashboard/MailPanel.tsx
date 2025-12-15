@@ -155,6 +155,29 @@ export default function MailPanel({ onClose }: MailPanelProps) {
               {selectedMail.content}
             </p>
           </div>
+          {selectedMail.actionUrl && (
+            <div className="mt-6">
+              <a
+                href={selectedMail.actionUrl}
+                className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white shadow hover:bg-teal-700 transition active:scale-95"
+              >
+                {selectedMail.actionLabel ?? '查看详情'}
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </a>
+            </div>
+          )}
           {/* 新手欢迎邮件当前不提供附件，附件区域暂时移除，避免造成误解 */}
         </div>
       </div>

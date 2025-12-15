@@ -9,6 +9,33 @@ export interface Mail {
   isRead: boolean;
   type: 'system' | 'report' | 'notification';
   hasAttachment?: boolean;
+  actionUrl?: string;
+  actionLabel?: string;
+  expiresAt?: string; // ISO
+}
+
+const MAIL_TTL_DAYS = 84; // 12 周
+
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function getMonday(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0 Sun .. 6 Sat
+  const offset = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+
+function formatYmd(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 const MOCK_MAILS: Mail[] = [
@@ -25,6 +52,10 @@ const MOCK_MAILS: Mail[] = [
 2. 种植你的心树，见证自我成长
 3. 完成里程碑，记录每一个进步的瞬间
 
+重要提醒（建议尽快完成）：
+请前往「个人中心 → 账号安全 → 设置密保问题」完成密保设置。
+这会帮助你在忘记密码时，随时回到 Echo。
+
 如果暂时还不确定怎么用 Echo，可以在仪表盘点击右上角的 🔍，打开「使用指南」查看详细说明。
 
 愿你在这里找回内心的平静与力量。
@@ -33,7 +64,22 @@ Echo 团队
 敬上`,
     date: '2025-10-24',
     isRead: false,
-    type: 'system'
+    type: 'system',
+    actionUrl: '/profile/security-questions',
+    actionLabel: '去设置密保'
+  },
+  {
+    id: 'mail_weekly_report_demo',
+    sender: 'Echo 周报',
+    title: '本周专注周报 · 12/08 - 12/14',
+    content: `您的本周专注周报已生成~ 点击下方按钮查看。`,
+    date: '2025-12-15',
+    isRead: false,
+    type: 'report',
+    hasAttachment: false,
+    actionUrl: `/reports/weekly?weekStart=${formatYmd(addDays(getMonday(new Date()), -7))}`,
+    actionLabel: '查看周报',
+    expiresAt: addDays(new Date('2025-12-15T00:00:00.000Z'), MAIL_TTL_DAYS).toISOString(),
   }
 ];
 
@@ -62,11 +108,24 @@ export class MailSystem {
     // 从 localStorage 加载已读状态
     const readStatus = JSON.parse(localStorage.getItem('mailReadStatus') || '{}');
     
-    // 合并 Mock 数据和已读状态
-    this.mails = MOCK_MAILS.map(mail => ({
+    const now = Date.now();
+    const isExpired = (mail: Mail) => {
+      if (mail.expiresAt) {
+        return new Date(mail.expiresAt).getTime() <= now;
+      }
+      // 默认 TTL：按 date 计算（兼容旧邮件）
+      const mailDate = new Date(mail.date);
+      const expires = addDays(mailDate, MAIL_TTL_DAYS).getTime();
+      return expires <= now;
+    };
+
+    // 合并 Mock 数据和已读状态 + 过滤过期邮件
+    const merged = MOCK_MAILS.map(mail => ({
       ...mail,
       isRead: !!readStatus[mail.id]
-    }));
+    })).filter(mail => !isExpired(mail));
+
+    this.mails = merged;
     
     // 按日期倒序排序
     this.mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

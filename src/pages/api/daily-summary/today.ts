@@ -118,22 +118,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
 
-        // Check limit (90 days)
-        const count = await db.dailySummary.count({
+        // 保留最近 8 条小结，超出则删除更早的
+        const overflow = await db.dailySummary.findMany({
           where: { userId },
+          orderBy: { date: 'desc' },
+          skip: 8,
+          select: { id: true },
         });
 
-        if (count > 90) {
-          const oldest = await db.dailySummary.findFirst({
-            where: { userId },
-            orderBy: { date: 'asc' },
+        if (overflow.length > 0) {
+          await db.dailySummary.deleteMany({
+            where: { id: { in: overflow.map(item => item.id) } },
           });
-
-          if (oldest) {
-            await db.dailySummary.delete({
-              where: { id: oldest.id },
-            });
-          }
         }
       }
 

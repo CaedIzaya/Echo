@@ -34,25 +34,46 @@ export default async function handler(
       return res.status(404).json({ error: "用户不存在" });
     }
 
-    // TODO: 验证密保答案
-    // 这里简化处理，实际应该：
-    // 1. 从数据库读取recovery_questions
-    // 2. 对每个答案进行hash+salt验证
-    // 3. 限制重试次数
-    
-    // 暂时简化验证逻辑
-    const isValid = true; // 实际应该验证答案hash
+    const storedQuestions = await db.recoveryQuestion.findMany({
+      where: { userId: user.id },
+      select: { id: true, answerHash: true, salt: true },
+    });
 
-    if (!isValid) {
-      return res.status(400).json({ error: "答案不正确" });
+    if (storedQuestions.length === 0) {
+      return res.status(400).json({ error: "该账户未设置密保问题" });
     }
+
+    const answerMap = new Map<string, string>();
+    answers.forEach((a: { questionId: string; answer: string }) => {
+      if (a?.questionId) answerMap.set(a.questionId, String(a.answer ?? ""));
+    });
+
+    // 要求：所有已存问题都必须回答
+    const checks = await Promise.all(
+      storedQuestions.map(async (q) => {
+        const raw = answerMap.get(q.id);
+        if (!raw) return false;
+        const normalized = raw.trim().toLowerCase();
+        return bcrypt.compare(normalized + q.salt, q.answerHash);
+      }),
+    );
+
+    const isValid = checks.every(Boolean);
+    if (!isValid) return res.status(400).json({ error: "答案不正确" });
 
     // 生成临时token（10分钟有效）
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分钟后过期
 
-    // TODO: 将token存储到数据库或Redis，用于后续验证
-    // 这里简化处理，实际应该存储token和过期时间
+    // 将 token 存到数据库（只存 hash，避免明文泄漏）
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    await db.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      },
+    });
 
     res.status(200).json({
       success: true,
