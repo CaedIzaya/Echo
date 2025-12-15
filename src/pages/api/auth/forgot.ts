@@ -61,8 +61,29 @@ export default async function handler(
         question: q.question,
       })),
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("找回密码失败:", error);
+    
+    // 检查是否是数据库连接错误
+    const errorMessage = error?.message || String(error);
+    const isDatabaseError = 
+      errorMessage.includes("datasource") ||
+      errorMessage.includes("DATABASE_URL") ||
+      errorMessage.includes("file:") ||
+      errorMessage.includes("prisma") ||
+      errorMessage.includes("connection");
+    
+    if (isDatabaseError) {
+      // 数据库连接失败，提示联系管理员
+      return res.status(200).json({
+        success: true,
+        mode: "admin",
+        adminEmail: ADMIN_EMAIL,
+        message:
+          "系统暂时无法访问数据库。请联系管理员协助找回密码。",
+      });
+    }
+    
     res.status(500).json({ error: "找回密码失败" });
   }
 }
