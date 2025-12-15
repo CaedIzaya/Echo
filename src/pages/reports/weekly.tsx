@@ -12,9 +12,66 @@ type Props = {
   report: WeeklyReportPayload | null;
   expired: boolean;
   requestedWeekStart: string | null;
+  error?: string;
 };
 
-const WeeklyReportPage = ({ report, expired, requestedWeekStart }: Props) => {
+const WeeklyReportPage = ({ report, expired, requestedWeekStart, error }: Props) => {
+  if (error) {
+    return (
+      <>
+        <Head>
+          <title>周报加载失败</title>
+        </Head>
+        {_weeklyReportMotionStyle}
+        <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 pb-20 relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-24 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-br from-red-200/60 via-orange-200/50 to-yellow-200/40 blur-3xl opacity-80 translate-x-1/3 animate-float-slow" />
+          <div className="pointer-events-none absolute -bottom-24 left-0 h-[520px] w-[520px] rounded-full bg-gradient-to-br from-red-200/60 via-orange-200/40 to-yellow-200/40 blur-3xl opacity-70 -translate-x-1/3 animate-float-slower" />
+
+          <main className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-16 relative">
+            <div className="rounded-[2rem] bg-white/80 backdrop-blur-xl border border-white/80 shadow-[0_20px_60px_-40px_rgba(239,68,68,0.45)] overflow-hidden p-8">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-red-100 px-4 py-2 shadow-sm">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                </span>
+                <span className="text-sm font-semibold text-red-700">
+                  加载失败
+                </span>
+              </div>
+
+              <h1 className="mt-4 text-3xl font-bold text-slate-900 tracking-tight">
+                周报加载失败
+              </h1>
+              <p className="mt-2 text-slate-600 leading-relaxed">
+                {error}
+              </p>
+              {process.env.NODE_ENV === "development" && (
+                <p className="mt-4 text-xs text-slate-400 font-mono bg-slate-50 p-3 rounded-lg">
+                  {error}
+                </p>
+              )}
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  href="/reports/weekly"
+                  className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-black transition"
+                >
+                  重试
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-white transition"
+                >
+                  返回主页
+                </Link>
+              </div>
+            </div>
+          </main>
+        </div>
+      </>
+    );
+  }
+
   if (expired) {
     return (
       <>
@@ -388,48 +445,66 @@ function formatDateLabel(date: string) {
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
-  const session = await getServerSession(ctx.req, ctx.res, authOptions);
-  if (!session?.user?.id) {
-    return {
-      redirect: {
-        destination: "/auth/signin",
-        permanent: false,
-      },
-    };
-  }
-
-  const TTL_DAYS = 84; // 12 周
-  const weekStartParamRaw = ctx.query.weekStart;
-  const weekStartParam =
-    typeof weekStartParamRaw === "string" ? weekStartParamRaw : null;
-
-  if (weekStartParam) {
-    const requested = new Date(weekStartParam);
-    const now = new Date();
-    const threshold = new Date(now);
-    threshold.setDate(threshold.getDate() - TTL_DAYS);
-    if (requested.getTime() < threshold.getTime()) {
+  try {
+    const session = await getServerSession(ctx.req, ctx.res, authOptions);
+    if (!session?.user?.id) {
       return {
-        props: {
-          report: null,
-          expired: true,
-          requestedWeekStart: weekStartParam,
+        redirect: {
+          destination: "/auth/signin",
+          permanent: false,
         },
       };
     }
+
+    const TTL_DAYS = 84; // 12 周
+    const weekStartParamRaw = ctx.query.weekStart;
+    const weekStartParam =
+      typeof weekStartParamRaw === "string" ? weekStartParamRaw : null;
+
+    if (weekStartParam) {
+      const requested = new Date(weekStartParam);
+      const now = new Date();
+      const threshold = new Date(now);
+      threshold.setDate(threshold.getDate() - TTL_DAYS);
+      if (requested.getTime() < threshold.getTime()) {
+        return {
+          props: {
+            report: null,
+            expired: true,
+            requestedWeekStart: weekStartParam,
+          },
+        };
+      }
+    }
+
+    const referenceDate = weekStartParam ? new Date(weekStartParam) : undefined;
+    const report = sanitizeForJson(
+      await computeWeeklyReport(session.user.id, {
+        referenceDate,
+        persist: false,
+      }),
+    );
+
+    return {
+      props: { report, expired: false, requestedWeekStart: weekStartParam },
+    };
+  } catch (error: any) {
+    console.error("[weekly-report] getServerSideProps error:", error);
+    console.error("[weekly-report] error message:", error?.message);
+    console.error("[weekly-report] error stack:", error?.stack);
+    
+    // 返回错误页面而不是直接抛出 500
+    return {
+      props: {
+        report: null,
+        expired: false,
+        requestedWeekStart: null,
+        error: process.env.NODE_ENV === "development" 
+          ? error?.message || "未知错误" 
+          : "周报生成失败，请稍后重试",
+      },
+    };
   }
-
-  const referenceDate = weekStartParam ? new Date(weekStartParam) : undefined;
-  const report = sanitizeForJson(
-    await computeWeeklyReport(session.user.id, {
-      referenceDate,
-      persist: false,
-    }),
-  );
-
-  return {
-    props: { report, expired: false, requestedWeekStart: weekStartParam },
-  };
 };
 
 export default WeeklyReportPage;

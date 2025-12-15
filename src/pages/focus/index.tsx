@@ -75,7 +75,7 @@ export default function Focus() {
   const sessionRef = useRef<FocusSession | null>(null);
   const isInitialLoadRef = useRef(true);
   const hasPlayedGoalSoundRef = useRef(false); // 标记是否已播放目标达成提示音
-  const todayMinutesBeforeStartRef = useRef(0); // 开始本次专注前，今日已累计专注分钟数（用于“今日累计达标”）
+  const todayMinutesBeforeStartRef = useRef(0); // 开始本次专注前，今日已累计专注分钟数（用于"今日累计达标"）
   const audioContextRef = useRef<AudioContext | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null); // Wake Lock 引用
   const autoInterruptedAtKey = 'focusSessionAutoInterruptedAt';
@@ -888,9 +888,10 @@ export default function Focus() {
     // 请求屏幕常亮（防止手机黑屏）
     requestWakeLock();
     
-    // 开始计时（基于时间戳的实时计算）
+    // 开始计时（每秒更新一次，平衡性能与体验）
     if (intervalRef.current === null) {
-      intervalRef.current = setInterval(() => {
+      // 立即更新一次（避免启动延迟）
+      const updateTime = () => {
         if (!sessionRef.current) {
           cleanupInterval();
           return;
@@ -903,7 +904,10 @@ export default function Focus() {
           false
         );
         
+        // 更新 UI
         setElapsedTime(calculatedTime);
+        
+        // 保存状态到 localStorage（每秒一次）
         saveState({ elapsedTime: calculatedTime });
         
         // 检查是否达到目标时长
@@ -917,7 +921,13 @@ export default function Focus() {
             playGoalAchievementSound();
           }
         }
-      }, 100); // 每100ms更新一次，确保显示流畅
+      };
+      
+      // 立即执行一次
+      updateTime();
+      
+      // 每秒更新一次（对于秒级计时器，1fps 完全够用）
+      intervalRef.current = setInterval(updateTime, 1000);
     }
   };
 
