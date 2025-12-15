@@ -76,6 +76,7 @@ export default function Focus() {
   const isInitialLoadRef = useRef(true);
   const hasPlayedGoalSoundRef = useRef(false); // 标记是否已播放目标达成提示音
   const todayMinutesBeforeStartRef = useRef(0); // 开始本次专注前，今日已累计专注分钟数（用于"今日累计达标"）
+  const saveCounterRef = useRef(0); // 用于控制 localStorage 保存频率（每 5 秒保存一次）
   const audioContextRef = useRef<AudioContext | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null); // Wake Lock 引用
   const autoInterruptedAtKey = 'focusSessionAutoInterruptedAt';
@@ -904,16 +905,18 @@ export default function Focus() {
           false
         );
         
-        // 更新 UI
+        // 更新 UI（每秒更新）
         setElapsedTime(calculatedTime);
         
-        // 保存状态到 localStorage（每秒一次）
-        saveState({ elapsedTime: calculatedTime });
+        // 降低 localStorage 保存频率：每 5 秒保存一次（减少写入压力）
+        saveCounterRef.current += 1;
+        if (saveCounterRef.current >= 5) {
+          saveState({ elapsedTime: calculatedTime });
+          saveCounterRef.current = 0;
+        }
         
         // 检查是否达到目标时长
-        const effectiveElapsed =
-          calculatedTime + todayMinutesBeforeStartRef.current * 60;
-        if (effectiveElapsed >= plannedMinutes * 60) {
+        if (calculatedTime >= plannedMinutes * 60) {
           // 达到目标时长，不自动结束，继续计时（显示金色背景）
           // 播放温柔的提示音（仅播放一次）
           if (!hasPlayedGoalSoundRef.current && plannedMinutes > 0) {
@@ -926,7 +929,7 @@ export default function Focus() {
       // 立即执行一次
       updateTime();
       
-      // 每秒更新一次（对于秒级计时器，1fps 完全够用）
+      // 每秒更新一次 UI（对于秒级计时器，1fps 完全够用）
       intervalRef.current = setInterval(updateTime, 1000);
     }
   };
