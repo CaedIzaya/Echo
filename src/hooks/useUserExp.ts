@@ -108,7 +108,7 @@ export function useUserExp() {
       // 立即更新 localStorage（用户体验优先）
       localStorage.setItem(STORAGE_KEY, newExp.toString());
       setUserExp(newExp);
-      setUserLevel(levelInfo.level);
+      setUserLevel(levelInfo.currentLevel);
 
       // 如果已登录，同步到数据库
       if (session?.user?.id) {
