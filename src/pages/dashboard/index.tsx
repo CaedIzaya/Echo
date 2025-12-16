@@ -16,6 +16,9 @@ import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { useMailSystem } from '~/lib/MailSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
+import { useUserExp } from '~/hooks/useUserExp';
+import { useHeartTreeExp } from '~/hooks/useHeartTreeExp';
+import { useAchievements } from '~/hooks/useAchievements';
 import { 
   pickHomeSentence, 
   pickUniversalSentence, 
@@ -291,6 +294,11 @@ export default function Dashboard() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   
+  // ========== 持久化 Hooks（数据库同步）==========
+  const { userExp, userLevel: hookUserLevel, addUserExp, updateUserExp } = useUserExp();
+  const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
+  const { unlockAchievement: unlockAchievementToDB } = useAchievements();
+  
   // 使用 useMemo 缓存 userId，避免因 session 对象引用变化而触发重新渲染
   const userId = useMemo(() => session?.user?.id, [session?.user?.id]);
   
@@ -503,17 +511,15 @@ export default function Dashboard() {
   };
 
   // 小精灵点击统一处理：经验值 + 觉察检查 + 文案展示
-  const handleSpiritClick = () => {
+  const handleSpiritClick = async () => {
     const today = getTodayDate();
     if (typeof window !== 'undefined') {
       const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
       if (lastSpiritInteractionDate !== today) {
         const spiritExp = LevelManager.calculateSpiritInteractionExp();
-        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-        const newExp = currentExp + spiritExp;
-        localStorage.setItem('userExp', newExp.toString());
+        await addUserExp(spiritExp); // 使用 Hook 自动保存到数据库
         localStorage.setItem('lastSpiritInteractionDate', today);
-        setUserLevel(LevelManager.calculateLevel(newExp));
+        // userLevel 会自动同步，无需手动 setUserLevel
       }
     }
 
@@ -536,6 +542,15 @@ export default function Dashboard() {
   const [unviewedAchievements, setUnviewedAchievements] = useState<any[]>([]);
   const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
+  
+  // ========== 同步 Hook 的用户等级到本地 state ==========
+  useEffect(() => {
+    if (hookUserLevel > 0) {
+      const levelInfo = LevelManager.calculateLevel(userExp);
+      setUserLevel(levelInfo);
+    }
+  }, [hookUserLevel, userExp]);
+  
   const [completingMilestoneId, setCompletingMilestoneId] = useState<string | null>(null); // 正在完成的小目标ID（用于动画）
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<Set<string>>(new Set()); // 多选的小目标ID集合
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
@@ -640,7 +655,7 @@ export default function Dashboard() {
     }
     
     // 延迟执行完成逻辑，让动画先播放
-    setTimeout(() => {
+    setTimeout(async () => {
       setPrimaryPlan(prev => {
         if (!prev) return prev;
         
@@ -663,34 +678,34 @@ export default function Dashboard() {
           localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
         }
 
-        // 批量完成小目标获得经验值
-        if (typeof window !== 'undefined') {
-          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-          const milestoneExp = LevelManager.calculateMilestoneExp(); // 每个5 EXP
-          const totalExp = currentExp + (milestoneExp * milestoneIds.length);
-          localStorage.setItem('userExp', totalExp.toString());
-          
-          const oldLevel = LevelManager.calculateLevel(currentExp);
-          const newLevel = LevelManager.calculateLevel(totalExp);
-          setUserLevel(newLevel);
-          
-          if (newLevel.currentLevel > oldLevel.currentLevel) {
-            console.log('🎉 等级提升！（批量完成小目标触发）', newLevel);
-          }
-          
-          // 心树 EXP 系统：小目标完成事件
-          try {
-            // 每个里程碑 30 EXP
-            const baseExp = EXP_MILESTONE * milestoneIds.length;
-            gainHeartTreeExp(baseExp);
-            console.log('🌳 心树 EXP +', baseExp, '（完成', milestoneIds.length, '个小目标）');
-          } catch (e) {
-            console.error('小目标完成时更新心树 EXP 失败:', e);
-          }
-        }
-
         return updatedPlan;
       });
+
+      // 批量完成小目标获得经验值（移到 setPrimaryPlan 之外）
+      if (typeof window !== 'undefined') {
+        const milestoneExp = LevelManager.calculateMilestoneExp(); // 每个5 EXP
+        const totalExpToAdd = milestoneExp * milestoneIds.length;
+        
+        const oldLevel = LevelManager.calculateLevel(userExp);
+        await addUserExp(totalExpToAdd); // 使用 Hook 自动保存到数据库
+        const newLevel = LevelManager.calculateLevel(userExp + totalExpToAdd);
+        setUserLevel(newLevel);
+        
+        if (newLevel.currentLevel > oldLevel.currentLevel) {
+          console.log('🎉 等级提升！（批量完成小目标触发）', newLevel);
+        }
+        
+        // 心树 EXP 系统：小目标完成事件
+        try {
+          // 每个里程碑 30 EXP
+          const baseExp = EXP_MILESTONE * milestoneIds.length;
+          const newHeartTreeState = gainHeartTreeExp(baseExp);
+          await updateHeartTreeExpState(newHeartTreeState);
+          console.log('🌳 心树 EXP +', baseExp, '（完成', milestoneIds.length, '个小目标）');
+        } catch (e) {
+          console.error('小目标完成时更新心树 EXP 失败:', e);
+        }
+      }
 
       // 更新完成的小目标计数（触发成就检查）
       incrementCompletedGoals(milestoneIds.length);
@@ -805,7 +820,7 @@ export default function Dashboard() {
   };
 
   // 专注完成后更新统计数据（由focus页面调用）
-  const handleFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
+  const handleFocusSessionComplete = async (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
     const status = completed ? '✅ 完成' : '⚠️ 中断';
     console.log('📈 Dashboard收到专注报告', { 
       status,
@@ -928,7 +943,7 @@ export default function Dashboard() {
     });
 
     // 更新等级经验值（传递 plannedMinutes 用于判断经验值类型）
-    updateUserExp(minutes, rating, completed, plannedMinutes);
+    await updateUserExpFromSession(minutes, rating, completed, plannedMinutes);
     
     // 检查首次专注成就（在第一次完成专注时立即触发）
     if (completed && currentTotalMinutes === 0 && newTotalMinutes > 0) {
@@ -962,8 +977,8 @@ export default function Dashboard() {
   };
 
   // 更新用户经验值（优化后的经验值系统）
-  const updateUserExp = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
-    const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+  const updateUserExpFromSession = async (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
+    const currentExp = userExp; // 使用 Hook 的值
     
     let sessionExp = 0;
     
@@ -998,8 +1013,8 @@ export default function Dashboard() {
     const oldLevel = LevelManager.calculateLevel(currentExp);
     const newLevel = LevelManager.calculateLevel(newTotalExp);
     
-    // 保存经验值
-    localStorage.setItem('userExp', newTotalExp.toString());
+    // 保存经验值到数据库 + localStorage
+    await updateUserExp(newTotalExp);
     
     // 检测等级提升
     if (newLevel.currentLevel > oldLevel.currentLevel) {
@@ -1168,7 +1183,7 @@ export default function Dashboard() {
       setIsLoading(false);
       
       // 延迟一会确保页面已渲染完成
-      setTimeout(() => {
+      setTimeout(async () => {
         // 先检查专注完成标记，如果有则优先播放祝贺气泡（暂时仍使用旧池）
         const focusCompleted = localStorage.getItem('focusCompleted');
         if (focusCompleted === 'true') {
@@ -1185,12 +1200,10 @@ export default function Dashboard() {
         if (lastLoginDate !== today) {
           // 今日首次登录，给予经验值奖励
           const loginExp = LevelManager.calculateDailyLoginExp();
-          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-          const newExp = currentExp + loginExp;
-          localStorage.setItem('userExp', newExp.toString());
+          await addUserExp(loginExp); // 使用 Hook 自动保存到数据库
           localStorage.setItem('lastLoginDate', today);
-          console.log('📈 每日登录经验值奖励', { exp: loginExp, total: newExp });
-          setUserLevel(LevelManager.calculateLevel(newExp));
+          console.log('📈 每日登录经验值奖励', { exp: loginExp, total: userExp + loginExp });
+          // userLevel 会自动同步
         }
         
         // 如果没有专注完成，再根据 V2 语境 + 频率逻辑决定是否播放首页文案
@@ -1386,32 +1399,38 @@ export default function Dashboard() {
       
       //  });
       
-      // 成就解锁获得经验值（每个成就20 EXP）
-      if (typeof window !== 'undefined') {
-        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-        const achievementExp = LevelManager.calculateAchievementExp('common'); // 常规成就20 EXP
-        const totalExp = currentExp + (achievementExp * allNew.length);
-        localStorage.setItem('userExp', totalExp.toString());
-        
-        const oldLevel = LevelManager.calculateLevel(currentExp);
-        const newLevel = LevelManager.calculateLevel(totalExp);
-        setUserLevel(newLevel);
-        
-        console.log(`🎁 解锁${allNew.length}个成就，获得${achievementExp * allNew.length} EXP`);
-        
-        if (newLevel.currentLevel > oldLevel.currentLevel) {
-          console.log('🎉 等级提升！（成就解锁触发）', newLevel);
+      // 成就解锁获得经验值（每个成就20 EXP）- 使用异步函数处理
+      (async () => {
+        if (typeof window !== 'undefined') {
+          const achievementExp = LevelManager.calculateAchievementExp('common'); // 常规成就20 EXP
+          const totalExpToAdd = achievementExp * allNew.length;
+          
+          const oldLevel = LevelManager.calculateLevel(userExp);
+          await addUserExp(totalExpToAdd); // 使用 Hook 自动保存到数据库
+          const newLevel = LevelManager.calculateLevel(userExp + totalExpToAdd);
+          setUserLevel(newLevel);
+          
+          // 同步成就到数据库
+          for (const achievement of allNew) {
+            await unlockAchievementToDB(achievement.id, achievement.category);
+          }
+          
+          console.log(`🎁 解锁${allNew.length}个成就，获得${achievementExp * allNew.length} EXP`);
+          
+          if (newLevel.currentLevel > oldLevel.currentLevel) {
+            console.log('🎉 等级提升！（成就解锁触发）', newLevel);
+          }
+          
+          // 心树 EXP 系统：成就解锁 → 授予施肥 Buff
+          try {
+            const state = loadHeartTreeExpState();
+            await updateHeartTreeExpState(grantFertilizerBuff(state));
+            console.log('🌱 心树获得施肥 Buff！（成就解锁）');
+          } catch (e) {
+            console.error('成就解锁时授予心树施肥 Buff 失败:', e);
+          }
         }
-        
-        // 心树 EXP 系统：成就解锁 → 授予施肥 Buff
-        try {
-          const state = loadHeartTreeExpState();
-          grantFertilizerBuff(state);
-          console.log('🌱 心树获得施肥 Buff！（成就解锁）');
-        } catch (e) {
-          console.error('成就解锁时授予心树施肥 Buff 失败:', e);
-        }
-      }
+      })();
       
       // 3秒后自动清空，以便再次触发
       setTimeout(() => setNewAchievements([]), 3000);
@@ -1439,11 +1458,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const userExp = parseFloat(localStorage.getItem('userExp') || '0');
-    const levelInfo = LevelManager.calculateLevel(userExp);
-    setUserLevel(levelInfo);
-    
-    console.log('📊 用户等级信息', levelInfo);
+    // userExp 来自 Hook，会自动同步
+    // 此 useEffect 已经被 Hook 的 useEffect 取代，保留空实现避免错误
+    if (userExp >= 0) {
+      const levelInfo = LevelManager.calculateLevel(userExp);
+      setUserLevel(levelInfo);
+      console.log('📊 用户等级信息', levelInfo);
+    }
   }, [todayStats.minutes, weeklyStats.totalMinutes, stats.streakDays]);
 
   // 检查是否达到每日目标并给予奖励

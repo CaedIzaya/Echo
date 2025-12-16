@@ -14,6 +14,9 @@ import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
+import { useUserExp } from '~/hooks/useUserExp';
+import { useHeartTreeExp } from '~/hooks/useHeartTreeExp';
+import { useAchievements } from '~/hooks/useAchievements';
 import {
   FlowMetrics,
   FlowUpdateContext,
@@ -261,6 +264,11 @@ export default function Dashboard() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   
+  // ========== 持久化 Hooks（数据库同步）==========
+  const { userExp, userLevel: hookUserLevel, addUserExp, updateUserExp: saveUserExpToDB } = useUserExp();
+  const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
+  const { unlockAchievement: unlockAchievementToDB } = useAchievements();
+  
   // 使用 useMemo 缓存 userId，避免因 session 对象引用变化而触发重新渲染
   const userId = useMemo(() => session?.user?.id, [session?.user?.id]);
   
@@ -401,6 +409,15 @@ export default function Dashboard() {
   const [unviewedAchievements, setUnviewedAchievements] = useState<any[]>([]);
   const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
+  
+  // ========== 同步 Hook 的用户等级到本地 state ==========
+  useEffect(() => {
+    if (hookUserLevel > 0 && userExp >= 0) {
+      const levelInfo = LevelManager.calculateLevel(userExp);
+      setUserLevel(levelInfo);
+    }
+  }, [hookUserLevel, userExp]);
+  
   const [completingMilestoneId, setCompletingMilestoneId] = useState<string | null>(null); // 正在完成的小目标ID（用于动画）
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<Set<string>>(new Set()); // 多选的小目标ID集合
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
@@ -505,7 +522,7 @@ export default function Dashboard() {
     }
     
     // 延迟执行完成逻辑，让动画先播放
-    setTimeout(() => {
+    setTimeout(async () => {
       setPrimaryPlan(prev => {
         if (!prev) return prev;
         
@@ -528,30 +545,29 @@ export default function Dashboard() {
           localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
         }
 
-        // 批量完成小目标获得经验值
-        if (typeof window !== 'undefined') {
-          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-          const milestoneExp = LevelManager.calculateMilestoneExp(); // 每个5 EXP
-          const totalExp = currentExp + (milestoneExp * milestoneIds.length);
-          localStorage.setItem('userExp', totalExp.toString());
-          
-          const oldLevel = LevelManager.calculateLevel(currentExp);
-          const newLevel = LevelManager.calculateLevel(totalExp);
-          setUserLevel(newLevel);
-          
-          if (newLevel.currentLevel > oldLevel.currentLevel) {
-            console.log('🎉 等级提升！（批量完成小目标触发）', newLevel);
-          }
-          
-          // 心树功能暂时屏蔽
-          // 增加浇水机会（批量完成小目标）
-          // const completedCount = updatedMilestones.filter((m: Milestone) => m.isCompleted).length;
-          // const { HeartTreeManager } = require('./HeartTreeSystem');
-          // HeartTreeManager.addWaterOpportunityOnMilestoneComplete(completedCount);
-        }
-
         return updatedPlan;
       });
+
+      // 批量完成小目标获得经验值（移到 setPrimaryPlan 之外）
+      if (typeof window !== 'undefined') {
+        const milestoneExp = LevelManager.calculateMilestoneExp(); // 每个5 EXP
+        const totalExpToAdd = milestoneExp * milestoneIds.length;
+        
+        const oldLevel = LevelManager.calculateLevel(userExp);
+        await addUserExp(totalExpToAdd); // 使用 Hook 自动保存到数据库
+        const newLevel = LevelManager.calculateLevel(userExp + totalExpToAdd);
+        setUserLevel(newLevel);
+        
+        if (newLevel.currentLevel > oldLevel.currentLevel) {
+          console.log('🎉 等级提升！（批量完成小目标触发）', newLevel);
+        }
+        
+        // 心树功能暂时屏蔽
+        // 增加浇水机会（批量完成小目标）
+        // const completedCount = updatedMilestones.filter((m: Milestone) => m.isCompleted).length;
+        // const { HeartTreeManager } = require('./HeartTreeSystem');
+        // HeartTreeManager.addWaterOpportunityOnMilestoneComplete(completedCount);
+      }
 
       // 更新完成的小目标计数（触发成就检查）
       incrementCompletedGoals(milestoneIds.length);
@@ -666,7 +682,7 @@ export default function Dashboard() {
   };
 
   // 专注完成后更新统计数据（由focus页面调用）
-  const handleFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
+  const handleFocusSessionComplete = async (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
     const status = completed ? '✅ 完成' : '⚠️ 中断';
     console.log('📈 Dashboard收到专注报告', { 
       status,
@@ -771,7 +787,7 @@ export default function Dashboard() {
     });
 
     // 更新等级经验值（传递 plannedMinutes 用于判断经验值类型）
-    updateUserExp(minutes, rating, completed, plannedMinutes);
+    await updateUserExpFromSession(minutes, rating, completed, plannedMinutes);
     
     // 检查首次专注成就（在第一次完成专注时立即触发）
     if (completed && currentTotalMinutes === 0 && newTotalMinutes > 0) {
@@ -805,8 +821,8 @@ export default function Dashboard() {
   };
 
   // 更新用户经验值（优化后的经验值系统）
-  const updateUserExp = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
-    const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+  const updateUserExpFromSession = async (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
+    const currentExp = userExp;
     
     let sessionExp = 0;
     
@@ -841,8 +857,8 @@ export default function Dashboard() {
     const oldLevel = LevelManager.calculateLevel(currentExp);
     const newLevel = LevelManager.calculateLevel(newTotalExp);
     
-    // 保存经验值
-    localStorage.setItem('userExp', newTotalExp.toString());
+    // 保存经验值到数据库 + localStorage
+    await saveUserExpToDB(newTotalExp);
     
     // 检测等级提升
     if (newLevel.currentLevel > oldLevel.currentLevel) {
@@ -1011,7 +1027,7 @@ export default function Dashboard() {
       setIsLoading(false);
       
       // 延迟一会确保页面已渲染完成
-      setTimeout(() => {
+      setTimeout(async () => {
         // 先检查专注完成标记，如果有则优先播放祝贺气泡
         const focusCompleted = localStorage.getItem('focusCompleted');
         if (focusCompleted === 'true') {
@@ -1030,12 +1046,10 @@ export default function Dashboard() {
         if (lastLoginDate !== today) {
           // 今日首次登录，给予经验值奖励
           const loginExp = LevelManager.calculateDailyLoginExp();
-          const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-          const newExp = currentExp + loginExp;
-          localStorage.setItem('userExp', newExp.toString());
+          await addUserExp(loginExp); // 使用 Hook 自动保存到数据库
           localStorage.setItem('lastLoginDate', today);
-          console.log('📈 每日登录经验值奖励', { exp: loginExp, total: newExp });
-          setUserLevel(LevelManager.calculateLevel(newExp));
+          console.log('📈 每日登录经验值奖励', { exp: loginExp, total: userExp + loginExp });
+          // userLevel 会自动同步
         }
         
         // 如果没有专注完成，再检查是否需要首次欢迎
@@ -1181,28 +1195,34 @@ export default function Dashboard() {
         localStorage.setItem('unviewedAchievements', JSON.stringify(allNew));
       }
       
-      // 成就解锁获得经验值（每个成就20 EXP）
-      if (typeof window !== 'undefined') {
-        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-        const achievementExp = LevelManager.calculateAchievementExp('common'); // 常规成就20 EXP
-        const totalExp = currentExp + (achievementExp * allNew.length);
-        localStorage.setItem('userExp', totalExp.toString());
-        
-        const oldLevel = LevelManager.calculateLevel(currentExp);
-        const newLevel = LevelManager.calculateLevel(totalExp);
-        setUserLevel(newLevel);
-        
-        console.log(`🎁 解锁${allNew.length}个成就，获得${achievementExp * allNew.length} EXP`);
-        
-        if (newLevel.currentLevel > oldLevel.currentLevel) {
-          console.log('🎉 等级提升！（成就解锁触发）', newLevel);
+      // 成就解锁获得经验值（每个成就20 EXP）- 使用异步函数处理
+      (async () => {
+        if (typeof window !== 'undefined') {
+          const achievementExp = LevelManager.calculateAchievementExp('common'); // 常规成就20 EXP
+          const totalExpToAdd = achievementExp * allNew.length;
+          
+          const oldLevel = LevelManager.calculateLevel(userExp);
+          await addUserExp(totalExpToAdd); // 使用 Hook 自动保存到数据库
+          const newLevel = LevelManager.calculateLevel(userExp + totalExpToAdd);
+          setUserLevel(newLevel);
+          
+          // 同步成就到数据库
+          for (const achievement of allNew) {
+            await unlockAchievementToDB(achievement.id, achievement.category);
+          }
+          
+          console.log(`🎁 解锁${allNew.length}个成就，获得${achievementExp * allNew.length} EXP`);
+          
+          if (newLevel.currentLevel > oldLevel.currentLevel) {
+            console.log('🎉 等级提升！（成就解锁触发）', newLevel);
+          }
+          
+          // 心树功能暂时屏蔽
+          // 增加施肥机会（成就解锁）
+          // const { HeartTreeManager } = require('./HeartTreeSystem');
+          // HeartTreeManager.addFertilizeOpportunityOnAchievementUnlock(allNew.length);
         }
-        
-        // 心树功能暂时屏蔽
-        // 增加施肥机会（成就解锁）
-        // const { HeartTreeManager } = require('./HeartTreeSystem');
-        // HeartTreeManager.addFertilizeOpportunityOnAchievementUnlock(allNew.length);
-      }
+      })();
       
       // 3秒后自动清空，以便再次触发
       setTimeout(() => setNewAchievements([]), 3000);
@@ -1230,12 +1250,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const userExp = parseFloat(localStorage.getItem('userExp') || '0');
-    const levelInfo = LevelManager.calculateLevel(userExp);
-    setUserLevel(levelInfo);
-    
-    console.log('📊 用户等级信息', levelInfo);
-  }, [todayStats.minutes, weeklyStats.totalMinutes, stats.streakDays]);
+    // userExp 来自 Hook，会自动同步
+    if (userExp >= 0) {
+      const levelInfo = LevelManager.calculateLevel(userExp);
+      setUserLevel(levelInfo);
+      console.log('📊 用户等级信息', levelInfo);
+    }
+  }, [userExp, todayStats.minutes, weeklyStats.totalMinutes, stats.streakDays]);
 
   // 检查是否达到每日目标并给予奖励
   useEffect(() => {
@@ -1758,16 +1779,14 @@ export default function Dashboard() {
                         setCurrentSpiritState(newState as 'idle' | 'happy' | 'excited');
                       }
                     }}
-                    onClick={() => {
+                    onClick={async () => {
                       const today = getTodayDate();
                       const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
                       if (lastSpiritInteractionDate !== today) {
                         const spiritExp = LevelManager.calculateSpiritInteractionExp();
-                        const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
-                        const newExp = currentExp + spiritExp;
-                        localStorage.setItem('userExp', newExp.toString());
+                        await addUserExp(spiritExp); // 使用 Hook 自动保存到数据库
                         localStorage.setItem('lastSpiritInteractionDate', today);
-                        setUserLevel(LevelManager.calculateLevel(newExp));
+                        // userLevel 会自动同步
                       }
                       if (spiritDialogRef.current) {
                         spiritDialogRef.current.showMessage();
@@ -2011,7 +2030,7 @@ export default function Dashboard() {
             const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
             if (lastSpiritInteractionDate !== today) {
               const spiritExp = LevelManager.calculateSpiritInteractionExp();
-              const currentExp = parseFloat(localStorage.getItem('userExp') || '0');
+              const currentExp = userExp;
               const newExp = currentExp + spiritExp;
               localStorage.setItem('userExp', newExp.toString());
               localStorage.setItem('lastSpiritInteractionDate', today);
