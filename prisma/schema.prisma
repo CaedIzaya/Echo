@@ -56,6 +56,14 @@ model User {
   updatedAt              DateTime       @default(now()) @updatedAt
   hasCompletedOnboarding Boolean        @default(false)
   heartTreeName          String?        @default("心树")
+  userExp                Float          @default(0)
+  userLevel              Int            @default(1)
+  heartTreeLevel         Int            @default(1)
+  heartTreeCurrentExp    Float          @default(0)
+  heartTreeTotalExp      Float          @default(0)
+  lastWateredDate        String?
+  fertilizerExpiresAt    DateTime?
+  fertilizerMultiplier   Float?
   accounts               Account[]
   sessions               Session[]
   projects               Project[]
@@ -65,6 +73,7 @@ model User {
   weeklyReports          WeeklyReport[]
   recoveryQuestions      RecoveryQuestion[]
   passwordResetTokens    PasswordResetToken[]
+  achievements           Achievement[]
 
   @@index([createdAt])
   @@index([email])
@@ -204,4 +213,18 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model Achievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  category      String
+  unlockedAt    DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+  @@map("achievements_unlocked")
 }
