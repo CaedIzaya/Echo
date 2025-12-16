@@ -44,7 +44,7 @@ export function useUserExp() {
       if (localExp > 0) {
         setUserExp(localExp);
         const levelInfo = LevelManager.calculateLevel(localExp);
-        setUserLevel(levelInfo.level);
+        setUserLevel(levelInfo.currentLevel);
       }
     } finally {
       setIsLoading(false);
@@ -68,7 +68,7 @@ export function useUserExp() {
         if (localExp > 0) {
           setUserExp(localExp);
           const levelInfo = LevelManager.calculateLevel(localExp);
-          setUserLevel(levelInfo.level);
+          setUserLevel(levelInfo.currentLevel);
         }
         setIsLoading(false);
         
@@ -81,7 +81,7 @@ export function useUserExp() {
       if (localExp > 0) {
         setUserExp(localExp);
         const levelInfo = LevelManager.calculateLevel(localExp);
-        setUserLevel(levelInfo.level);
+        setUserLevel(levelInfo.currentLevel);
       }
       setIsLoading(false);
     }
