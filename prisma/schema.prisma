@@ -55,6 +55,7 @@ model User {
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @default(now()) @updatedAt
   hasCompletedOnboarding Boolean        @default(false)
+  heartTreeName          String?        @default("心树")
   accounts               Account[]
   sessions               Session[]
   projects               Project[]

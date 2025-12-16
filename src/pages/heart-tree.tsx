@@ -5,12 +5,13 @@ import HeartTreeComponent from './dashboard/HeartTree';
 import BottomNavigation from './dashboard/BottomNavigation';
 import { getNamingGuideText, getFirstMeetingText } from '~/awareness/heart-tree-naming';
 import { useSafeTimeout } from '~/hooks/usePerformance';
+import { useHeartTreeName } from '~/hooks/useHeartTreeName';
 
 export default function HeartTreePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [hasCompletedFocusToday, setHasCompletedFocusToday] = useState(false);
-  const [heartTreeName, setHeartTreeName] = useState<string | null>(null);
+  const { treeName, isLoading: isLoadingName, updateTreeName, isSaving } = useHeartTreeName();
   const [isNaming, setIsNaming] = useState(false);
   const [namingInput, setNamingInput] = useState('');
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
@@ -35,36 +36,38 @@ export default function HeartTreePage() {
           setHasCompletedFocusToday(false);
         }
 
-        // 2）加载心树名字
-        const storedName = localStorage.getItem('heartTreeNameV1');
-        if (storedName && storedName.trim().length > 0) {
-          setHeartTreeName(storedName.trim());
-          setIsNaming(false);
-        } else {
-          setHeartTreeName(null);
-          setIsNaming(true);
+        // 2）检查是否需要命名（从Hook获取）
+        if (!isLoadingName) {
+          if (treeName && treeName !== '心树') {
+            setIsNaming(false);
+          } else {
+            setIsNaming(true);
+          }
         }
       } catch {
         setHasCompletedFocusToday(false);
-        setHeartTreeName(null);
-        setIsNaming(true);
       }
     };
     
     // 页面加载时检查一次今日专注状态和心树命名状态
     // 删除轮询，避免在用户刚命名完成时意外关闭欢迎文案弹层
     checkTodayAndName();
-  }, []);
+  }, [treeName, isLoadingName]);
 
-  const handleConfirmName = () => {
+  const handleConfirmName = async () => {
     const trimmed = namingInput.trim();
     if (!trimmed) return;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('heartTreeNameV1', trimmed);
+    
+    // 使用新的Hook保存到数据库和localStorage
+    const success = await updateTreeName(trimmed);
+    
+    if (success) {
+      setIsNaming(false); // 关闭起名弹窗
+      setShowWelcomeDialog(true); // 打开欢迎弹窗
+    } else {
+      // 保存失败时显示提示
+      alert('保存失败，请重试');
     }
-    setHeartTreeName(trimmed);
-    setIsNaming(false); // 关闭起名弹窗
-    setShowWelcomeDialog(true); // 打开欢迎弹窗
   };
 
   // 欢迎弹窗显示后，10秒自动关闭
@@ -108,7 +111,7 @@ export default function HeartTreePage() {
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 pb-20">
           <div className="max-w-4xl mx-auto">
             {/* 如果已命名，显示心树组件；否则显示占位内容 */}
-            {heartTreeName ? (
+            {!isLoadingName && treeName && treeName !== '心树' ? (
               <HeartTreeComponent
                 todaySessions={hasCompletedFocusToday ? 1 : 0}
                 completedMilestonesToday={0}
@@ -117,7 +120,7 @@ export default function HeartTreePage() {
             ) : (
               <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center text-gray-400">
-                  <p className="text-sm">请先为心树起个名字</p>
+                  <p className="text-sm">{isLoadingName ? '加载中...' : '请先为心树起个名字'}</p>
                 </div>
               </div>
             )}
@@ -153,14 +156,14 @@ export default function HeartTreePage() {
                 <button
                   type="button"
                   onClick={handleConfirmName}
-                  disabled={!namingInput.trim()}
+                  disabled={!namingInput.trim() || isSaving}
                   className={`px-6 py-2 rounded-xl text-sm font-semibold text-white transition
-                    ${namingInput.trim()
+                    ${namingInput.trim() && !isSaving
                       ? 'bg-emerald-500 hover:bg-emerald-600 shadow-lg'
                       : 'bg-emerald-200 cursor-not-allowed'
                     }`}
                 >
-                  完成命名
+                  {isSaving ? '保存中...' : '完成命名'}
                 </button>
               </div>
             </div>
@@ -168,16 +171,16 @@ export default function HeartTreePage() {
         )}
 
         {/* 第二个弹窗：欢迎对话（删除了树苗emoji） */}
-        {showWelcomeDialog && heartTreeName && (
+        {showWelcomeDialog && treeName && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
             <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-6 relative animate-fade-in">
               <div className="space-y-6">
                 <div className="text-center">
                   <p className="text-xs uppercase tracking-[0.35em] text-emerald-500 font-medium mb-4">
-                    {heartTreeName}
+                    {treeName}
                   </p>
                   <p className="text-gray-800 text-base leading-relaxed whitespace-pre-line px-4">
-                    {getFirstMeetingText(heartTreeName)}
+                    {getFirstMeetingText(treeName)}
                   </p>
                 </div>
                 <div className="flex flex-col items-center gap-3">

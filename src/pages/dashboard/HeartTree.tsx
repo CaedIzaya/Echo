@@ -21,6 +21,7 @@ import {
   getRandomFertilizeMessage,
 } from '~/lib/heartTreeDialogue';
 import { useSafeTimeout } from '~/hooks/usePerformance';
+import { useHeartTreeName } from '~/hooks/useHeartTreeName';
 
 interface HeartTreeProps {
   flowIndex?: number;
@@ -45,6 +46,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
   const [waterOpportunities, setWaterOpportunities] = useState(props.completedMilestonesToday || 0);
   const [fertilizeOpportunities, setFertilizeOpportunities] = useState(props.newAchievementsToday || 0);
   const { setSafeTimeout, clearSafeTimeout } = useSafeTimeout();
+  const { treeName, isLoading: isLoadingName } = useHeartTreeName();
 
   // 加载心树数据
   useEffect(() => {
@@ -603,9 +605,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
                   <div className="text-2xl">🌳</div>
                   <div>
                     <p className="text-sm font-semibold text-teal-700 mb-0.5">
-                      {typeof window !== 'undefined'
-                        ? (window.localStorage.getItem('heartTreeNameV1') || '心树')
-                        : '心树'}
+                      {isLoadingName ? '...' : treeName}
                     </p>
                     <p className="text-xs text-gray-500">Lv.{levelView.level}</p>
                   </div>
