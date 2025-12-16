@@ -17,47 +17,63 @@ type Props = {
 
 const WeeklyReportPage = ({ report, expired, requestedWeekStart, error }: Props) => {
   if (error) {
+    // 判断是否是第一周保护错误
+    const isFirstWeekProtection = error.includes("注册时间不足");
+    const bgColor = isFirstWeekProtection 
+      ? "from-blue-50 via-white to-indigo-50" 
+      : "from-red-50 via-white to-orange-50";
+    const accentColor = isFirstWeekProtection ? "blue" : "red";
+    
     return (
       <>
         <Head>
-          <title>周报加载失败</title>
+          <title>{isFirstWeekProtection ? "周报尚未开放" : "周报加载失败"}</title>
         </Head>
         {_weeklyReportMotionStyle}
-        <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 pb-20 relative overflow-hidden">
-          <div className="pointer-events-none absolute -top-24 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-br from-red-200/60 via-orange-200/50 to-yellow-200/40 blur-3xl opacity-80 translate-x-1/3 animate-float-slow" />
-          <div className="pointer-events-none absolute -bottom-24 left-0 h-[520px] w-[520px] rounded-full bg-gradient-to-br from-red-200/60 via-orange-200/40 to-yellow-200/40 blur-3xl opacity-70 -translate-x-1/3 animate-float-slower" />
+        <div className={`min-h-screen bg-gradient-to-br ${bgColor} pb-20 relative overflow-hidden`}>
+          <div className={`pointer-events-none absolute -top-24 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-br from-${accentColor}-200/60 via-${accentColor === "blue" ? "indigo" : "orange"}-200/50 to-${accentColor === "blue" ? "purple" : "yellow"}-200/40 blur-3xl opacity-80 translate-x-1/3 animate-float-slow`} />
+          <div className={`pointer-events-none absolute -bottom-24 left-0 h-[520px] w-[520px] rounded-full bg-gradient-to-br from-${accentColor}-200/60 via-${accentColor === "blue" ? "indigo" : "orange"}-200/40 to-${accentColor === "blue" ? "purple" : "yellow"}-200/40 blur-3xl opacity-70 -translate-x-1/3 animate-float-slower`} />
 
           <main className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-16 relative">
-            <div className="rounded-[2rem] bg-white/80 backdrop-blur-xl border border-white/80 shadow-[0_20px_60px_-40px_rgba(239,68,68,0.45)] overflow-hidden p-8">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-red-100 px-4 py-2 shadow-sm">
+            <div className="rounded-[2rem] bg-white/80 backdrop-blur-xl border border-white/80 shadow-[0_20px_60px_-40px_rgba(59,130,246,0.45)] overflow-hidden p-8">
+              <div className={`inline-flex items-center gap-2 rounded-full bg-white/90 border border-${accentColor}-100 px-4 py-2 shadow-sm`}>
                 <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-${accentColor}-400 opacity-75`} />
+                  <span className={`relative inline-flex rounded-full h-3 w-3 bg-${accentColor}-500`} />
                 </span>
-                <span className="text-sm font-semibold text-red-700">
-                  加载失败
+                <span className={`text-sm font-semibold text-${accentColor}-700`}>
+                  {isFirstWeekProtection ? "还差几天" : "加载失败"}
                 </span>
               </div>
 
               <h1 className="mt-4 text-3xl font-bold text-slate-900 tracking-tight">
-                周报加载失败
+                {isFirstWeekProtection ? "周报即将解锁" : "周报加载失败"}
               </h1>
               <p className="mt-2 text-slate-600 leading-relaxed">
                 {error}
               </p>
-              {process.env.NODE_ENV === "development" && (
+              {isFirstWeekProtection && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                  <p className="text-sm text-blue-700 leading-relaxed">
+                    💡 提示：为了生成有意义的周报，我们需要至少一周的数据。继续专注吧，很快就能看到第一份周报了！
+                  </p>
+                </div>
+              )}
+              {!isFirstWeekProtection && process.env.NODE_ENV === "development" && (
                 <p className="mt-4 text-xs text-slate-400 font-mono bg-slate-50 p-3 rounded-lg">
                   {error}
                 </p>
               )}
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href="/reports/weekly"
-                  className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-black transition"
-                >
-                  重试
-                </Link>
+                {!isFirstWeekProtection && (
+                  <Link
+                    href="/reports/weekly"
+                    className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-black transition"
+                  >
+                    重试
+                  </Link>
+                )}
                 <Link
                   href="/dashboard"
                   className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-white transition"

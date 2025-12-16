@@ -118,6 +118,30 @@ export async function computeWeeklyReport(
       }),
     ]);
 
+  // 用户验证
+  if (!user) {
+    console.error(`[computeWeeklyReport] 用户不存在: userId=${userId}`);
+    throw new Error("用户不存在");
+  }
+
+  // 第一周保护机制：注册未满7天的用户不生成周报
+  if (user.createdAt) {
+    const daysSinceRegistration = Math.floor(
+      (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    console.log(`[computeWeeklyReport] 用户注册天数: ${daysSinceRegistration}天, userId=${userId}`);
+    
+    if (daysSinceRegistration < 7) {
+      console.warn(`[computeWeeklyReport] 注册时间不足7天: userId=${userId}, days=${daysSinceRegistration}`);
+      throw new Error(
+        `注册时间不足7天（当前${daysSinceRegistration}天），暂不生成周报。继续专注吧，第二周将为你生成第一份周报！`
+      );
+    }
+  }
+
+  // 数据验证日志
+  console.log(`[computeWeeklyReport] 数据统计: userId=${userId}, sessions=${sessions.length}, prevSessions=${prevSessions.length}, summaries=${summaries.length}`);
+
   const summaryMap = new Map<string, string>();
   summaries.forEach((s) => summaryMap.set(s.date, s.text));
 
@@ -268,39 +292,56 @@ async function persistWeekly(
   weekStart: Date,
   weekEnd: Date,
 ): Promise<WeeklyReport> {
-  const expiresAt = new Date(weekEnd);
-  expiresAt.setDate(expiresAt.getDate() + WEEKLY_REPORT_TTL_DAYS);
-  return db.weeklyReport.upsert({
-    where: { userId_weekStart: { userId, weekStart } },
-    update: {
-      weekEnd,
-      totalMinutes: payload.totals.minutes,
-      wowChange: payload.totals.wowChange,
-      streakDays: payload.totals.streakDays,
-      bestDay: payload.bestDay ? new Date(payload.bestDay.date) : null,
-      bestDayNote: payload.bestDay?.note,
-      flowAvg: payload.totals.flowAvg,
-      flowDelta: payload.totals.flowDelta,
-      expTotal: payload.totals.expTotal,
-      payloadJson: payload,
-      expiresAt,
-    },
-    create: {
+  try {
+    const expiresAt = new Date(weekEnd);
+    expiresAt.setDate(expiresAt.getDate() + WEEKLY_REPORT_TTL_DAYS);
+    
+    console.log(`[persistWeekly] 开始保存周报: userId=${userId}, weekStart=${weekStart.toISOString()}`);
+    
+    const result = await db.weeklyReport.upsert({
+      where: { userId_weekStart: { userId, weekStart } },
+      update: {
+        weekEnd,
+        totalMinutes: payload.totals.minutes,
+        wowChange: payload.totals.wowChange,
+        streakDays: payload.totals.streakDays,
+        bestDay: payload.bestDay ? new Date(payload.bestDay.date) : null,
+        bestDayNote: payload.bestDay?.note,
+        flowAvg: payload.totals.flowAvg,
+        flowDelta: payload.totals.flowDelta,
+        expTotal: payload.totals.expTotal,
+        payloadJson: payload,
+        expiresAt,
+        updatedAt: new Date(),
+      },
+      create: {
+        userId,
+        weekStart,
+        weekEnd,
+        totalMinutes: payload.totals.minutes,
+        wowChange: payload.totals.wowChange,
+        streakDays: payload.totals.streakDays,
+        bestDay: payload.bestDay ? new Date(payload.bestDay.date) : null,
+        bestDayNote: payload.bestDay?.note,
+        flowAvg: payload.totals.flowAvg,
+        flowDelta: payload.totals.flowDelta,
+        expTotal: payload.totals.expTotal,
+        payloadJson: payload,
+        expiresAt,
+      },
+    });
+    
+    console.log(`[persistWeekly] 周报保存成功: reportId=${result.id}`);
+    return result;
+  } catch (error: any) {
+    console.error("[persistWeekly] 保存周报失败:", {
       userId,
-      weekStart,
-      weekEnd,
-      totalMinutes: payload.totals.minutes,
-      wowChange: payload.totals.wowChange,
-      streakDays: payload.totals.streakDays,
-      bestDay: payload.bestDay ? new Date(payload.bestDay.date) : null,
-      bestDayNote: payload.bestDay?.note,
-      flowAvg: payload.totals.flowAvg,
-      flowDelta: payload.totals.flowDelta,
-      expTotal: payload.totals.expTotal,
-      payloadJson: payload,
-      expiresAt,
-    },
-  });
+      weekStart: weekStart.toISOString(),
+      error: error?.message || error,
+      stack: error?.stack,
+    });
+    throw new Error(`周报保存失败: ${error?.message || "未知错误"}`);
+  }
 }
 
 function calcTotals(
