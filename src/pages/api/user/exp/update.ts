@@ -33,14 +33,14 @@ export default async function handler(
     // 计算等级
     const levelInfo = LevelManager.calculateLevel(userExp);
 
-    console.log(`[user-exp] 更新用户经验: userId=${session.user.id}, exp=${userExp}, level=${levelInfo.level}`);
+    console.log(`[user-exp] 更新用户经验: userId=${session.user.id}, exp=${userExp}, level=${levelInfo.currentLevel}`);
 
     // 更新数据库
     const updatedUser = await db.user.update({
       where: { id: session.user.id },
       data: {
         userExp,
-        userLevel: levelInfo.level,
+        userLevel: levelInfo.currentLevel,
       },
       select: {
         userExp: true,
