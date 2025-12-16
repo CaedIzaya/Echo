@@ -23,8 +23,8 @@ export function useAchievements() {
     try {
       const response = await fetch('/api/achievements');
       if (response.ok) {
-        const data = await response.json();
-        const ids = new Set(data.achievements.map((a: any) => a.id));
+        const data = await response.json() as { achievements: Array<{ id: string; category: string; unlockedAt: string }> };
+        const ids = new Set<string>(data.achievements.map((a) => a.id));
         
         // 更新状态和 localStorage
         setAchievedIds(ids);
