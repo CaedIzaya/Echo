@@ -39,7 +39,8 @@ export function useAchievements() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         try {
-          const ids = new Set(JSON.parse(stored));
+          const idsArray = JSON.parse(stored) as string[];
+          const ids = new Set<string>(idsArray);
           setAchievedIds(ids);
         } catch (e) {
           console.error('[useAchievements] 解析 localStorage 失败:', e);
@@ -63,7 +64,8 @@ export function useAchievements() {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           try {
-            const ids = new Set(JSON.parse(stored));
+            const idsArray = JSON.parse(stored) as string[];
+            const ids = new Set<string>(idsArray);
             setAchievedIds(ids);
           } catch (e) {
             console.error('[useAchievements] 解析失败:', e);
@@ -76,7 +78,8 @@ export function useAchievements() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         try {
-          const ids = new Set(JSON.parse(stored));
+          const idsArray = JSON.parse(stored) as string[];
+          const ids = new Set<string>(idsArray);
           setAchievedIds(ids);
         } catch (e) {
           console.error('[useAchievements] 解析失败:', e);
