@@ -714,8 +714,18 @@ export default function Dashboard() {
       // 更新昨日数据到主统计数据
       updateStats({ yesterdayMinutes });
       
-      // 更新连续天数
-      const newStreakDays = stats.streakDays + (yesterdayMinutes > 0 ? 1 : 0);
+      // 更新累计天数（累计天数逻辑：只要完成了一次最小每日专注时长目标，即可+1，不会因为第二天没上线而中断）
+      // 判断昨天是否完成了每日目标
+      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
+      const MIN_FOCUS_MINUTES = 25; // 用于判断"达到最小专注时长"的日级阈值
+      const yesterdayCompletedGoal = dailyGoalMinutes > 0 
+        ? yesterdayMinutes >= dailyGoalMinutes 
+        : yesterdayMinutes >= MIN_FOCUS_MINUTES;
+      
+      // 如果昨天完成了目标，累计天数+1；如果没完成，累计天数不变（不会减少）
+      const newStreakDays = yesterdayCompletedGoal 
+        ? stats.streakDays + 1 
+        : stats.streakDays;
       updateStats({ streakDays: newStreakDays });
       
       // 保存今日日期标记
@@ -1980,7 +1990,7 @@ export default function Dashboard() {
                   {showStreakInfo && (
                     <div data-tooltip-trigger className="absolute top-10 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 w-[150px]">
                       <p className="text-xs text-zinc-600 leading-relaxed">
-                        最近一段连续完成专注目标时长的天数
+                        你在echo连续累计下来的专注时光
                       </p>
                     </div>
                   )}

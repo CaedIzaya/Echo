@@ -397,3 +397,5 @@ SELECT COUNT(*) FROM users WHERE heart_tree_name IS NULL OR heart_tree_name = '�
 **状态**: ✅ 完成并测试  
 **兼容性**: ✅ 完全向后兼容
 
+
+

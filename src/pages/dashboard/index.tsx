@@ -852,25 +852,34 @@ export default function Dashboard() {
       // 更新昨日数据到主统计数据
       updateStats({ yesterdayMinutes });
       
-      // 更新连续天数
-      const newStreakDays = stats.streakDays + (yesterdayMinutes > 0 ? 1 : 0);
+      // 更新累计天数（累计天数逻辑：只要完成了一次最小每日专注时长目标，即可+1，不会因为第二天没上线而中断）
+      // 判断昨天是否完成了每日目标
+      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
+      const yesterdayCompletedGoal = dailyGoalMinutes > 0 
+        ? yesterdayMinutes >= dailyGoalMinutes 
+        : yesterdayMinutes >= MIN_FOCUS_MINUTES;
+      
+      // 如果昨天完成了目标，累计天数+1；如果没完成，累计天数不变（不会减少）
+      const newStreakDays = yesterdayCompletedGoal 
+        ? stats.streakDays + 1 
+        : stats.streakDays;
       updateStats({ streakDays: newStreakDays });
       
-      // 心树 EXP 系统：连续天数事件
-      if (yesterdayMinutes > 0 && typeof window !== 'undefined') {
+      // 心树 EXP 系统：累计天数事件（仅在完成目标时触发）
+      if (yesterdayCompletedGoal && typeof window !== 'undefined') {
         try {
-          // 昨日有专注 → streak+1，给 10 EXP
+          // 昨日完成目标 → 累计天数+1，给 10 EXP
           gainHeartTreeExp(EXP_STREAK_DAY);
-          console.log('🌳 心树 EXP +', EXP_STREAK_DAY, '（连续专注', newStreakDays, '天）');
+          console.log('🌳 心树 EXP +', EXP_STREAK_DAY, '（累计专注', newStreakDays, '天）');
           
           // 关键节点：7 / 14 / 30 天 → 授予一次施肥 Buff（7天，+30% EXP）
           if ([7, 14, 30].includes(newStreakDays)) {
             const state = loadHeartTreeExpState();
             grantFertilizerBuff(state);
-            console.log('🌱 心树获得施肥 Buff！（连续', newStreakDays, '天）');
+            console.log('🌱 心树获得施肥 Buff！（累计', newStreakDays, '天）');
           }
         } catch (e) {
-          console.error('连续天数时更新心树 EXP 失败:', e);
+          console.error('累计天数时更新心树 EXP 失败:', e);
         }
       }
       
@@ -2270,7 +2279,7 @@ export default function Dashboard() {
                 {showStreakInfo && (
                   <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
                     <p className="text-xs text-zinc-600 leading-relaxed">
-                      最近一段连续完成专注目标时长的天数
+                      你在echo连续累计下来的专注时光
                     </p>
                     <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
                   </div>
