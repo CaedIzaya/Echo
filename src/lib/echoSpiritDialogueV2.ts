@@ -35,7 +35,8 @@ export type EchoEventKey =
   | 'session_basic_end'   // 刚结束一次专注但未达标（first-after-session）
   | 'first_full_focus'    // 生涯首次完整专注达标（最高规格胜利节点）
   | 'streak7_event'       // 连胜 7 天（仅当日首次进入首页覆盖首页首句）
-  | 'achievement_event';  // 成就解锁
+  | 'achievement_event'   // 成就解锁
+  | 'idle_encourage_event'; // 空闲鼓励（上线1分钟后未专注时触发）
 
 export type EchoPoolKey =
   | EchoUniversalPoolKey
@@ -67,6 +68,7 @@ export interface EchoPools {
   first_full_focus_pool: string[];
   streak7_pool: string[];
   achievement_pool: string[];
+  idle_encourage_pool: string[];
 }
 
 // 默认文案池：新通用池（A/B/C）+ 旧 SpiritDialog 文案合并
@@ -269,6 +271,44 @@ export const defaultEchoPools: EchoPools = {
   first_full_focus_pool: [],
   streak7_pool: [],
   achievement_pool: [],
+  
+  // 空闲鼓励池：上线1分钟后未专注时轻引导
+  // 🟡 B 类｜降低门槛 + 🟢 D 类｜轻引导
+  idle_encourage_pool: [
+    // 🟡 B 类｜降低门槛（15 句）- 核心目标：不用想、不用决定、先坐下
+    '不用想要做多久，先坐下就好。',
+    '我们不赶进度，只走第一步。',
+    '今天不需要计划，只需要开始。',
+    '先 5 分钟，剩下的交给感觉。',
+    '不用一下子进入状态，慢慢来。',
+    '你已经来了，这本身就算开始。',
+    '不用把今天过完，我们过这一刻。',
+    '不追求效率，只求启动。',
+    '先打开页面，别的等等再说。',
+    '不用想结果，先动一小下。',
+    '开始不需要理由。',
+    '哪怕只动一下，也算前进。',
+    '不用证明什么，先陪我坐一会儿。',
+    '今天可以很小，小也没关系。',
+    '我们只做一件最简单的事。',
+
+    // 🟢 D 类｜轻引导（15 句）- 核心目标：把"开始"变成顺水推舟
+    '要不要一起试试？不行就停。',
+    '我在这，开始一下看看？',
+    '我们轻轻开始，好吗？',
+    '现在这个状态，其实刚刚好。',
+    '不用完美，开始就行。',
+    '我陪你走前几步。',
+    '要不，就现在？',
+    '感觉到了吗？可以继续一点点。',
+    '你已经比刚才更接近开始了。',
+    '就从眼前这一小步。',
+    '开始了，就已经赢了一半。',
+    '不急，我们一起。',
+    '你不需要准备好。',
+    '现在开始，也算刚好。',
+    '我们开始吧，很轻地那种。',
+  ],
 };
 
 // 进入首页时的状态快照（由调用方提供）
@@ -406,6 +446,7 @@ export function pickSentenceFromPool(
     first_full_focus: 'first_full_focus_pool',
     streak7_event: 'streak7_pool',
     achievement_event: 'achievement_pool',
+    idle_encourage_event: 'idle_encourage_pool',
   };
 
   const targetKey = map[poolKey];

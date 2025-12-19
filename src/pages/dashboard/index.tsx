@@ -23,7 +23,8 @@ import {
   pickHomeSentence, 
   pickUniversalSentence, 
   pickEventSentence, 
-  EchoHomeStatus 
+  EchoHomeStatus,
+  EchoEventKey
 } from '~/lib/echoSpiritDialogueV2';
 import { HeartTreeManager } from '~/lib/HeartTreeSystem';
 import { handleAwarenessEvent, AwarenessContext } from '~/awareness';
@@ -1278,6 +1279,61 @@ export default function Dashboard() {
       }, 800); // 延迟800ms确保页面渲染完成
     }
   }, [authKey]);
+
+  // ============================================
+  // 空闲鼓励触发逻辑（上线1分钟后未开始专注时轻引导）
+  // - 优先级：AUTO_DIALOGUE (100)
+  // - 不会抢占每日欢迎（DAILY_WELCOME = 500）
+  // - 每天只触发一次
+  // ============================================
+  useEffect(() => {
+    if (typeof window === 'undefined' || !spiritDialogRef.current) return;
+
+    const today = getTodayDate();
+    const idleEncourageShownDate = localStorage.getItem('idleEncourageShownDate');
+    
+    // 如果今天已经触发过，跳过
+    if (idleEncourageShownDate === today) {
+      return;
+    }
+
+    // 记录页面加载时的今日专注时长
+    const initialTodayMinutes = todayStats.minutes;
+    
+    // 1分钟后检查是否开始专注
+    const timer = setTimeout(() => {
+      // 重新获取当前的今日专注时长
+      const currentTodayStats = (() => {
+        try {
+          const data = localStorage.getItem('todayStats');
+          if (!data) return { minutes: 0, date: today };
+          const parsed = JSON.parse(data);
+          const todayData = parsed[today];
+          return todayData || { minutes: 0, date: today };
+        } catch {
+          return { minutes: 0, date: today };
+        }
+      })();
+
+      // 如果专注时长有增加，说明用户已经开始专注，不触发
+      if (currentTodayStats.minutes > initialTodayMinutes) {
+        return;
+      }
+
+      // 如果用户还没有开始专注，触发空闲鼓励文案
+      if (spiritDialogRef.current) {
+        const { text } = pickEventSentence('idle_encourage_event' as EchoEventKey);
+        if (text) {
+          // @ts-ignore: 扩展的 ref 方法在运行时已存在
+          spiritDialogRef.current.showTypedMessage?.(text, 'cute');
+          // 记录今天已触发，避免重复
+          localStorage.setItem('idleEncourageShownDate', today);
+        }
+      }
+    }, 60000); // 60秒 = 1分钟
+
+    return () => clearTimeout(timer);
+  }, [authKey, todayStats.minutes]); // 依赖authKey和todayStats.minutes
 
   // ============================================
   // 心流指数说明 - 目前在UI中隐藏，但保留完整逻辑

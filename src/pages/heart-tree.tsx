@@ -108,8 +108,13 @@ export default function HeartTreePage() {
     // 显示心树页面（无论是否命名都显示，但未命名时显示命名弹窗）
     return (
       <>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 pb-20">
-          <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen bg-gradient-to-b from-sky-300 via-sky-100 to-white pb-20 relative overflow-hidden">
+          {/* 云朵背景装饰 */}
+          <div className="absolute top-[10%] left-[15%] w-24 h-8 bg-white/60 rounded-full blur-xl animate-pulse" style={{ animationDuration: '8s' }} />
+          <div className="absolute top-[15%] right-[20%] w-32 h-10 bg-white/70 rounded-full blur-xl animate-pulse" style={{ animationDuration: '12s' }} />
+          <div className="absolute top-[25%] left-[40%] w-20 h-6 bg-white/50 rounded-full blur-lg animate-pulse" style={{ animationDuration: '10s' }} />
+          
+          <div className="max-w-4xl mx-auto relative z-10">
             {/* 如果已命名，显示心树组件；否则显示占位内容 */}
             {!isLoadingName && treeName && treeName !== '心树' ? (
               <HeartTreeComponent
@@ -129,18 +134,18 @@ export default function HeartTreePage() {
 
         {/* 第一个弹窗：起名流程（未命名时显示） */}
         {isNaming && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gradient-to-br from-green-50/95 via-teal-50/95 to-cyan-50/95 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-6 relative">
-              <div className="mb-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-emerald-500 font-medium mb-2">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-sky-400/20 backdrop-blur-md">
+            <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl max-w-md w-full mx-4 p-8 relative border border-white/50">
+              <div className="mb-6">
+                <p className="text-[10px] uppercase tracking-[0.4em] text-sky-500 font-bold mb-3">
                   心树初次见面
                 </p>
-                <p className="text-gray-800 text-sm leading-relaxed">
+                <p className="text-gray-700 text-sm leading-relaxed font-medium">
                   {getNamingGuideText()}
                 </p>
               </div>
-              <div className="mt-4">
-                <label className="block text-xs text-gray-500 mb-1">
+              <div className="mt-6">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
                   给心树起一个名字（2-6 个字）
                 </label>
                 <input
@@ -148,19 +153,19 @@ export default function HeartTreePage() {
                   value={namingInput}
                   maxLength={6}
                   onChange={(e) => setNamingInput(e.target.value)}
-                  className="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
-                  placeholder="比如：年轮、阿树、小年轮…"
+                  className="w-full rounded-2xl border-2 border-sky-100 bg-sky-50/30 px-4 py-3 text-base focus:outline-none focus:ring-4 focus:ring-sky-400/20 focus:border-sky-400 transition-all placeholder:text-gray-300"
+                  placeholder="比如：年轮、阿树..."
                 />
               </div>
-              <div className="mt-6 flex justify-end">
+              <div className="mt-8">
                 <button
                   type="button"
                   onClick={handleConfirmName}
                   disabled={!namingInput.trim() || isSaving}
-                  className={`px-6 py-2 rounded-xl text-sm font-semibold text-white transition
+                  className={`w-full py-4 rounded-2xl text-sm font-bold text-white transition-all shadow-xl
                     ${namingInput.trim() && !isSaving
-                      ? 'bg-emerald-500 hover:bg-emerald-600 shadow-lg'
-                      : 'bg-emerald-200 cursor-not-allowed'
+                      ? 'bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 shadow-sky-200'
+                      : 'bg-gray-200 cursor-not-allowed'
                     }`}
                 >
                   {isSaving ? '保存中...' : '完成命名'}

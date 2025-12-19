@@ -185,7 +185,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
 
     return (
       <div
-        className="w-full h-auto max-w-md mx-auto cursor-pointer"
+        className="w-full h-auto max-w-full mx-auto cursor-pointer transform hover:scale-[1.02] transition-transform duration-500"
         onClick={handleTreeClick}
       >
         <BigHeartTree animState={animState} />
@@ -589,8 +589,13 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-teal-50 to-cyan-50 pb-20">
-      <div className="p-6 pt-4">
+    <div className="min-h-screen bg-gradient-to-b from-sky-300 via-sky-100 to-white pb-20 relative overflow-hidden">
+      {/* 云朵背景装饰 */}
+      <div className="absolute top-[8%] left-[10%] w-24 h-8 bg-white/60 rounded-full blur-xl animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="absolute top-[12%] right-[15%] w-32 h-10 bg-white/70 rounded-full blur-xl animate-pulse" style={{ animationDuration: '12s' }} />
+      <div className="absolute top-[20%] left-[35%] w-20 h-6 bg-white/50 rounded-full blur-lg animate-pulse" style={{ animationDuration: '10s' }} />
+
+      <div className="p-6 pt-4 relative z-10">
         {/* 头部信息（按需求去除文案） */}
         <div className="mb-0 text-center" />
 
@@ -599,34 +604,37 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
           const levelView = getHeartTreeLevelView(expState);
           const hasBuff = getFertilizerMultiplier(expState) > 1;
           return (
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 mb-6 shadow-md border border-teal-100">
+            <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 mb-8 shadow-[0_8px_32px_rgba(0,0,0,0.05)] border border-white/40 transition-all hover:bg-white/50">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl">🌳</div>
+                <div className="flex items-center gap-4">
+                  <div className="text-3xl filter drop-shadow-sm">🌳</div>
                   <div>
-                    <p className="text-sm font-semibold text-teal-700 mb-0.5">
+                    <p className="text-base font-bold text-sky-900/80 mb-0.5">
                       {isLoadingName ? '...' : treeName}
                     </p>
-                    <p className="text-xs text-gray-500">Lv.{levelView.level}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-sky-500/10 rounded-md text-[10px] font-bold text-sky-600 uppercase">Level</span>
+                      <p className="text-sm font-bold text-sky-700">Lv.{levelView.level}</p>
+                    </div>
                   </div>
                 </div>
                 {hasBuff && (
-                  <div className="px-3 py-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full text-white text-xs font-semibold shadow-sm">
-                    ⚡ 经验加速中
+                  <div className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full text-white text-[10px] font-bold shadow-sm animate-bounce">
+                    ✨ EXP BOOST
                   </div>
                 )}
               </div>
 
-              <div className="mt-3 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">下一等级</span>
-                  <span className="font-semibold text-gray-900">
-                    {levelView.currentExp} / {Number.isFinite(levelView.expToNext) ? levelView.expToNext : 'MAX'} EXP
+              <div className="mt-5 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-sky-800/60 font-medium">成长进度</span>
+                  <span className="font-bold text-sky-900/70">
+                    {levelView.currentExp} / {Number.isFinite(levelView.expToNext) ? levelView.expToNext : 'MAX'}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden border border-white/20 p-[2px]">
                   <div
-                    className="bg-gradient-to-r from-teal-400 via-teal-500 to-green-500 h-2.5 rounded-full transition-all duration-500"
+                    className="bg-gradient-to-r from-sky-400 via-emerald-400 to-green-400 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(56,189,248,0.5)]"
                     style={{ width: `${levelView.progress}%` }}
                   />
                 </div>
@@ -636,20 +644,20 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
         })()}
 
         {/* 树容器 */}
-        <div className="relative mb-6 flex items-center justify-center min-h-[320px]">
+        <div className="relative mb-6 flex items-center justify-center min-h-[320px] md:min-h-[500px]">
           {/* 树 */}
-          <div className="relative z-0 w-full max-w-lg">
+          <div className="relative z-0 w-full max-w-lg md:max-w-3xl transition-all duration-700">
             {renderTree()}
           </div>
         </div>
 
-        {/* 小树消息（绿色渐变文案框） */}
+        {/* 小树消息（蓝色渐变文案框） */}
         {showMessage && (
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-xs animate-slide-down pointer-events-none">
-            <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-green-100 border border-emerald-200 rounded-2xl p-4 shadow-2xl">
+          <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 max-w-xs animate-slide-down pointer-events-none">
+            <div className="bg-white/80 backdrop-blur-md border border-sky-100 rounded-[2rem] p-5 shadow-[0_15px_40px_rgba(0,0,0,0.1)] transition-all">
               <div className="flex items-start gap-3">
-                <span className="text-2xl">🌳</span>
-                <p className="text-sm text-emerald-900 leading-relaxed whitespace-pre-line">
+                <span className="text-3xl filter drop-shadow-sm">🌳</span>
+                <p className="text-sm text-sky-900 font-medium leading-relaxed whitespace-pre-line">
                   {currentMessage}
                 </p>
               </div>
@@ -658,22 +666,22 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
         )}
 
         {/* 操作按钮 */}
-        <div className="flex flex-row gap-3">
+        <div className="flex flex-row gap-4">
           {/* 浇水按钮 */}
           <button
             onClick={handleWater}
             disabled={waterOpportunities <= 0 || isWatering}
-            className={`flex-1 px-6 py-4 rounded-2xl font-semibold text-white transition-all shadow-lg ${
+            className={`flex-1 px-6 py-5 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
               waterOpportunities > 0 && !isWatering
-                ? 'bg-gradient-to-r from-blue-400 to-cyan-500 hover:from-blue-500 hover:to-cyan-600 active:scale-95'
-                : 'bg-gray-300 cursor-not-allowed'
+                ? 'bg-gradient-to-br from-sky-400/90 to-blue-500/90 hover:from-sky-500 hover:to-blue-600 active:scale-95 border-sky-300/50'
+                : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
             }`}
           >
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl">💧</span>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-2xl filter drop-shadow-md">💧</span>
               <div className="text-left">
-                <div>浇水</div>
-                <div className="text-xs opacity-90">
+                <div className="text-sm">浇水</div>
+                <div className="text-[10px] opacity-80 font-medium">
                   可用：{waterOpportunities}
                 </div>
               </div>
@@ -684,17 +692,17 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
           <button
             onClick={handleFertilize}
             disabled={fertilizeOpportunities <= 0 || isFertilizing}
-            className={`flex-1 px-6 py-4 rounded-2xl font-semibold text-white transition-all shadow-lg ${
+            className={`flex-1 px-6 py-5 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
               fertilizeOpportunities > 0 && !isFertilizing
-                ? 'bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 active:scale-95'
-                : 'bg-gray-300 cursor-not-allowed'
+                ? 'bg-gradient-to-br from-emerald-400/90 to-green-500/90 hover:from-emerald-500 hover:to-green-600 active:scale-95 border-emerald-300/50'
+                : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
             }`}
           >
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl">🌱</span>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-2xl filter drop-shadow-md">✨</span>
               <div className="text-left">
-                <div>施肥</div>
-                <div className="text-xs opacity-90">
+                <div className="text-sm">施肥</div>
+                <div className="text-[10px] opacity-80 font-medium">
                   可用：{fertilizeOpportunities}
                 </div>
               </div>

@@ -12,8 +12,8 @@ interface HeartTreeProps {
 
 export const HeartTree: React.FC<HeartTreeProps & { animState?: 'idle' | 'watering' | 'fertilizing' }> = ({ animState = 'idle' }) => {
   return (
-    <div className="w-full h-full max-w-[600px] max-h-[600px] select-none flex items-center justify-center relative">
-      <svg width="400" height="400" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl heart-tree-svg" data-anim-state={animState}>
+    <div className="w-full h-full max-w-[800px] max-h-[800px] select-none flex items-center justify-center relative transition-all duration-700">
+      <svg width="600" height="600" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)] heart-tree-svg" data-anim-state={animState}>
         <defs>
           {/* Existing Foliage Gradient */}
           <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -21,10 +21,17 @@ export const HeartTree: React.FC<HeartTreeProps & { animState?: 'idle' | 'wateri
             <stop offset="100%" style={{stopColor:'#6dbb6b',stopOpacity:1}} />
           </linearGradient>
           
-          {/* Existing Trunk Gradient */}
+          {/* Trunk Gradient with more depth */}
           <linearGradient id="trunkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" style={{stopColor:'#b48a59',stopOpacity:1}} />
-            <stop offset="80%" style={{stopColor:'#9c7548',stopOpacity:1}} />
+            <stop offset="40%" style={{stopColor:'#c8a278',stopOpacity:1}} />
+            <stop offset="100%" style={{stopColor:'#9c7548',stopOpacity:1}} />
+          </linearGradient>
+
+          {/* Grass Gradient for more natural look */}
+          <linearGradient id="grassGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style={{stopColor:'#74b473',stopOpacity:1}} />
+            <stop offset="100%" style={{stopColor:'#5a9c59',stopOpacity:1}} />
           </linearGradient>
 
           {/* CSS Animation Logic */}
@@ -165,7 +172,12 @@ export const HeartTree: React.FC<HeartTreeProps & { animState?: 'idle' | 'wateri
         {/* 2. Ground Grass Layer (Above trunk, below falling leaves) */}
         <g id="GrassLayer" className="grass-breathe">
           {/* A gentle hill curve filling the bottom, starting from trunk base (y=260) */}
-          <path d="M0,300 L0,260 C50,255 150,258 300,260 L300,300 Z" fill="#5a9c59" />
+          <path d="M-50,310 L-50,265 C50,250 250,250 350,265 L350,310 Z" fill="url(#grassGradient)" />
+          {/* Subtle grass details */}
+          <circle cx="60" cy="280" r="20" fill="#6dbb6b" opacity="0.3" />
+          <circle cx="240" cy="285" r="15" fill="#6dbb6b" opacity="0.2" />
+          <path d="M110,268 Q120,260 130,268" stroke="#4a8c49" strokeWidth="1" fill="none" opacity="0.4" />
+          <path d="M170,270 Q180,262 190,270" stroke="#4a8c49" strokeWidth="1" fill="none" opacity="0.4" />
         </g>
 
         {/* 3. Falling Leaves (Front Layer - Top layer) */}
