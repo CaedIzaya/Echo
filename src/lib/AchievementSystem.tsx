@@ -9,6 +9,7 @@ export interface Achievement {
 
 export class AchievementManager {
   private achievedAchievements: Set<string> = new Set();
+  private databaseSynced: boolean = false;
 
   constructor() {
     this.loadAchievedAchievements();
@@ -20,10 +21,48 @@ export class AchievementManager {
       if (stored) {
         try {
           this.achievedAchievements = new Set(JSON.parse(stored));
+          console.log('[AchievementSystem] 从 localStorage 加载成就:', this.achievedAchievements.size);
         } catch (e) {
-          console.error('Failed to load achievements:', e);
+          console.error('[AchievementSystem] 加载成就失败:', e);
         }
       }
+    }
+  }
+  
+  /**
+   * 从数据库同步成就数据
+   * 防止 localStorage 被清除导致的数据丢失
+   */
+  async syncFromDatabase(): Promise<void> {
+    if (this.databaseSynced) {
+      return; // 已同步，避免重复
+    }
+    
+    try {
+      const response = await fetch('/api/achievements');
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          // 合并数据库中的成就
+          const dbAchievements = new Set(data.map((a: any) => a.achievementId));
+          
+          // 如果数据库有成就但 localStorage 没有，说明 localStorage 被清除了
+          if (dbAchievements.size > this.achievedAchievements.size) {
+            console.warn('[AchievementSystem] 检测到数据不一致，从数据库恢复成就');
+            console.log('  - 数据库成就数:', dbAchievements.size);
+            console.log('  - 本地成就数:', this.achievedAchievements.size);
+            
+            // 使用数据库数据
+            this.achievedAchievements = dbAchievements;
+            this.saveAchievedAchievements();
+          }
+          
+          this.databaseSynced = true;
+          console.log('[AchievementSystem] ✅ 数据库同步完成，共', this.achievedAchievements.size, '个成就');
+        }
+      }
+    } catch (error) {
+      console.error('[AchievementSystem] 数据库同步失败:', error);
     }
   }
 
@@ -130,6 +169,15 @@ export class AchievementManager {
     return newAchievements;
   }
 
+  /**
+   * 检查"首次"成就
+   * 
+   * ⚠️ 重要：不再依赖 localStorage 标记
+   * 改为直接从已解锁成就列表判断（数据库同步后的数据）
+   * 
+   * @param type 成就类型
+   * @returns 新解锁的成就列表
+   */
   checkFirstTimeAchievements(
     type: 'focus' | 'milestone_created' | 'plan_created' | 'plan_completed' | 'milestone_completed',
   ): Achievement[] {
@@ -144,12 +192,32 @@ export class AchievementManager {
     };
 
     const achievementId = firstTimeMap[type];
+    
+    // 关键改进：只检查成就列表，不检查 localStorage 标记
+    // 如果成就已在列表中（从数据库同步），则不会重复解锁
     if (achievementId && !this.achievedAchievements.has(achievementId)) {
       const achievement = this.unlockAchievement(achievementId);
       if (achievement) newAchievements.push(achievement);
     }
 
     return newAchievements;
+  }
+  
+  /**
+   * 检查是否已拥有某个成就
+   * 
+   * @param achievementId 成就ID
+   * @returns 是否已解锁
+   */
+  hasAchievement(achievementId: string): boolean {
+    return this.achievedAchievements.has(achievementId);
+  }
+  
+  /**
+   * 获取已解锁成就数量
+   */
+  getAchievementCount(): number {
+    return this.achievedAchievements.size;
   }
 
   getAllAchievements(): Achievement[] {

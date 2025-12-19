@@ -24,13 +24,13 @@ const LOADING_STEPS = [
 const LANDING_FEATURES = [
   {
     title: '轻量规划',
-    description: '找到自己的热爱，并随时随地完成小目标',
+    description: '热爱无需多虑，随时随地设置完成小目标',
     icon: '🎯',
     accent: 'from-emerald-50 via-white to-teal-50/60 border-emerald-100/70',
   },
   {
     title: '专注计时',
-    description: '允许你划水，但是专注的时候，全力以赴',
+    description: '我们欢迎你划水，但是专注的时候，全力以赴',
     icon: '⏱️',
     accent: 'from-cyan-50 via-white to-sky-50/60 border-cyan-100/70',
   },
@@ -252,8 +252,8 @@ const LandingHero = ({
           </h1>
 
           <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
-            <p>在这个时代，你的注意力就是最后的领地。</p>
-            <p>Echo 会陪你一点点，重建你的节奏与清醒。</p>
+            <p>你不是不努力，只是需要一个安静的地方。</p>
+            <p>Echo 是一个陪你轻轻开始的专注空间。</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -355,7 +355,7 @@ const LandingHero = ({
             style={{ animationDuration: '3s' }}
           >
             <span className="text-2xl">⏱️</span>
-            <span className="ml-2 font-mono font-bold">25:00</span>
+            <span className="ml-2 font-mono font-bold">15:00</span>
           </div>
 
           <div
@@ -383,7 +383,7 @@ const LandingHero = ({
           <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
             <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <p className="text-base font-light leading-relaxed text-slate-700">
-              意识到自己的注意力常被无形牵引？
+              意识到自己的注意力经常涣散？
             </p>
           </div>
 
@@ -391,7 +391,7 @@ const LandingHero = ({
           <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
             <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-teal-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <p className="text-base font-light leading-relaxed text-slate-700">
-              想把精力花在真正值得的人与事上？
+              总觉得难以开始，没有动力？
             </p>
           </div>
 
@@ -399,7 +399,7 @@ const LandingHero = ({
           <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
             <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <p className="text-base font-light leading-relaxed text-slate-700">
-              渴望重新掌握自己的节奏与生活？
+              想要生活更充实有意义感？
             </p>
           </div>
         </div>
@@ -416,9 +416,9 @@ const FeatureGrid = () => (
         <span className="text-teal-600 font-semibold tracking-wider uppercase text-sm bg-teal-50 px-4 py-1 rounded-full">
           核心功能
         </span>
-        <h2 className="mt-6 text-4xl font-bold text-slate-900">夺回你的注意力</h2>
+        <h2 className="mt-6 text-4xl font-bold text-slate-900">你的赛博避难所</h2>
         <p className="mt-4 text-lg text-slate-500">
-          Echo 是你的注意力伙伴，它是你在嘈杂数字世界里的静谧避难所。
+          做自己感兴趣的事情，在这里没有考核，没有压力，没有打扰。
         </p>
       </div>
 
@@ -436,6 +436,33 @@ const FeatureGrid = () => (
             <div className="absolute bottom-4 left-8 right-8 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         ))}
+      </div>
+    </div>
+  </section>
+);
+
+const MotivationSection = () => (
+  <section className="pb-20 bg-white">
+    <div className="max-w-6xl mx-auto px-6">
+      <div className="rounded-[32px] border border-emerald-100/70 bg-gradient-to-br from-emerald-50 via-white to-cyan-50/70 shadow-lg p-10 md:p-12 relative overflow-hidden">
+        <div className="absolute -right-16 -top-12 w-64 h-64 bg-emerald-200/30 blur-3xl" />
+        <div className="absolute -left-20 -bottom-20 w-72 h-72 bg-cyan-200/25 blur-3xl" />
+        <div className="relative space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-emerald-100 text-sm font-semibold text-emerald-700">
+          </div>
+          <p className="text-2xl md:text-3xl font-bold text-slate-900 leading-relaxed">
+            你可能会担心：“不逼我，我肯定会摆烂。”<br />
+            但最难的不是坚持，是开始。我们会一起跨过这一步。
+          </p>
+          <div className="grid md:grid-cols-2 gap-4 text-slate-700 text-base leading-relaxed">
+            <p className="bg-white/80 border border-emerald-100 rounded-2xl p-4 shadow-sm">
+              哪怕今天只有 5 分钟，你也会清楚地看到：你不是在混日子。
+            </p>
+            <p className="bg-white/80 border border-cyan-100 rounded-2xl p-4 shadow-sm">
+              这一点，会慢慢改变你对生活的感觉——从“难以开始”变成“轻轻就能动起来”。
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -907,6 +934,7 @@ export default function Home() {
           onSecondaryAction={handleSecondaryAction}
         />
         <FeatureGrid />
+        <MotivationSection />
         <LandingCTA onPrimaryAction={handlePrimaryAction} />
       </main>
       <LandingFooter />

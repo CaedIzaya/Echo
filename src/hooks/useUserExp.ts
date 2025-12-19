@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { LevelManager } from '~/lib/LevelSystem';
+import { setProtectionMarker } from '~/lib/DataIntegritySystem';
 
 const STORAGE_KEY = 'userExp';
 const SYNC_KEY = 'userExpSynced';
@@ -109,6 +110,11 @@ export function useUserExp() {
       localStorage.setItem(STORAGE_KEY, newExp.toString());
       setUserExp(newExp);
       setUserLevel(levelInfo.currentLevel);
+      
+      // 设置经验值里程碑防护标记（每达到 100 EXP 设置一次）
+      if (newExp >= 100 && Math.floor(newExp / 100) > Math.floor((newExp - 100) / 100)) {
+        setProtectionMarker('exp_milestone');
+      }
 
       // 如果已登录，同步到数据库
       if (session?.user?.id) {

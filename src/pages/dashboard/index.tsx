@@ -16,9 +16,11 @@ import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { useMailSystem } from '~/lib/MailSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
+import { checkDataIntegrity, setProtectionMarker } from '~/lib/DataIntegritySystem';
 import { useUserExp } from '~/hooks/useUserExp';
 import { useHeartTreeExp } from '~/hooks/useHeartTreeExp';
 import { useAchievements } from '~/hooks/useAchievements';
+import { useDataSync } from '~/hooks/useDataSync';
 import { 
   pickHomeSentence, 
   pickUniversalSentence, 
@@ -299,6 +301,7 @@ export default function Dashboard() {
   const { userExp, userLevel: hookUserLevel, addUserExp, updateUserExp } = useUserExp();
   const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
   const { unlockAchievement: unlockAchievementToDB } = useAchievements();
+  const { syncStatus, syncAllData } = useDataSync(); // 🆕 数据同步 Hook
   
   // 使用 useMemo 缓存 userId，避免因 session 对象引用变化而触发重新渲染
   const userId = useMemo(() => session?.user?.id, [session?.user?.id]);
@@ -1380,10 +1383,25 @@ export default function Dashboard() {
     return computeFlowIndex(metrics, weeklyBehavior);
   }, [stats.streakDays, todayStats.minutes, weeklyStats.totalMinutes, totalFocusMinutes]);
 
-  // 初始化成就管理器
+  // 初始化成就管理器 + 数据完整性检查
   useEffect(() => {
     const manager = getAchievementManager();
     setAchievementManager(manager);
+    
+    // 启动时进行数据完整性检查和数据库同步
+    if (session?.user?.id) {
+      console.log('[Dashboard] 开始数据完整性检查...');
+      
+      // 1. 检查数据完整性（自动恢复丢失的数据）
+      checkDataIntegrity(session.user.id).catch(error => {
+        console.error('[Dashboard] 数据完整性检查失败:', error);
+      });
+      
+      // 2. 从数据库同步成就数据
+      manager.syncFromDatabase().catch(error => {
+        console.error('[Dashboard] 成就数据同步失败:', error);
+      });
+    }
     
     // 检查当前状态的成就
     const flowAchievements = manager.checkFlowIndexAchievements(flowIndex.score);
@@ -1399,47 +1417,25 @@ export default function Dashboard() {
     // 完成小目标成就
     const milestoneAchievements = manager.checkMilestoneAchievements(stats.completedGoals);
     
-    // 第一次完成专注成就 - 检查标记或总专注时长
-    const firstFocusCompleted = localStorage.getItem('firstFocusCompleted') === 'true';
-    const flowData = localStorage.getItem('flowMetrics');
-    const metrics = flowData ? JSON.parse(flowData) : null;
-    const sessionCount = metrics?.sessionCount || 0;
-    const hasAnyFocus = firstFocusCompleted || totalFocusMinutes > 0 || sessionCount > 0;
+    // ✅ 改进：首次成就判定不再依赖 localStorage 标记
+    // 改为基于实际数据判断（数据库同步后的成就列表已经包含历史成就）
     
-    const firstFocusAchievement = hasAnyFocus 
+    // 第一次完成专注成就 - 基于实际专注数据判断
+    const hasAnyFocus = totalFocusMinutes > 0 || todayStats.minutes > 0;
+    const firstFocusAchievement = hasAnyFocus && !manager.hasAchievement('first_focus')
       ? manager.checkFirstTimeAchievements('focus')
       : [];
     
-    // 如果成就已解锁，清除标记（避免重复检查）
+    // 如果成就已解锁，设置防护标记（不再需要清除 localStorage 标记）
     if (firstFocusAchievement.length > 0) {
-      localStorage.removeItem('firstFocusCompleted');
+      setProtectionMarker('first_focus');
     }
     
-    // 检查其他首次成就（通过 localStorage 标记）
-    const firstPlanCreated = localStorage.getItem('firstPlanCreated') === 'true';
-    const firstMilestoneCreated = localStorage.getItem('firstMilestoneCreated') === 'true';
-    const firstPlanCompleted = localStorage.getItem('firstPlanCompleted') === 'true';
-    
-    const firstPlanCreatedAchievement = firstPlanCreated 
-      ? manager.checkFirstTimeAchievements('plan_created')
-      : [];
-    const firstMilestoneCreatedAchievement = firstMilestoneCreated 
-      ? manager.checkFirstTimeAchievements('milestone_created')
-      : [];
-    const firstPlanCompletedAchievement = firstPlanCompleted 
-      ? manager.checkFirstTimeAchievements('plan_completed')
-      : [];
-    
-    // 如果成就已解锁，清除标记（避免重复检查）
-    if (firstPlanCreatedAchievement.length > 0) {
-      localStorage.removeItem('firstPlanCreated');
-    }
-    if (firstMilestoneCreatedAchievement.length > 0) {
-      localStorage.removeItem('firstMilestoneCreated');
-    }
-    if (firstPlanCompletedAchievement.length > 0) {
-      localStorage.removeItem('firstPlanCompleted');
-    }
+    // 其他首次成就 - 基于实际数据判断
+    // 注意：这些判定会在用户实际执行操作时触发，不需要在这里批量检查
+    const firstPlanCreatedAchievement: Achievement[] = [];
+    const firstMilestoneCreatedAchievement: Achievement[] = [];
+    const firstPlanCompletedAchievement: Achievement[] = [];
     
     const allNew = [
       ...flowAchievements, 
@@ -1460,6 +1456,8 @@ export default function Dashboard() {
       // 将未查看成就保存到localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('unviewedAchievements', JSON.stringify(allNew));
+        // 设置防护标记
+        setProtectionMarker('first_achievement');
       }
       
       //  });
