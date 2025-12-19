@@ -14,6 +14,7 @@ import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
+import type { Achievement } from '~/lib/AchievementSystem';
 import { useMailSystem } from '~/lib/MailSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 import { checkDataIntegrity, setProtectionMarker } from '~/lib/DataIntegritySystem';
