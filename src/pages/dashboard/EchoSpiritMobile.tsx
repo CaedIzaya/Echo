@@ -201,7 +201,7 @@ export default function EchoSpiritMobile({
             <stop offset="100%" stopColor="#FFB84D" stopOpacity="0" />
           </radialGradient>
         </defs>
-        <circle cx="60" cy="60" r="45" fill="url(#glow)" />
+        <circle cx="60" cy="60" r="45" fill="url(#glow)" className="glow-layer" />
         
         {/* 身体圆形 */}
         <circle cx="60" cy="60" r="32" fill={colors.body} />
@@ -262,6 +262,23 @@ export default function EchoSpiritMobile({
           border-radius: 50%;
         }
 
+        /* 光晕层动画 - 复制自PC端 */
+        .glow-layer {
+          animation: glowPulse 3s ease-in-out infinite;
+          transform-origin: 60px 60px;
+        }
+
+        @keyframes glowPulse {
+          0%, 100% { 
+            opacity: 0.8;
+            transform: scale(1);
+          }
+          50% { 
+            opacity: 1;
+            transform: scale(1.05);
+          }
+        }
+
         /* idle 动画 */
         .spirit-animate-idle {
           animation: spiritFloatIdle 3s ease-in-out infinite;
@@ -279,18 +296,42 @@ export default function EchoSpiritMobile({
           }
         }
 
-        /* idle状态 - 往左边看动画 */
+        /* idle状态 - 眼睛到处看动画（复制自PC端） */
         .spirit-animate-idle .eyes-group {
-          animation: lookLeftUp 5s ease-in-out infinite;
-          transform-origin: 60px 48px;
+          animation: eyeLookAround 8s ease-in-out infinite;
+          transform-origin: 60px 50px;
         }
 
-        @keyframes lookLeftUp {
-          0%, 100% { 
-            transform: translateX(0px) translateY(0px);
+        @keyframes eyeLookAround {
+          0%, 35% { transform: translate(0, 0); }
+          40%, 45% { transform: translate(-4px, -3px); }
+          50%, 75% { transform: translate(0, 0); }
+          80%, 85% { transform: translate(4px, -3px); }
+          90%, 100% { transform: translate(0, 0); }
+        }
+
+        /* idle状态 - 眨眼动画（复制自PC端） */
+        .spirit-animate-idle .left-eye,
+        .spirit-animate-idle .right-eye {
+          transform-origin: center center;
+        }
+
+        .spirit-animate-idle .left-eye {
+          animation: blink 4s infinite;
+        }
+
+        .spirit-animate-idle .right-eye {
+          animation: blink 4.2s infinite;
+        }
+
+        @keyframes blink {
+          0%, 48%, 52%, 100% { 
+            transform: scaleY(1);
+            opacity: 1;
           }
           50% { 
-            transform: translateX(-4px) translateY(-3px);
+            transform: scaleY(0.05);
+            opacity: 0.9;
           }
         }
 

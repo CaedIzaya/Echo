@@ -189,3 +189,6 @@ export function calculateStreakDays(sessions: Array<{ duration: number; startTim
   return streakDays;
 }
 
+
+
+

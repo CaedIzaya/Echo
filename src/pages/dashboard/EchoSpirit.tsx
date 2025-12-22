@@ -7,17 +7,42 @@ interface EchoSpiritProps {
   className?: string;
   onStateChange?: (state: string) => void;
   onClick?: () => void;
+  isCompleted?: boolean; // 专注是否完成，决定颜色：false=idle颜色，true=completed颜色
 }
 
 export default function EchoSpirit({ 
   state = 'idle', 
   className = '', 
   onStateChange, 
-  onClick 
+  onClick,
+  isCompleted = false
 }: EchoSpiritProps) {
   const [currentState, setCurrentState] = useState(state);
   const [isAnimating, setIsAnimating] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 根据isCompleted获取颜色配置（复制自手机端）
+  const getColors = () => {
+    if (isCompleted) {
+      // 专注完成后：使用completed颜色（明亮黄色）- 复制自手机端
+      return {
+        glowStart: '#FFE7A0',
+        glowEnd: '#FFD65C',
+        bodyStart: '#FFFBE3',
+        bodyEnd: '#FFFBE3',
+      };
+    } else {
+      // 专注未完成：使用idle颜色（暖黄色）
+      return {
+        glowStart: '#FFD27F',
+        glowEnd: '#FFB84D',
+        bodyStart: '#FFE09A',
+        bodyEnd: '#FFD27F',
+      };
+    }
+  };
+
+  const colors = getColors();
 
   // Sync external state
   useEffect(() => {
@@ -58,15 +83,15 @@ export default function EchoSpirit({
       >
       <svg className="echo-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          {/* 外圈光晕 - 增强可见度 */}
+          {/* 外圈光晕 - 使用动态颜色 */}
           <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#FFD27F" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#FFB84D" stopOpacity="0" />
+            <stop offset="0%" stopColor={colors.glowStart} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={colors.glowEnd} stopOpacity="0" />
           </radialGradient>
-          {/* 身体颜色 - 参考手机版 */}
+          {/* 身体颜色 - 使用动态颜色（复制自手机端完成颜色） */}
           <radialGradient id="gradBodySoft" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#FFE09A" />
-            <stop offset="100%" stopColor="#FFD27F" />
+            <stop offset="0%" stopColor={colors.bodyStart} />
+            <stop offset="100%" stopColor={colors.bodyEnd} />
           </radialGradient>
           {/* Eyes: 深棕色 */}
           <linearGradient id="gradEye" x1="0%" y1="0%" x2="0%" y2="100%">

@@ -277,3 +277,6 @@ export function hasProtectionMarker(type: 'first_focus' | 'first_achievement' | 
   return marker !== null;
 }
 
+
+
+

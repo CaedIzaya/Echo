@@ -544,7 +544,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
 
       {/* 手机端对话框 - 可自定义锚点 */}
       <div
-        className={mobileContainerClassName ?? 'sm:hidden fixed bottom-44 right-10 z-50 pointer-events-none max-w-[280px]'}
+        className={mobileContainerClassName ?? 'sm:hidden fixed bottom-44 right-4 z-50 pointer-events-none max-w-[280px]'}
         style={mobileContainerStyle}
       >
         <div

@@ -524,7 +524,7 @@ export default function DailySummaryPage() {
 
             {/* Note */}
             <p className="text-center text-xs text-gray-400">
-              为确保最佳视觉效果，建议保存图片分享
+              为确保最佳视觉效果，建议截屏保存。
             </p>
           </div>
         </div>

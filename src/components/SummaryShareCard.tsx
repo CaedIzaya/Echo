@@ -74,7 +74,7 @@ export default function SummaryShareCard({
 
   return (
     <div 
-      className="w-full md:w-[600px] md:h-[800px] relative overflow-hidden shadow-lg"
+      className="w-full aspect-[3/4] md:w-[600px] md:h-[800px] relative overflow-hidden shadow-lg"
       style={outerBgStyle}
     >
       {/* Mint Theme Background Blobs - 保持动态效果 */}
