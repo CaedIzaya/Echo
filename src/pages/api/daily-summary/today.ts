@@ -11,7 +11,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const userId = session.user.id;
-  const todayDate = new Date().toISOString().split('T')[0];
+  
+  // 优先使用客户端传递的日期（用户本地时区），否则使用服务器UTC日期
+  // 客户端应该传递 YYYY-MM-DD 格式的本地日期
+  const clientDate = req.query.date as string;
+  const todayDate = clientDate || new Date().toISOString().split('T')[0];
+  
+  // 日志记录，便于调试时区问题
+  console.log(`[daily-summary] 查询日期: ${todayDate}, 客户端传递: ${!!clientDate}, 用户: ${userId}`);
 
   if (req.method === 'GET') {
     try {

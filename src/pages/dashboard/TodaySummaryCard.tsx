@@ -27,11 +27,40 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
     }
 
     try {
-      const res = await fetch('/api/daily-summary/today', {
+      // 使用客户端（用户本地）时区获取日期，避免服务器UTC时区导致的日期错误
+      // 'en-CA' locale 返回 YYYY-MM-DD 格式，符合数据库存储格式
+      const localDate = new Date().toLocaleDateString('en-CA');
+      
+      console.log('[TodaySummaryCard] 查询今日小结，本地日期:', localDate);
+      
+      const res = await fetch(`/api/daily-summary/today?date=${localDate}`, {
       });
 
       if (res.ok) {
         const json = await res.json();
+        
+        // 验证返回的小结日期是否真的是今天的（防御性编程，处理时区问题）
+        if (json.todaySummary && json.todaySummary.date) {
+          const returnedDate = json.todaySummary.date;
+          const expectedDate = new Date().toLocaleDateString('en-CA');
+          
+          if (returnedDate !== expectedDate) {
+            console.warn('[TodaySummaryCard] 返回的小结不是今天的，已过滤', {
+              returned: returnedDate,
+              expected: expectedDate
+            });
+            
+            // 保留其他数据，但标记为"没有今日小结"
+            setData({
+              todayHasFocus: json.todayHasFocus,
+              todayHasSummary: false,
+              todaySummary: null,
+              totalFocusMinutes: json.totalFocusMinutes
+            });
+            return;
+          }
+        }
+        
         setData(json);
       } else {
         // 如果请求失败，但之前已经有数据，就保留原状态，避免界面“回退”
@@ -62,6 +91,28 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
 
   useEffect(() => {
     fetchData();
+    
+    // 定时检查日期是否变化（解决跨午夜问题）
+    const checkDateChange = () => {
+      if (typeof window === 'undefined') return;
+      
+      const currentDate = new Date().toLocaleDateString('en-CA');
+      const lastFetchDate = sessionStorage.getItem('lastSummaryFetchDate');
+      
+      if (lastFetchDate && lastFetchDate !== currentDate) {
+        console.log('[TodaySummaryCard] 检测到日期变化，刷新小结', {
+          old: lastFetchDate,
+          new: currentDate
+        });
+        fetchData();
+      }
+      sessionStorage.setItem('lastSummaryFetchDate', currentDate);
+    };
+    
+    // 每5分钟检查一次
+    const interval = setInterval(checkDateChange, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
