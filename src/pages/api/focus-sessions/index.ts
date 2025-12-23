@@ -19,13 +19,72 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "方法不允许" });
-  }
-
   const session = await getServerSession(req, res, authOptions);
   if (!session?.user?.id) {
     return res.status(401).json({ error: "未授权" });
+  }
+
+  // 🔥 新增：支持 GET 请求（获取专注记录）
+  if (req.method === "GET") {
+    try {
+      console.log("[focus-sessions] 获取专注记录", { userId: session.user.id });
+      
+      // 获取查询参数
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      // 查询用户的专注记录
+      const sessions = await db.focusSession.findMany({
+        where: { userId: session.user.id },
+        orderBy: { startTime: 'desc' },
+        take: limit,
+        skip: offset,
+        select: {
+          id: true,
+          startTime: true,
+          endTime: true,
+          duration: true,
+          note: true,
+          rating: true,
+          flowIndex: true,
+          expEarned: true,
+          projectId: true,
+          createdAt: true,
+        },
+      });
+      
+      // 获取总数
+      const total = await db.focusSession.count({
+        where: { userId: session.user.id },
+      });
+      
+      console.log("[focus-sessions] 查询成功", { 
+        userId: session.user.id,
+        count: sessions.length,
+        total,
+      });
+      
+      return res.status(200).json({ 
+        sessions,
+        total,
+        limit,
+        offset,
+      });
+    } catch (error: any) {
+      console.error("[focus-sessions] 获取记录失败", {
+        userId: session.user.id,
+        error: error?.message || error,
+      });
+      return res.status(500).json({ 
+        error: "服务器错误",
+        message: process.env.NODE_ENV === "development" ? error?.message : undefined
+      });
+    }
+  }
+
+  // 🔥 POST 请求：创建专注记录
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "方法不允许，仅支持 GET 和 POST" });
   }
 
   try {

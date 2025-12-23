@@ -15,7 +15,7 @@ import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import type { Achievement } from '~/lib/AchievementSystem';
-import { useMailSystem } from '~/lib/MailSystem';
+import { useMailSystem, MailSystem } from '~/lib/MailSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 import { checkDataIntegrity, setProtectionMarker } from '~/lib/DataIntegritySystem';
 import { useUserExp } from '~/hooks/useUserExp';
@@ -867,12 +867,20 @@ export default function Dashboard() {
       // 更新昨日数据到主统计数据
       updateStats({ yesterdayMinutes });
       
-      // 更新累计天数（累计天数逻辑：只要完成了一次最小每日专注时长目标，即可+1，不会因为第二天没上线而中断）
+      // 🔥 修复：更新累计天数逻辑 - 基于主要计划的每日目标，而不是默认25分钟
       // 判断昨天是否完成了每日目标
-      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
-      const yesterdayCompletedGoal = dailyGoalMinutes > 0 
-        ? yesterdayMinutes >= dailyGoalMinutes 
-        : yesterdayMinutes >= MIN_FOCUS_MINUTES;
+      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || MIN_FOCUS_MINUTES;
+      const yesterdayCompletedGoal = yesterdayMinutes >= dailyGoalMinutes;
+      
+      console.log('🎯 连续天数检查', {
+        昨日日期: yesterdayDate,
+        昨日时长: yesterdayMinutes,
+        目标时长: dailyGoalMinutes,
+        是否完成: yesterdayCompletedGoal,
+        当前连续: stats.streakDays,
+        将变为: yesterdayCompletedGoal ? stats.streakDays + 1 : stats.streakDays,
+        主要计划: primaryPlan?.name || '无'
+      });
       
       // 如果昨天完成了目标，累计天数+1；如果没完成，累计天数不变（不会减少）
       const newStreakDays = yesterdayCompletedGoal 
@@ -943,6 +951,12 @@ export default function Dashboard() {
         oldWeekStart: currentWeekStartDate,
         newWeekStart: currentWeekStart
       });
+      
+      // 🆕 生成上周的周报邮件（发送到信箱系统）
+      generateWeeklyReportMail(currentWeekStartDate).catch(err => {
+        console.error('❌ 生成周报邮件失败:', err);
+      });
+      
       currentWeeklyTotal = 0;
       currentWeekStartDate = currentWeekStart;
     }
@@ -1078,6 +1092,48 @@ export default function Dashboard() {
       streakDays: stats.streakDays,
       streakBonus: `${((LevelManager.getStreakBonusMultiplier(stats.streakDays) - 1) * 100).toFixed(0)}%`
     });
+  };
+
+  // 🆕 生成周报邮件并添加到信箱系统
+  const generateWeeklyReportMail = async (lastWeekStart: string) => {
+    if (!userId) return;
+    
+    try {
+      console.log('📧 开始生成上周周报邮件:', lastWeekStart);
+      
+      // 调用 API 生成周报邮件
+      const response = await fetch('/api/generate-weekly-mail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weekStart: lastWeekStart }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success && data.mail) {
+          // 添加到信箱系统
+          const mailSystem = MailSystem.getInstance();
+          mailSystem.addMail(data.mail);
+          
+          console.log('✅ 周报邮件已添加到信箱', {
+            mailId: data.mail.id,
+            title: data.mail.title,
+            reportSummary: data.reportSummary
+          });
+        }
+      } else {
+        const error = await response.json();
+        // 如果是"注册时间不足7天"的错误，静默处理（不是错误）
+        if (error.code !== 'INSUFFICIENT_REGISTRATION_TIME') {
+          console.error('❌ 生成周报邮件失败:', error);
+        } else {
+          console.log('ℹ️ 注册时间不足7天，暂不生成周报');
+        }
+      }
+    } catch (error) {
+      console.error('❌ 生成周报邮件异常:', error);
+    }
   };
 
   // 暴露给 focus 页使用的函数
@@ -1246,6 +1302,28 @@ export default function Dashboard() {
           localStorage.setItem('lastLoginDate', today);
           console.log('📈 每日登录经验值奖励', { exp: loginExp, total: userExp + loginExp });
           // userLevel 会自动同步
+        }
+        
+        // 🆕 检查是否需要生成周报邮件（每周一自动生成）
+        const currentWeekStart = getCurrentWeekStart();
+        const lastWeeklyMailCheck = localStorage.getItem('lastWeeklyMailCheck');
+        if (lastWeeklyMailCheck !== currentWeekStart) {
+          // 新的一周，检查并生成上周的周报邮件
+          console.log('📧 检测到新的一周，准备生成上周周报邮件');
+          
+          // 获取上周一的日期
+          const lastMonday = new Date(currentWeekStart);
+          lastMonday.setDate(lastMonday.getDate() - 7);
+          const lastWeekStart = lastMonday.toISOString().split('T')[0];
+          
+          // 生成周报邮件（异步，不阻塞页面）
+          generateWeeklyReportMail(lastWeekStart).catch(err => {
+            console.error('❌ 生成周报邮件失败:', err);
+          });
+          
+          // 标记已检查（避免重复生成）
+          localStorage.setItem('lastWeeklyMailCheck', currentWeekStart);
+          console.log('✅ 周报邮件检查标记已更新:', currentWeekStart);
         }
         
         // 如果没有专注完成，再根据 V2 语境 + 频率逻辑决定是否播放首页文案

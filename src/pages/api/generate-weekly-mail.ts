@@ -1,0 +1,103 @@
+import { NextApiRequest, NextApiResponse } from "next";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./auth/[...nextauth]";
+import { computeWeeklyReport, getWeekRange, formatDateKey } from "~/lib/weeklyReport";
+
+/**
+ * 生成周报邮件 API
+ * 
+ * 功能：
+ * 1. 生成上周的周报数据
+ * 2. 返回邮件信息，供前端 MailSystem 添加
+ * 
+ * 调用时机：每周一登录时自动调用
+ */
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "方法不允许" });
+  }
+
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user?.id) {
+    console.warn("[generate-weekly-mail] 未授权访问尝试");
+    return res.status(401).json({ error: "未授权" });
+  }
+
+  try {
+    // 获取周开始日期（从请求体或自动计算上周一）
+    const requestedWeekStart = req.body?.weekStart as string | undefined;
+    
+    let referenceDate: Date;
+    
+    if (requestedWeekStart) {
+      // 使用指定的周开始日期
+      referenceDate = new Date(requestedWeekStart);
+      console.log('[generate-weekly-mail] 使用指定日期:', requestedWeekStart);
+    } else {
+      // 默认：上周一（本周一往前推7天）
+      const today = new Date();
+      const lastMonday = new Date(today);
+      lastMonday.setDate(today.getDate() - 7);
+      referenceDate = lastMonday;
+      console.log('[generate-weekly-mail] 使用默认日期（上周一）:', formatDateKey(lastMonday));
+    }
+    
+    const { start: weekStart, end: weekEnd } = getWeekRange(referenceDate);
+    const weekStartStr = formatDateKey(weekStart);
+    const weekEndStr = formatDateKey(weekEnd);
+
+    console.log(`[generate-weekly-mail] 生成周报: userId=${session.user.id}, week=${weekStartStr} to ${weekEndStr}`);
+
+    // 生成周报数据（会自动保存到数据库）
+    const report = await computeWeeklyReport(session.user.id, {
+      referenceDate,
+      persist: true,
+    });
+
+    // 返回邮件信息（格式符合 MailSystem.Mail 接口）
+    const mail = {
+      id: `weekly_report_${weekStartStr}`,
+      sender: 'Echo 周报',
+      title: `本周专注周报 · ${report.period.label}`,
+      content: `您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。`,
+      date: formatDateKey(new Date()), // 今天的日期（邮件发送日期）
+      isRead: false,
+      type: 'report' as const,
+      hasAttachment: false,
+      actionUrl: `/reports/weekly?weekStart=${weekStartStr}`,
+      actionLabel: '查看周报',
+      expiresAt: new Date(Date.now() + 84 * 24 * 60 * 60 * 1000).toISOString(), // 84天后过期
+    };
+
+    console.log(`[generate-weekly-mail] ✅ 周报邮件生成成功: ${mail.id}`);
+
+    return res.status(200).json({ 
+      success: true,
+      mail,
+      reportSummary: {
+        totalMinutes: report.totals.minutes,
+        streakDays: report.totals.streakDays,
+        flowAvg: report.totals.flowAvg,
+      }
+    });
+  } catch (error: any) {
+    console.error("[generate-weekly-mail] 生成周报邮件失败:", {
+      userId: session.user.id,
+      error: error?.message || error,
+      stack: error?.stack,
+    });
+    
+    // 如果是"注册时间不足7天"的错误，返回特殊状态码
+    const errorMessage = error?.message || "服务器错误";
+    const statusCode = errorMessage.includes("注册时间不足") ? 400 : 500;
+    
+    return res.status(statusCode).json({ 
+      error: errorMessage,
+      code: statusCode === 400 ? "INSUFFICIENT_REGISTRATION_TIME" : "SERVER_ERROR"
+    });
+  }
+}
+

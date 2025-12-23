@@ -105,8 +105,9 @@ export class MailSystem {
       return;
     }
 
-    // 从 localStorage 加载已读状态
+    // 从 localStorage 加载已读状态和自定义邮件
     const readStatus = JSON.parse(localStorage.getItem('mailReadStatus') || '{}');
+    const customMails = JSON.parse(localStorage.getItem('customMails') || '[]');
     
     const now = Date.now();
     const isExpired = (mail: Mail) => {
@@ -119,16 +120,30 @@ export class MailSystem {
       return expires <= now;
     };
 
-    // 合并 Mock 数据和已读状态 + 过滤过期邮件
-    const merged = MOCK_MAILS.map(mail => ({
+    // 合并 Mock 数据、自定义邮件和已读状态 + 过滤过期邮件
+    const mockWithStatus = MOCK_MAILS.map(mail => ({
       ...mail,
       isRead: !!readStatus[mail.id]
-    })).filter(mail => !isExpired(mail));
-
-    this.mails = merged;
+    }));
+    
+    const customWithStatus = customMails.map((mail: Mail) => ({
+      ...mail,
+      isRead: !!readStatus[mail.id]
+    }));
+    
+    // 合并并过滤过期邮件
+    const allMails = [...mockWithStatus, ...customWithStatus];
+    this.mails = allMails.filter(mail => !isExpired(mail));
     
     // 按日期倒序排序
     this.mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    // 清理过期的自定义邮件
+    const validCustomMails = customWithStatus.filter(mail => !isExpired(mail));
+    if (validCustomMails.length !== customMails.length) {
+      localStorage.setItem('customMails', JSON.stringify(validCustomMails));
+      console.log('[MailSystem] 清理过期邮件:', customMails.length - validCustomMails.length);
+    }
   }
 
   public getMails(): Mail[] {
@@ -172,6 +187,51 @@ export class MailSystem {
       localStorage.setItem('mailReadStatus', JSON.stringify(readStatus));
       this.notifyListeners();
     }
+  }
+
+  // 🆕 添加新邮件到信箱
+  public addMail(mail: Mail) {
+    if (typeof window === 'undefined') return;
+
+    // 检查是否已存在（避免重复）
+    if (this.mails.some(m => m.id === mail.id)) {
+      console.log('[MailSystem] 邮件已存在，跳过添加:', mail.id);
+      return;
+    }
+
+    // 添加到列表
+    this.mails.unshift(mail); // 添加到开头（最新的）
+    
+    // 持久化到 localStorage
+    const customMails = JSON.parse(localStorage.getItem('customMails') || '[]');
+    customMails.unshift(mail);
+    localStorage.setItem('customMails', JSON.stringify(customMails));
+
+    console.log('[MailSystem] ✅ 新邮件已添加:', mail.title);
+    
+    // 通知监听者
+    this.notifyListeners();
+  }
+
+  // 🆕 创建周报邮件
+  public static createWeeklyReportMail(weekStart: string, weekEnd: string, weekLabel: string): Mail {
+    const mailId = `weekly_report_${weekStart}`;
+    const monday = new Date(weekStart);
+    const mailDate = formatYmd(monday);
+    
+    return {
+      id: mailId,
+      sender: 'Echo 周报',
+      title: `本周专注周报 · ${weekLabel}`,
+      content: `您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。`,
+      date: mailDate,
+      isRead: false,
+      type: 'report',
+      hasAttachment: false,
+      actionUrl: `/reports/weekly?weekStart=${weekStart}`,
+      actionLabel: '查看周报',
+      expiresAt: addDays(monday, MAIL_TTL_DAYS).toISOString(),
+    };
   }
 
   public subscribe(listener: () => void) {

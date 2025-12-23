@@ -121,11 +121,20 @@ async function fetchUserDataFromDatabase(userId: string): Promise<UserDataSnapsh
     const achievementsData = achievementsResponse.ok ? await achievementsResponse.json() : null;
     const sessionsData = sessionsResponse.ok ? await sessionsResponse.json() : null;
     
+    // 🔥 修复：正确处理 sessions API 的返回格式
+    const sessions = sessionsData?.sessions || [];
+    const totalSessions = sessionsData?.total || 0;
+    
+    // 计算总专注时长
+    const totalFocusMinutes = Array.isArray(sessions) 
+      ? sessions.reduce((sum: number, session: any) => sum + (session.duration || 0), 0)
+      : 0;
+    
     return {
       userExp: userData?.userExp || 0,
       userLevel: userData?.userLevel || 1,
-      totalFocusMinutes: 0, // 需要从专注记录计算
-      totalSessions: Array.isArray(sessionsData) ? sessionsData.length : 0,
+      totalFocusMinutes,
+      totalSessions,
       hasAnyAchievements: Array.isArray(achievementsData) && achievementsData.length > 0,
       createdAt: userData?.createdAt,
     };
