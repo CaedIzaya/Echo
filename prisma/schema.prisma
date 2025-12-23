@@ -66,6 +66,9 @@ model User {
   fertilizerExpiresAt    DateTime?
   fertilizerMultiplier   Float?
   flowMetrics            Json?          // 心流指标数据（impression, tempFlow等）
+  streakDays             Int            @default(0)     // 🔥 连续专注天数
+  lastStreakDate         String?                        // 🔥 最后一次更新连续天数的日期 (YYYY-MM-DD)
+  totalFocusMinutes      Int            @default(0)     // 🔥 总专注时长（分钟）
   accounts               Account[]
   sessions               Session[]
   projects               Project[]

@@ -1,10 +1,11 @@
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import type { GetServerSideProps } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]";
 import type { WeeklyReportPayload } from "~/lib/weeklyReport";
-import { computeWeeklyReport } from "~/lib/weeklyReport";
+import { computeWeeklyReport, getWeekRange, formatDateKey } from "~/lib/weeklyReport";
 import { useEffect, useMemo, useState } from "react";
 import localforage from "localforage";
 
@@ -13,9 +14,19 @@ type Props = {
   expired: boolean;
   requestedWeekStart: string | null;
   error?: string;
+  isCurrentWeek: boolean;  // 🔥 新增：是否是本周
+  navigation: {            // 🔥 新增：导航信息
+    hasPrev: boolean;
+    hasNext: boolean;
+    prevWeekStart: string | null;
+    nextWeekStart: string | null;
+  };
 };
 
-const WeeklyReportPage = ({ report, expired, requestedWeekStart, error }: Props) => {
+const WeeklyReportPage = ({ report, expired, requestedWeekStart, error, isCurrentWeek, navigation }: Props) => {
+  const router = useRouter();
+  const [showHistoryMenu, setShowHistoryMenu] = useState(false);
+  const [historyList, setHistoryList] = useState<any[]>([]);
   if (error) {
     // 判断是否是第一周保护错误
     const isFirstWeekProtection = error.includes("注册时间不足");
@@ -167,6 +178,31 @@ const WeeklyReportPage = ({ report, expired, requestedWeekStart, error }: Props)
   const avatarSrc = useMemo(() => {
     return localAvatar ?? report.user.image ?? null;
   }, [localAvatar, report.user.image]);
+
+  // 🔥 新增：加载周报历史列表
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const response = await fetch('/api/weekly-reports/history');
+        if (response.ok) {
+          const data = await response.json();
+          setHistoryList(data.history || []);
+        }
+      } catch (error) {
+        console.error('[weekly-report] 加载历史列表失败:', error);
+      }
+    };
+    loadHistory();
+  }, []);
+
+  // 🔥 导航函数
+  const navigateToWeek = (weekStart: string) => {
+    router.push(`/reports/weekly?weekStart=${weekStart}`);
+  };
+
+  const goToCurrentWeek = () => {
+    router.push('/reports/weekly');
+  };
 
   return (
     <>
@@ -348,15 +384,132 @@ const WeeklyReportPage = ({ report, expired, requestedWeekStart, error }: Props)
             </div>
           </section>
 
-          <div className="flex items-center justify-between">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-white transition"
-            >
-              <span>←</span>
-              <span>返回主页</span>
-            </Link>
-            <div className="text-xs text-slate-500">这份周报，适合截图留念。</div>
+          {/* 🔥 新增：周报导航区域 */}
+          <div className="rounded-[2rem] bg-white/80 backdrop-blur-xl p-5 shadow-sm ring-1 ring-white/70 border border-slate-100/60">
+            <div className="flex flex-col gap-4">
+              {/* 周报导航按钮 */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  {/* 上一周按钮 */}
+                  <button
+                    onClick={() => navigation.hasPrev && navigation.prevWeekStart && navigateToWeek(navigation.prevWeekStart)}
+                    disabled={!navigation.hasPrev}
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      navigation.hasPrev
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
+                    }`}
+                    title={navigation.hasPrev ? '查看上一周周报' : '已经是最早的周报了'}
+                  >
+                    <span>←</span>
+                    <span>上一周</span>
+                  </button>
+
+                  {/* 下一周按钮 */}
+                  <button
+                    onClick={() => navigation.hasNext && navigation.nextWeekStart && navigateToWeek(navigation.nextWeekStart)}
+                    disabled={!navigation.hasNext}
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      navigation.hasNext
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
+                    }`}
+                    title={navigation.hasNext ? '查看下一周周报' : '已经是最新的周报了'}
+                  >
+                    <span>下一周</span>
+                    <span>→</span>
+                  </button>
+
+                  {/* 返回本周按钮 */}
+                  {!isCurrentWeek && (
+                    <button
+                      onClick={goToCurrentWeek}
+                      className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold bg-gradient-to-r from-emerald-500 to-cyan-600 text-white shadow-lg hover:shadow-xl transition"
+                      title="返回本周周报"
+                    >
+                      <span>📅</span>
+                      <span>本周</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* 当前周标识 */}
+                {isCurrentWeek && (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+                    <span>⭐</span>
+                    <span>当前周报</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 历史周报列表（下拉菜单） */}
+              {historyList.length > 1 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowHistoryMenu(!showHistoryMenu)}
+                    className="w-full inline-flex items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-sm font-medium bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition"
+                  >
+                    <span className="text-slate-700">📚 查看历史周报（{historyList.length - 1} 周）</span>
+                    <span className={`text-slate-400 transition-transform ${showHistoryMenu ? 'rotate-180' : ''}`}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {showHistoryMenu && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-10">
+                      {historyList.map((week, index) => {
+                        const isCurrent = week.weekStart === report?.period.start.split('T')[0];
+                        return (
+                          <button
+                            key={week.id}
+                            onClick={() => {
+                              if (!isCurrent) {
+                                navigateToWeek(week.weekStart);
+                              }
+                              setShowHistoryMenu(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left hover:bg-emerald-50 transition ${
+                              isCurrent ? 'bg-emerald-50' : ''
+                            } ${index > 0 ? 'border-t border-slate-100' : ''}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-sm font-semibold text-slate-900">
+                                  {week.label}
+                                  {isCurrent && <span className="ml-2 text-emerald-600">（当前）</span>}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                  {week.totalHours} 小时 · {week.streakDays} 天连续
+                                  {week.flowAvg && ` · 心流 ${week.flowAvg}`}
+                                </div>
+                              </div>
+                              {!isCurrent && (
+                                <span className="text-slate-400">→</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 分隔线 */}
+              <div className="border-t border-slate-200" />
+
+              {/* 底部操作 */}
+              <div className="flex items-center justify-between">
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center gap-2 rounded-full bg-white border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+                >
+                  <span>←</span>
+                  <span>返回主页</span>
+                </Link>
+                <div className="text-xs text-slate-500">这份周报，适合截图留念。</div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -473,9 +626,14 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
     }
 
     const TTL_DAYS = 84; // 12 周
+    const MAX_HISTORY_WEEKS = 4; // 🔥 最多查看4周历史
     const weekStartParamRaw = ctx.query.weekStart;
     const weekStartParam =
       typeof weekStartParamRaw === "string" ? weekStartParamRaw : null;
+
+    // 🔥 计算本周的周一
+    const { start: currentWeekStart } = getWeekRange(new Date());
+    const currentWeekStartStr = formatDateKey(currentWeekStart);
 
     if (weekStartParam) {
       const requested = new Date(weekStartParam);
@@ -488,6 +646,13 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
             report: null,
             expired: true,
             requestedWeekStart: weekStartParam,
+            isCurrentWeek: false,
+            navigation: {
+              hasPrev: false,
+              hasNext: false,
+              prevWeekStart: null,
+              nextWeekStart: null,
+            },
           },
         };
       }
@@ -501,8 +666,53 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
       }),
     );
 
+    // 🔥 计算导航信息
+    const reportWeekStart = report.period.start.split('T')[0];
+    const isCurrentWeek = reportWeekStart === currentWeekStartStr;
+
+    // 计算上一周和下一周的周一日期
+    const reportWeekDate = new Date(reportWeekStart);
+    
+    // 上一周
+    const prevWeekDate = new Date(reportWeekDate);
+    prevWeekDate.setDate(reportWeekDate.getDate() - 7);
+    const prevWeekStart = formatDateKey(prevWeekDate);
+    
+    // 下一周
+    const nextWeekDate = new Date(reportWeekDate);
+    nextWeekDate.setDate(reportWeekDate.getDate() + 7);
+    const nextWeekStart = formatDateKey(nextWeekDate);
+
+    // 检查是否有上一周（不超过4周历史）
+    const oldestAllowedDate = new Date(currentWeekStart);
+    oldestAllowedDate.setDate(currentWeekStart.getDate() - (MAX_HISTORY_WEEKS * 7));
+    const hasPrev = prevWeekDate.getTime() >= oldestAllowedDate.getTime();
+
+    // 检查是否有下一周（不能超过本周）
+    const hasNext = nextWeekDate.getTime() <= currentWeekStart.getTime();
+
+    const navigation = {
+      hasPrev,
+      hasNext,
+      prevWeekStart: hasPrev ? prevWeekStart : null,
+      nextWeekStart: hasNext ? nextWeekStart : null,
+    };
+
+    console.log('[weekly-report] 导航信息:', {
+      当前周: currentWeekStartStr,
+      显示周: reportWeekStart,
+      是否本周: isCurrentWeek,
+      导航: navigation,
+    });
+
     return {
-      props: { report, expired: false, requestedWeekStart: weekStartParam },
+      props: { 
+        report, 
+        expired: false, 
+        requestedWeekStart: weekStartParam,
+        isCurrentWeek,
+        navigation,
+      },
     };
   } catch (error: any) {
     console.error("[weekly-report] getServerSideProps error:", error);
@@ -518,6 +728,13 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
         error: process.env.NODE_ENV === "development" 
           ? error?.message || "未知错误" 
           : "周报生成失败，请稍后重试",
+        isCurrentWeek: false,
+        navigation: {
+          hasPrev: false,
+          hasNext: false,
+          prevWeekStart: null,
+          nextWeekStart: null,
+        },
       },
     };
   }

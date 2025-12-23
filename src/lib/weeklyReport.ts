@@ -3,7 +3,7 @@ import type { WeeklyReport } from "@prisma/client";
 import { LevelManager } from "~/lib/LevelSystem";
 import { expToNextLevel } from "~/lib/HeartTreeExpSystem";
 
-const WEEKLY_REPORT_TTL_DAYS = 84; // 12 周
+const WEEKLY_REPORT_TTL_DAYS = 84; // 12 周（保留更长时间确保对比数据不丢失）
 
 export type DailyPoint = {
   date: string; // YYYY-MM-DD
