@@ -3,9 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 interface EchoSpiritMobileProps {
-  state?: 'idle' | 'excited' | 'focus' | 'happy' | 'nod';
+  state?: 'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success';
   className?: string;
-  onStateChange?: (state: 'idle' | 'excited' | 'focus' | 'happy' | 'nod') => void;
+  onStateChange?: (state: 'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success') => void;
   onClick?: () => void; // 点击回调
   allowFocus?: boolean; // 是否允许focus状态（主页应该设为false）
   isCompleted?: boolean; // 专注是否完成，决定颜色：false=idle颜色，true=completed颜色
@@ -176,6 +176,8 @@ export default function EchoSpiritMobile({
   const getAnimationClass = () => {
     if (currentState === 'focus') return 'spirit-animate-focus';
     if (currentState === 'happy' || currentState === 'nod') return 'spirit-animate-happy';
+    if (currentState === 'highfive') return 'spirit-animate-highfive';
+    if (currentState === 'highfive-success') return 'spirit-animate-highfive-success';
     return 'spirit-animate-idle';
   };
 
@@ -476,6 +478,49 @@ export default function EchoSpiritMobile({
           50% { 
             transform: rotate(6deg);
           }
+        }
+
+        /* highfive 准备状态：抬头 */
+        .spirit-animate-highfive {
+          animation: headLookUp 3s ease-in-out infinite;
+          transform-origin: 60px 92px;
+        }
+
+        @keyframes headLookUp {
+          0%, 100% { transform: translateY(0) rotate(2deg); }
+          50% { transform: translateY(-3px) rotate(5deg); }
+        }
+
+        /* highfive 准备状态：举手 */
+        .spirit-svg[data-state="highfive"] .hand-right {
+          opacity: 1 !important;
+          animation: highFiveReady 0.5s ease-out forwards;
+        }
+
+        @keyframes highFiveReady {
+          0% { transform: translate(0, 0) scale(1); opacity: 0; }
+          100% { transform: translate(5px, -25px) scale(1.3); opacity: 1; }
+        }
+
+        /* highfive 成功状态：快速点头 */
+        .spirit-animate-highfive-success {
+          animation: successNod 0.4s ease-in-out infinite;
+          transform-origin: 60px 92px;
+        }
+
+        @keyframes successNod {
+          0%, 100% { transform: rotate(0deg) translateY(0); }
+          50% { transform: rotate(8deg) translateY(3px); }
+        }
+
+        .spirit-svg[data-state="highfive-success"] .hand-right {
+          opacity: 1 !important;
+          transform: translate(5px, -25px) scale(1.3);
+        }
+
+        .spirit-svg[data-state="highfive-success"] .hand-left {
+          opacity: 1 !important;
+          animation: nodHands 0.8s ease-in-out infinite;
         }
       `}</style>
     </>

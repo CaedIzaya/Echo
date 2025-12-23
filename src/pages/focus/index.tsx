@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import BottomNavigation from '../dashboard/BottomNavigation';
 import InterruptedSessionAlert from './InterruptedSessionAlert';
+import EchoSpirit from '../dashboard/EchoSpirit';
 
 type FocusState =  
   | 'preparing'      // 准备中（设置时长）
@@ -55,6 +56,11 @@ export default function Focus() {
   const [pendingEndCompleted, setPendingEndCompleted] = useState(false);
   const [celebrateMode, setCelebrateMode] = useState<'session' | 'daily' | null>(null);
   
+
+  // 击掌功能相关状态
+  const [highFivePhase, setHighFivePhase] = useState<'none' | 'ready' | 'success' | 'finished'>('none');
+  const [highFiveText, setHighFiveText] = useState('');
+  const highFiveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionRef = useRef<FocusSession | null>(null);
@@ -159,6 +165,57 @@ export default function Focus() {
     } catch (error) {
       console.warn('播放庆祝音效失败:', error);
     }
+  };
+
+  // 播放 叮~ 击掌音效
+  const playDingSound = () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const audioContext = audioContextRef.current;
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+      }
+
+      // 叮~ 清脆的高音
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880; // A5
+
+      const startTime = audioContext.currentTime;
+      const duration = 0.3;
+
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(0.2, startTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    } catch (e) {
+      console.warn('播放音效失败', e);
+    }
+  };
+
+  // 处理击掌交互
+  const handleHighFiveClick = () => {
+    if (highFivePhase !== 'ready') return;
+    
+    playDingSound();
+    setHighFivePhase('success');
+    setHighFiveText('太棒了！你这次超亮！');
+    
+    // 5秒后进入平稳状态
+    if (highFiveTimerRef.current) clearTimeout(highFiveTimerRef.current);
+    highFiveTimerRef.current = setTimeout(() => {
+      setHighFivePhase('finished');
+      setHighFiveText(''); // 文案消失
+    }, 5000);
   };
   
   // 加载主要计划作为默认
@@ -1080,9 +1137,19 @@ export default function Focus() {
     }, 1500);
   };
 
+  // 当显示结算选项且是已完成状态时，初始化击掌交互
+  useEffect(() => {
+    if (showEndOptions && state === 'completed' && highFivePhase === 'none') {
+      setHighFivePhase('ready');
+      setHighFiveText('干得漂亮！来击个掌吧！');
+    }
+  }, [showEndOptions, state, highFivePhase]);
+
   // 返回主页
   const goToDashboard = () => {
     // 清理所有状态和标志
+    setHighFivePhase('none');
+    setHighFiveText('');
     localStorage.removeItem('focusSession');
     localStorage.removeItem('focusSessionEnded');
     localStorage.removeItem('focusTimerLastSaved');
@@ -1097,6 +1164,8 @@ export default function Focus() {
   // 继续专注
   const continueFocus = () => {
     // 重置状态
+    setHighFivePhase('none');
+    setHighFiveText('');
     setState('preparing');
     setShowEndOptions(false);
     setShowConfetti(false);
@@ -1220,6 +1289,9 @@ export default function Focus() {
       window.removeEventListener('pagehide', handlePageHide);
       if (saveInterval) clearInterval(saveInterval);
       if (pauseSaveInterval) clearInterval(pauseSaveInterval);
+      if (highFiveTimerRef.current) clearTimeout(highFiveTimerRef.current);
+      // 确保释放屏幕常亮
+      releaseWakeLock();
     };
   }, [state, elapsedTime]);
 
@@ -1821,10 +1893,10 @@ export default function Focus() {
 
         {/* 如果正在显示选择按钮 */}
         {showEndOptions && (
-          <div className={`min-h-screen flex items-center justify-center p-6 bg-gradient-to-br ${
+          <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center p-6 bg-gradient-to-br transition-all duration-700 ${
             completed ? 'from-teal-500 to-cyan-600' : 'from-purple-500 to-pink-600'
           }`}>
-          <div className="text-center max-w-md w-full">
+          <div className="text-center max-w-md w-full z-10">
             <div className="text-6xl mb-6">
               {completed ? '🎉' : '💙'}
             </div>
@@ -1846,14 +1918,14 @@ export default function Focus() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                写今日小结
+                {highFivePhase === 'finished' ? '写个小结？' : '写今日小结'}
               </button>
               
               <button
                 onClick={goToDashboard}
                 className="w-full rounded-xl bg-white px-4 py-4 text-teal-600 font-semibold text-lg hover:bg-gray-100 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
               >
-                返回主页
+                {highFivePhase === 'finished' ? '下次再说' : '返回主页'}
               </button>
               <button
                 onClick={continueFocus}
@@ -1863,8 +1935,44 @@ export default function Focus() {
               </button>
             </div>
           </div>
+
+          {/* 小精灵击掌区域 - 仅在完成后显示 */}
+          {completed && highFivePhase !== 'none' && (
+            <div className="mt-12 md:mt-0 md:ml-12 relative flex flex-col items-center animate-fade-in">
+              {/* 对话气泡 */}
+              {highFiveText && (
+                <div className="absolute -top-16 bg-white rounded-2xl px-4 py-2 shadow-xl animate-bounce-subtle text-teal-800 font-bold whitespace-nowrap after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-8 after:border-transparent after:border-t-white">
+                  {highFiveText}
+                </div>
+              )}
+              
+              <EchoSpirit 
+                state={highFivePhase === 'ready' ? 'highfive' : highFivePhase === 'success' ? 'highfive-success' : 'idle'}
+                isCompleted={true}
+                className="w-32 h-32 md:w-40 md:h-40 cursor-pointer hover:scale-105 transition-transform"
+                onClick={handleHighFiveClick}
+              />
+            </div>
+          )}
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes bounce-subtle {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        .animate-bounce-subtle {
+          animation: bounce-subtle 2s ease-in-out infinite;
+        }
+        @keyframes fade-in {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out forwards;
+        }
+      `}</style>
       
       {/* 显示完成信息 */}
       {!showEndOptions && (

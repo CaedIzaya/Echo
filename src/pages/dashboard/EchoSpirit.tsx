@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface EchoSpiritProps {
-  state?: 'idle' | 'excited' | 'focus' | 'happy' | 'nod';
+  state?: 'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success';
   className?: string;
   onStateChange?: (state: string) => void;
   onClick?: () => void;
@@ -395,6 +395,75 @@ export default function EchoSpirit({
         
         .echo-spirit-container[data-state="excited"] .hand-right {
           animation-delay: 0.1s;
+        }
+
+        /* =========================================
+           4. HIGHFIVE ANIMATIONS
+           ========================================= */
+        
+        /* highfive 准备状态：抬头 */
+        @keyframes headLookUp {
+          0%, 100% { transform: translate(0, 100) rotate(-5deg) translateY(-5px); }
+          50% { transform: translate(0, 100) rotate(-8deg) translateY(-8px); }
+        }
+
+        /* highfive 准备状态：举手 */
+        @keyframes highFiveReady {
+          0% { transform: translate(0, 0) scale(1); opacity: 0; }
+          100% { transform: translate(15px, -50px) scale(1.3); opacity: 1; }
+        }
+
+        /* highfive 准备状态：眼睛向上看 */
+        @keyframes eyeLookUp {
+          0%, 100% { transform: translate(0, -12px); }
+          50% { transform: translate(2px, -15px); }
+        }
+
+        /* highfive 成功状态：快速点头 */
+        @keyframes successNod {
+          0%, 100% { transform: rotate(0deg) translateY(0); }
+          50% { transform: rotate(12deg) translateY(5px); }
+        }
+
+        /* Apply highfive ready */
+        .echo-spirit-container[data-state="highfive"] .main-rotator {
+          animation: headLookUp 3s ease-in-out infinite;
+          transform-origin: center center;
+        }
+
+        .echo-spirit-container[data-state="highfive"] .face-container {
+          animation: eyeLookUp 3s ease-in-out infinite;
+        }
+
+        .echo-spirit-container[data-state="highfive"] .right-hand {
+          opacity: 1 !important;
+          animation: highFiveReady 0.5s ease-out forwards;
+          transform-origin: center center;
+        }
+
+        .echo-spirit-container[data-state="highfive"] .eye-left ellipse,
+        .echo-spirit-container[data-state="highfive"] .eye-right ellipse {
+          animation: blink 3s infinite;
+        }
+
+        /* Apply highfive success */
+        .echo-spirit-container[data-state="highfive-success"] .main-rotator {
+          animation: successNod 0.4s ease-in-out infinite;
+          transform-origin: center bottom;
+        }
+
+        .echo-spirit-container[data-state="highfive-success"] .hand-group {
+          opacity: 1;
+        }
+
+        .echo-spirit-container[data-state="highfive-success"] .right-hand {
+          opacity: 1 !important;
+          transform: translate(15px, -50px) scale(1.3);
+        }
+
+        .echo-spirit-container[data-state="highfive-success"] .left-hand {
+          opacity: 1 !important;
+          animation: nodHands 0.8s ease-in-out infinite;
         }
       `}</style>
     </div>
