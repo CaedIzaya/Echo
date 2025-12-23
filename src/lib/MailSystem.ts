@@ -139,7 +139,7 @@ export class MailSystem {
     this.mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     // 清理过期的自定义邮件
-    const validCustomMails = customWithStatus.filter(mail => !isExpired(mail));
+    const validCustomMails = customWithStatus.filter((mail: Mail) => !isExpired(mail));
     if (validCustomMails.length !== customMails.length) {
       localStorage.setItem('customMails', JSON.stringify(validCustomMails));
       console.log('[MailSystem] 清理过期邮件:', customMails.length - validCustomMails.length);

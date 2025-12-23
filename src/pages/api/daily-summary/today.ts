@@ -125,11 +125,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
 
-        // 保留最近 8 条小结，超出则删除更早的
+        // 🔥 保留最近 10 条小结，确保上周数据能完整保存
         const overflow = await db.dailySummary.findMany({
           where: { userId },
           orderBy: { date: 'desc' },
-          skip: 8,
+          skip: 10,
           select: { id: true },
         });
 

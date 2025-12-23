@@ -54,17 +54,29 @@ type Options = {
 };
 
 export function getWeekRange(referenceDate = new Date()) {
+  // 🔥 使用用户本地时区计算周期（周一00:00 - 周日23:59）
   const ref = new Date(referenceDate);
   ref.setHours(0, 0, 0, 0);
   const day = ref.getDay(); // 0 (Sun) - 6 (Sat)
   const mondayOffset = day === 0 ? -6 : 1 - day;
+  
+  // 周一 00:00:00
   const start = new Date(ref);
   start.setDate(ref.getDate() + mondayOffset);
   start.setHours(0, 0, 0, 0);
 
+  // 周日 23:59:59.999（从周一开始+6天）
   const end = new Date(start);
-  end.setDate(start.getDate() + 7);
-  end.setMilliseconds(-1);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+
+  // 🔥 详细日志，方便确认日期区间
+  console.log(`[getWeekRange] 📅 周期计算:`, {
+    参考日期: formatDateKey(ref),
+    周一: formatDateKey(start),
+    周日: formatDateKey(end),
+    标签: formatLabel(start, end),
+  });
 
   return { start, end };
 }
@@ -113,7 +125,7 @@ export async function computeWeeklyReport(
       db.dailySummary.findMany({
         where: { userId },
         orderBy: { date: "desc" },
-        take: 8,
+        take: 10,  // 🔥 增加到10条，确保上周数据能完整保存
         select: { date: true, text: true },
       }),
     ]);
@@ -139,8 +151,18 @@ export async function computeWeeklyReport(
     }
   }
 
-  // 数据验证日志
-  console.log(`[computeWeeklyReport] 数据统计: userId=${userId}, sessions=${sessions.length}, prevSessions=${prevSessions.length}, summaries=${summaries.length}`);
+  // 🔥 详细的数据验证日志（包括日期区间）
+  console.log(`[computeWeeklyReport] ==================== 周报数据生成 ====================`);
+  console.log(`[computeWeeklyReport] 用户ID: ${userId}`);
+  console.log(`[computeWeeklyReport] 📅 周期范围（用户本地时区）:`);
+  console.log(`[computeWeeklyReport]    开始: ${formatDateKey(weekStart)} (周一)`);
+  console.log(`[computeWeeklyReport]    结束: ${formatDateKey(weekEnd)} (周日)`);
+  console.log(`[computeWeeklyReport]    标签: ${formatLabel(weekStart, weekEnd)}`);
+  console.log(`[computeWeeklyReport] 📊 数据统计:`);
+  console.log(`[computeWeeklyReport]    本周专注记录: ${sessions.length} 条`);
+  console.log(`[computeWeeklyReport]    上周专注记录: ${prevSessions.length} 条`);
+  console.log(`[computeWeeklyReport]    每日小结: ${summaries.length} 条`);
+  console.log(`[computeWeeklyReport] 📆 7天日期列表:`, weekDates);
 
   const summaryMap = new Map<string, string>();
   summaries.forEach((s) => summaryMap.set(s.date, s.text));
@@ -159,6 +181,12 @@ export async function computeWeeklyReport(
             ) / daySessions.length,
           )
         : null;
+    
+    // 🔥 每日数据日志
+    if (minutes > 0 || flowAvg !== null) {
+      console.log(`[computeWeeklyReport]    ${date}: ${minutes}分钟, 心流${flowAvg || 'N/A'}`);
+    }
+    
     return {
       date,
       minutes,
@@ -166,6 +194,8 @@ export async function computeWeeklyReport(
       note: summaryMap.get(date) ?? null,
     };
   });
+  
+  console.log(`[computeWeeklyReport] ========================================================`);
 
   const totals = calcTotals(sessions);
   const prevTotals = calcTotals(prevSessions);
@@ -402,8 +432,12 @@ function getWeekDates(weekStart: Date) {
 }
 
 export function formatDateKey(date: Date) {
+  // 🔥 修复：使用用户本地时区，而不是 UTC
+  // toISOString() 会导致时区偏移问题
   const local = new Date(date);
-  local.setHours(0, 0, 0, 0);
-  return local.toISOString().slice(0, 10);
+  const year = local.getFullYear();
+  const month = String(local.getMonth() + 1).padStart(2, '0');
+  const day = String(local.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 

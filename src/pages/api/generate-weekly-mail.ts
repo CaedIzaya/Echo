@@ -72,7 +72,11 @@ export default async function handler(
       expiresAt: new Date(Date.now() + 84 * 24 * 60 * 60 * 1000).toISOString(), // 84天后过期
     };
 
-    console.log(`[generate-weekly-mail] ✅ 周报邮件生成成功: ${mail.id}`);
+    console.log(`[generate-weekly-mail] ✅ 周报邮件生成成功`);
+    console.log(`[generate-weekly-mail]    邮件ID: ${mail.id}`);
+    console.log(`[generate-weekly-mail]    标题: ${mail.title}`);
+    console.log(`[generate-weekly-mail]    周期: ${weekStartStr} 至 ${weekEndStr}`);
+    console.log(`[generate-weekly-mail]    数据: ${report.totals.minutes}分钟, ${report.totals.streakDays}天连续, 心流${report.totals.flowAvg || 'N/A'}`);
 
     return res.status(200).json({ 
       success: true,
