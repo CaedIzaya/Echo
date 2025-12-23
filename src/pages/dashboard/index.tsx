@@ -842,6 +842,16 @@ export default function Dashboard() {
 
     // 处理新的一天：归档昨日数据并重置今日数据
     if (isNewDay) {
+      // 🔒 保护性检查：记录经验值状态，确保不被意外修改
+      const beforeUserExp = localStorage.getItem('userExp');
+      console.log('📅 新的一天开始 - 数据保护检查', {
+        日期: today,
+        昨日日期: lastFocusDate,
+        当前用户经验: beforeUserExp,
+        当前用户等级: userLevel?.currentLevel,
+        提示: '经验值在日期切换时应保持不变'
+      });
+      
       // 归档昨日数据
       const yesterdayDate = lastFocusDate || today;
       const yesterdayStatsData = localStorage.getItem('todayStats');
@@ -894,6 +904,24 @@ export default function Dashboard() {
       // 重置今日数据（从0开始）
       saveTodayStats(0);
       setTodayStats({ minutes: 0, date: today });
+      
+      // 🔒 保护性验证：确认经验值没有被意外修改
+      const afterUserExp = localStorage.getItem('userExp');
+      if (beforeUserExp !== afterUserExp) {
+        console.error('❌❌❌ 严重警告：经验值在日期切换时被意外修改！', {
+          切换前: beforeUserExp,
+          切换后: afterUserExp,
+          损失: (parseFloat(beforeUserExp || '0') - parseFloat(afterUserExp || '0')).toFixed(0) + ' EXP'
+        });
+        console.error('❌ 正在尝试恢复经验值...');
+        // 尝试恢复
+        if (beforeUserExp && parseFloat(beforeUserExp) > parseFloat(afterUserExp || '0')) {
+          localStorage.setItem('userExp', beforeUserExp);
+          console.log('✅ 经验值已恢复');
+        }
+      } else {
+        console.log('✅ 经验值保护验证通过', { userExp: afterUserExp });
+      }
       
       console.log('🔄 日期已更新', { today, newStreakDays });
     }

@@ -27,19 +27,52 @@ export function useUserExp() {
       const response = await fetch('/api/user/exp');
       if (response.ok) {
         const data = await response.json();
-        const exp = data.userExp || 0;
-        const level = data.userLevel || 1;
+        const dbExp = data.userExp || 0;
+        const dbLevel = data.userLevel || 1;
         
-        // 更新状态和 localStorage
-        setUserExp(exp);
-        setUserLevel(level);
-        localStorage.setItem(STORAGE_KEY, exp.toString());
-        localStorage.setItem(SYNC_KEY, 'true');
+        // 🔥 新增：对比 localStorage 和数据库的值，选择更大的那个
+        const localExp = parseFloat(localStorage.getItem(STORAGE_KEY) || '0');
         
-        console.log('[useUserExp] 从数据库加载经验:', exp, '等级:', level);
+        console.log('[useUserExp] 数据对比', {
+          数据库经验: dbExp,
+          本地经验: localExp,
+          使用数据源: localExp > dbExp ? 'localStorage (本地更高)' : 'database (数据库更高或相等)'
+        });
+        
+        // ✅ 如果 localStorage 的值大于数据库，说明数据库数据过期或同步失败
+        if (localExp > dbExp) {
+          console.warn('[useUserExp] ⚠️ 检测到数据不一致！localStorage经验值高于数据库');
+          console.warn('[useUserExp] 🔧 使用localStorage数据并同步到数据库，防止经验值丢失');
+          
+          setUserExp(localExp);
+          const levelInfo = LevelManager.calculateLevel(localExp);
+          setUserLevel(levelInfo.currentLevel);
+          localStorage.setItem(STORAGE_KEY, localExp.toString());
+          
+          // 自动修复：同步到数据库
+          const syncResponse = await fetch('/api/user/exp/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userExp: localExp }),
+          });
+          
+          if (syncResponse.ok) {
+            console.log('[useUserExp] ✅ 数据已修复并同步到数据库');
+            localStorage.setItem(SYNC_KEY, 'true');
+          } else {
+            console.error('[useUserExp] ❌ 同步到数据库失败，但本地数据已保留');
+          }
+        } else {
+          // 数据库的值 >= localStorage，使用数据库的值
+          setUserExp(dbExp);
+          setUserLevel(dbLevel);
+          localStorage.setItem(STORAGE_KEY, dbExp.toString());
+          localStorage.setItem(SYNC_KEY, 'true');
+          console.log('[useUserExp] ✅ 从数据库加载经验:', dbExp, '等级:', dbLevel);
+        }
       }
     } catch (error) {
-      console.error('[useUserExp] 加载失败:', error);
+      console.error('[useUserExp] 加载失败，使用本地数据:', error);
       // 失败时使用 localStorage 的值
       const localExp = parseFloat(localStorage.getItem(STORAGE_KEY) || '0');
       if (localExp > 0) {

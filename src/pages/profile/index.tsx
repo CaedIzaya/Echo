@@ -242,6 +242,9 @@ export default function Profile() {
                         LV.{userLevel.currentLevel} {userLevel.title}
                     </div>
                 )}
+                {profile?.bio && (
+                    <p className="text-sm text-gray-600 mt-2 italic">"{profile.bio}"</p>
+                )}
              </div>
              
              {/* Decor */}
@@ -288,62 +291,25 @@ export default function Profile() {
            >
              退出登录
            </button>
-           <p className="text-center text-xs text-gray-400 mt-4">Echo v0.1.0 • Built with ❤️</p>
+           <p className="text-center text-xs text-gray-400 mt-4">Echo v0.9.5 • Built with ❤️</p>
         </div>
       </PageLayout>
     );
   }
 
   if (currentView === 'EDIT_PROFILE') {
-    return (
-      <PageLayout title="编辑资料" onBack={() => setCurrentView('MENU')}>
-         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
-            {/* Avatar - Centered Large */}
-            <div className="flex flex-col items-center">
-               <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
-                   <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-teal-50 shadow-inner bg-gray-100">
-                     {localAvatar ? (
-                       <img src={localAvatar} alt="avatar" className="w-full h-full object-cover" />
-                     ) : (
-                       <div className="w-full h-full flex items-center justify-center bg-teal-100 text-teal-600 text-3xl font-bold">
-                         {userInitial}
-                       </div>
-                     )}
-                   </div>
-                   <div className="absolute bottom-0 right-0 bg-teal-500 text-white rounded-full p-2 shadow-sm border-2 border-white">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      </svg>
-                   </div>
-               </div>
-               <p className="text-sm text-gray-400 mt-3">点击头像更换</p>
-            </div>
-
-            {/* Fields */}
-            <div className="space-y-4">
-                <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-2">昵称</label>
-                   <input 
-                     type="text" 
-                     value={displayName} 
-                     disabled 
-                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed focus:outline-none"
-                   />
-                   <p className="text-xs text-gray-400 mt-1">昵称暂不支持修改</p>
-                </div>
-                <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-2">个性签名</label>
-                   <textarea 
-                     value={profile?.bio || '这是你的界面。它只为你安静地生长。'} 
-                     disabled 
-                     rows={3}
-                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed focus:outline-none resize-none"
-                   />
-                </div>
-            </div>
-         </div>
-      </PageLayout>
-    );
+    return <EditProfileView 
+      profile={profile}
+      localAvatar={localAvatar}
+      userInitial={userInitial}
+      displayName={displayName}
+      onBack={() => setCurrentView('MENU')}
+      onAvatarClick={handleAvatarClick}
+      onProfileUpdate={(updatedProfile) => {
+        setProfile(updatedProfile);
+        setCurrentView('MENU');
+      }}
+    />;
   }
 
   if (currentView === 'SECURITY') {
@@ -409,7 +375,7 @@ export default function Profile() {
              </div>
              <h3 className="text-lg font-bold text-gray-900 mb-2">需要帮助？</h3>
              <p className="text-gray-500 mb-6">如果你有任何建议或遇到问题，请随时邮件联系我们。</p>
-             <a href="mailto:support@echo.com" className="inline-block px-6 py-3 bg-teal-500 text-white rounded-xl font-medium shadow-lg shadow-teal-500/30 hover:bg-teal-600 transition-colors">
+             <a href="mailto:Caedmon_Izaya@outlook.com" className="inline-block px-6 py-3 bg-teal-500 text-white rounded-xl font-medium shadow-lg shadow-teal-500/30 hover:bg-teal-600 transition-colors">
                发送邮件
              </a>
           </div>
@@ -558,5 +524,163 @@ function SessionManagement() {
         ))
       )}
     </div>
+  );
+}
+
+function EditProfileView({ profile, localAvatar, userInitial, displayName, onBack, onAvatarClick, onProfileUpdate }: {
+  profile: UserProfile | null;
+  localAvatar: string | null;
+  userInitial: string;
+  displayName: string;
+  onBack: () => void;
+  onAvatarClick: () => void;
+  onProfileUpdate: (profile: UserProfile) => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: profile?.name || displayName,
+    bio: profile?.bio || '',
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          bio: formData.bio,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setSuccess(true);
+        setTimeout(() => {
+          onProfileUpdate(result);
+        }, 500);
+      } else {
+        setError(result.error || '保存失败');
+      }
+    } catch (error) {
+      setError('网络错误，请重试');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const PageLayout = ({ children, title, onBack }: { children: React.ReactNode, title: string, onBack?: () => void }) => (
+    <div className="min-h-screen bg-[#F5F7F9] pb-24">
+      {/* Header */}
+      <div className="bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-20">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             {onBack ? (
+                <button onClick={onBack} className="p-1 -ml-2 rounded-full hover:bg-gray-100 transition-colors">
+                  <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+             ) : (
+                <div className="w-4" /> // Spacer
+             )}
+             <h1 className="text-lg font-bold text-gray-900">{title}</h1>
+          </div>
+          <div className="w-8"></div>
+        </div>
+      </div>
+      
+      {/* Content */}
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {children}
+      </div>
+
+      <BottomNavigation active="home" />
+    </div>
+  );
+
+  return (
+    <PageLayout title="编辑资料" onBack={onBack}>
+      <form onSubmit={handleSubmit}>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+          {/* Avatar - Centered Large */}
+          <div className="flex flex-col items-center">
+            <div className="relative group cursor-pointer" onClick={onAvatarClick}>
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-teal-50 shadow-inner bg-gray-100">
+                {localAvatar ? (
+                  <img src={localAvatar} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-teal-100 text-teal-600 text-3xl font-bold">
+                    {userInitial}
+                  </div>
+                )}
+              </div>
+              <div className="absolute bottom-0 right-0 bg-teal-500 text-white rounded-full p-2 shadow-sm border-2 border-white">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-sm text-gray-400 mt-3">点击头像更换</p>
+          </div>
+
+          {/* Success Message */}
+          {success && (
+            <div className="p-3 bg-green-50 text-green-700 text-sm rounded-xl text-center">
+              保存成功！
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl text-center">
+              {error}
+            </div>
+          )}
+
+          {/* Fields */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">昵称</label>
+              <input 
+                type="text" 
+                value={formData.name} 
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-300 transition-colors"
+                placeholder="请输入昵称"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">个性签名</label>
+              <textarea 
+                value={formData.bio} 
+                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-300 transition-colors resize-none"
+                placeholder="写下你的个性签名..."
+                maxLength={100}
+              />
+              <p className="text-xs text-gray-400 mt-1">{formData.bio.length}/100</p>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full py-3 bg-teal-500 text-white rounded-xl font-semibold hover:bg-teal-600 transition-colors shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? '保存中...' : '保存修改'}
+          </button>
+        </div>
+      </form>
+    </PageLayout>
   );
 }
