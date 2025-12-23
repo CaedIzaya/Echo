@@ -721,6 +721,44 @@ export default function Focus() {
     }
   };
 
+  // 请求屏幕常亮（Wake Lock API）
+  const requestWakeLock = async () => {
+    // 检查浏览器是否支持 Wake Lock API
+    if ('wakeLock' in navigator) {
+      try {
+        // 请求屏幕常亮
+        const wakeLock = await (navigator as any).wakeLock.request('screen');
+        wakeLockRef.current = wakeLock;
+        console.log('✅ 屏幕常亮已启用');
+        
+        // 监听 Wake Lock 释放事件（比如用户切换应用或系统自动释放）
+        wakeLock.addEventListener('release', () => {
+          console.log('⚠️ 屏幕常亮已被释放');
+          wakeLockRef.current = null;
+        });
+      } catch (err: any) {
+        // 如果请求失败（比如用户拒绝或浏览器不支持），静默处理
+        console.warn('无法启用屏幕常亮:', err.message);
+        wakeLockRef.current = null;
+      }
+    } else {
+      console.log('⚠️ 浏览器不支持 Wake Lock API');
+    }
+  };
+
+  // 释放屏幕常亮
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('✅ 屏幕常亮已释放');
+      } catch (err) {
+        console.warn('释放屏幕常亮失败:', err);
+      }
+    }
+  };
+
   // 基于时间戳计算已专注时长（避免后台挂起时计时不准）
   const calculateElapsedTime = (startTimeStr: string, totalPause: number, isCurrentlyPaused: boolean, pauseStartStr?: string): number => {
     if (!startTimeStr) return 0;
@@ -1306,7 +1344,12 @@ export default function Focus() {
       if (pauseSaveInterval) clearInterval(pauseSaveInterval);
       if (highFiveTimerRef.current) clearTimeout(highFiveTimerRef.current);
       // 确保释放屏幕常亮
-      releaseWakeLock();
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch((err: any) => {
+          console.warn('释放屏幕常亮失败:', err);
+        });
+        wakeLockRef.current = null;
+      }
     };
   }, [state, elapsedTime]);
 
