@@ -283,7 +283,7 @@ export default function Dashboard() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 小精灵状态
-  const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 用于对话框的状态
+  const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success'>('idle'); // 用于对话框的状态
   const spiritDialogRef = useRef<SpiritDialogRef>(null); // 对话框ref
   
   // 获取今日日期的工具函数
