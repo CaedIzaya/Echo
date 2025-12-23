@@ -7,6 +7,20 @@ import BottomNavigation from '../dashboard/BottomNavigation';
 import InterruptedSessionAlert from './InterruptedSessionAlert';
 import EchoSpirit from '../dashboard/EchoSpirit';
 
+// Wake Lock API 类型定义
+interface WakeLockSentinel extends EventTarget {
+  released: boolean;
+  type: 'screen';
+  release(): Promise<void>;
+  addEventListener(type: 'release', listener: () => void): void;
+}
+
+interface Navigator {
+  wakeLock?: {
+    request(type: 'screen'): Promise<WakeLockSentinel>;
+  };
+}
+
 type FocusState =  
   | 'preparing'      // 准备中（设置时长）
   | 'starting'       // 3秒倒计时
@@ -70,6 +84,7 @@ export default function Focus() {
   const goldActivatedThisSessionRef = useRef(false); // 本次会话是否已进入金色态
   const hasPlayedTadaSoundRef = useRef(false); // 是否已播放 ta~da 音效
   const audioContextRef = useRef<AudioContext | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null); // Wake Lock 引用
   const autoInterruptedAtKey = 'focusSessionAutoInterruptedAt';
 
   // 播放温柔的成就提示音
