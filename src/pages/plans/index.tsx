@@ -80,8 +80,8 @@ export default function PlansPage() {
     return plans
       .filter(p => p.isCompleted)
       .sort((a, b) => {
-        const aTime = new Date(a.updatedAt || a.createdAt).getTime();
-        const bTime = new Date(b.updatedAt || b.createdAt).getTime();
+        const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
         return bTime - aTime; // 最新的在前
       })
       .slice(0, 5);
@@ -157,8 +157,8 @@ export default function PlansPage() {
       if (currentCompleted.length >= 5) {
         // 找到最旧的已完成计划
         const oldestCompleted = currentCompleted.sort((a, b) => {
-          const aTime = new Date(a.updatedAt || a.createdAt).getTime();
-          const bTime = new Date(b.updatedAt || b.createdAt).getTime();
+          const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
           return aTime - bTime;
         })[0];
         
