@@ -45,6 +45,7 @@ export type WeeklyReportPayload = {
   };
   daily: DailyPoint[];
   summaries: { date: string; text: string }[];
+  completedMilestones: { title: string; projectName: string; completedAt: string }[];
   generatedAt: string;
 };
 
@@ -95,7 +96,7 @@ export async function computeWeeklyReport(
 
   const weekDates = getWeekDates(weekStart);
 
-  const [user, sessions, prevSessions, summaries, lastSummaries] =
+  const [user, sessions, prevSessions, summaries, lastSummaries, completedMilestones] =
     await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
       db.focusSession.findMany({
@@ -127,6 +128,24 @@ export async function computeWeeklyReport(
         orderBy: { date: "desc" },
         take: 10,  // 🔥 增加到10条，确保上周数据能完整保存
         select: { date: true, text: true },
+      }),
+      // 🔥 查询本周完成的小目标
+      db.milestone.findMany({
+        where: {
+          project: { userId },
+          isCompleted: true,
+          updatedAt: { gte: weekStart, lte: weekEnd },
+        },
+        select: {
+          title: true,
+          updatedAt: true,
+          project: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
       }),
     ]);
 
@@ -259,6 +278,11 @@ export async function computeWeeklyReport(
         : undefined,
     daily,
     summaries: lastSummaries.map((s) => ({ date: s.date, text: s.text })),
+    completedMilestones: completedMilestones.map((m) => ({
+      title: m.title,
+      projectName: m.project.name,
+      completedAt: m.updatedAt.toISOString(),
+    })),
     generatedAt: new Date().toISOString(),
   };
 

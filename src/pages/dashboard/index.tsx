@@ -22,8 +22,11 @@ import { useUserExp } from '~/hooks/useUserExp';
 import { useHeartTreeExp } from '~/hooks/useHeartTreeExp';
 import { useAchievements } from '~/hooks/useAchievements';
 import { useDataSync } from '~/hooks/useDataSync';
+import { useDashboardData } from '~/hooks/useDashboardData';
+import { useProjects } from '~/hooks/useProjects';
 import { 
   pickHomeSentence, 
+  pickSentenceFromPool,
   pickUniversalSentence, 
   pickEventSentence, 
   EchoHomeStatus,
@@ -83,6 +86,7 @@ interface Milestone {
 }
 
 const MIN_FOCUS_MINUTES = 25; // 用于判断“达到最小专注时长”的日级阈值（可按需调整）
+const JUST_COMPLETED_FOCUS_FLAG = 'justCompletedFocusAt';
 
 // 分离的数据结构 - 今日数据和累计数据独立
 interface TodayStats {
@@ -304,6 +308,22 @@ export default function Dashboard() {
   const { unlockAchievement: unlockAchievementToDB } = useAchievements();
   const { syncStatus, syncAllData } = useDataSync(); // 🆕 数据同步 Hook
   
+  // 🔥 统计数据从数据库加载
+  const { 
+    data: dashboardData, 
+    refresh: refreshDashboardData,
+    isLoading: dashboardDataLoading 
+  } = useDashboardData();
+  
+  // 🔥 计划数据从数据库加载
+  const { 
+    projects: dbProjects,
+    primaryProject: dbPrimaryProject,
+    isLoading: projectsLoading,
+    updateMilestones: updateMilestonesToDB,
+    createProject: createProjectToDB,
+  } = useProjects();
+  
   // 使用 useMemo 缓存 userId，避免因 session 对象引用变化而触发重新渲染
   const userId = useMemo(() => session?.user?.id, [session?.user?.id]);
   
@@ -401,28 +421,60 @@ export default function Dashboard() {
     localStorage.setItem('weeklyStats', JSON.stringify({ totalMinutes, weekStart }));
   };
 
-  // 今日数据状态
-  const [todayStats, setTodayStats] = useState<TodayStats>(() => getTodayStats());
+  // 今日数据状态 - 🔥 优先使用数据库数据
+  const [todayStats, setTodayStats] = useState<TodayStats>(() => {
+    const cached = getTodayStats();
+    // 如果有数据库数据且不在加载中，使用数据库数据
+    if (!dashboardDataLoading && dashboardData.todayMinutes >= 0) {
+      return {
+        minutes: dashboardData.todayMinutes,
+        date: dashboardData.todayDate,
+      };
+    }
+    return cached;
+  });
 
-  // 本周数据状态
-  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>(() => getWeeklyStats());
+  // 本周数据状态 - 🔥 优先使用数据库数据
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>(() => {
+    const cached = getWeeklyStats();
+    if (!dashboardDataLoading && dashboardData.weeklyMinutes >= 0) {
+      return {
+        totalMinutes: dashboardData.weeklyMinutes,
+        weekStart: dashboardData.weekStart,
+      };
+    }
+    return cached;
+  });
 
-  // 总专注时长状态（从使用至今累计）
-  const [totalFocusMinutes, setTotalFocusMinutes] = useState<number>(() => getTotalFocusMinutes());
+  // 总专注时长状态 - 🔥 优先使用数据库数据
+  const [totalFocusMinutes, setTotalFocusMinutes] = useState<number>(() => {
+    const cached = getTotalFocusMinutes();
+    if (!dashboardDataLoading && dashboardData.totalMinutes >= 0) {
+      return dashboardData.totalMinutes;
+    }
+    return cached;
+  });
 
-  // 从localStorage加载统计数据（其他数据）
+  // 从localStorage加载统计数据（其他数据）- 🔥 streakDays 优先使用数据库
   const [stats, setStats] = useState<DashboardStats>(() => {
     if (typeof window !== 'undefined') {
       const savedStats = localStorage.getItem('dashboardStats');
-      return savedStats ? JSON.parse(savedStats) : {
+      const parsed = savedStats ? JSON.parse(savedStats) : {
         yesterdayMinutes: 0,
         streakDays: 0,
         completedGoals: 0
       };
+      
+      // 如果有数据库数据，使用数据库的 streakDays
+      if (!dashboardDataLoading && dashboardData.streakDays >= 0) {
+        parsed.streakDays = dashboardData.streakDays;
+      }
+      
+      return parsed;
     }
     return {
       yesterdayMinutes: 0,
-      streakDays: 0,
+      streakDays: dashboardData.streakDays || 0,
       completedGoals: 0
     };
   });
@@ -430,8 +482,14 @@ export default function Dashboard() {
   // 记录近10分钟内的小精灵点击，用于觉察规则6
   const [lumiClickEvents, setLumiClickEvents] = useState<number[]>([]);
 
-  // 主要计划状态 - 从localStorage加载
+  // 主要计划状态 - 🔥 优先从数据库加载
   const [primaryPlan, setPrimaryPlan] = useState<Project | null>(() => {
+    // 如果有数据库数据，使用数据库的主计划
+    if (!projectsLoading && dbPrimaryProject) {
+      return dbPrimaryProject;
+    }
+    
+    // 否则使用缓存
     if (typeof window !== 'undefined') {
       const savedPlans = localStorage.getItem('userPlans');
       const plans = savedPlans ? JSON.parse(savedPlans) : [];
@@ -673,7 +731,24 @@ export default function Dashboard() {
           milestones: updatedMilestones
         };
 
-        // 同步到localStorage
+        // 🔥 保存到数据库（使用 Hook 方法）
+        if (session?.user?.id && prev.id) {
+          console.log('💾 批量更新小目标到数据库', {
+            projectId: prev.id,
+            milestoneIds,
+            count: milestoneIds.length,
+          });
+          
+          updateMilestonesToDB(prev.id, updatedMilestones).then(success => {
+            if (success) {
+              console.log('✅ 小目标已同步到数据库');
+            } else {
+              console.error('❌ 同步小目标失败');
+            }
+          });
+        }
+
+        // 同步到localStorage（缓存）
         if (typeof window !== 'undefined') {
           const savedPlans = localStorage.getItem('userPlans');
           const plans = savedPlans ? JSON.parse(savedPlans) : [];
@@ -1228,6 +1303,75 @@ export default function Dashboard() {
     }
   }, []); // 只在组件挂载时执行一次
 
+  // 🔥 监听数据库数据变化，同步更新状态
+  useEffect(() => {
+    if (dashboardDataLoading) return;
+    
+    console.log('[Dashboard] 🔄 数据库数据已加载，同步更新状态', {
+      todayMinutes: dashboardData.todayMinutes,
+      weeklyMinutes: dashboardData.weeklyMinutes,
+      totalMinutes: dashboardData.totalMinutes,
+      streakDays: dashboardData.streakDays,
+    });
+    
+    // 更新今日统计
+    setTodayStats({
+      minutes: dashboardData.todayMinutes,
+      date: dashboardData.todayDate,
+    });
+    
+    // 更新本周统计
+    setWeeklyStats({
+      totalMinutes: dashboardData.weeklyMinutes,
+      weekStart: dashboardData.weekStart,
+    });
+    
+    // 更新累计时长
+    setTotalFocusMinutes(dashboardData.totalMinutes);
+    
+    // 更新连续天数
+    setStats(prev => ({
+      ...prev,
+      streakDays: dashboardData.streakDays,
+    }));
+    
+    // 同步到 localStorage 缓存
+    saveTodayStats(dashboardData.todayMinutes);
+    saveWeeklyStats(dashboardData.weeklyMinutes, dashboardData.weekStart);
+    saveTotalFocusMinutes(dashboardData.totalMinutes);
+    
+    console.log('[Dashboard] ✅ 状态同步完成');
+  }, [dashboardDataLoading, dashboardData]);
+  
+  // 🔥 监听计划数据变化，同步更新主计划
+  useEffect(() => {
+    if (projectsLoading) return;
+    
+    if (dbPrimaryProject) {
+      console.log('[Dashboard] 🔄 更新主计划', dbPrimaryProject.name);
+      setPrimaryPlan(dbPrimaryProject);
+      
+      // 同步到 localStorage 缓存
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('userPlans', JSON.stringify(dbProjects));
+      }
+    }
+  }, [projectsLoading, dbPrimaryProject, dbProjects]);
+  
+  // 🔥 检测专注完成标记，触发数据刷新
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const needRefresh = localStorage.getItem('needRefreshDashboard');
+    if (needRefresh === 'true') {
+      console.log('[Dashboard] 🔄 检测到新数据，刷新统计...');
+      setTimeout(() => {
+        refreshDashboardData();
+      }, 1000);
+      localStorage.removeItem('needRefreshDashboard');
+    }
+  }, [refreshDashboardData]);
+
   // 检查并重置本周数据（每周一00:00刷新）
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1326,7 +1470,6 @@ export default function Dashboard() {
           console.log('✅ 周报邮件检查标记已更新:', currentWeekStart);
         }
         
-        // 如果没有专注完成，再根据 V2 语境 + 频率逻辑决定是否播放首页文案
         const lastWelcomeDate = localStorage.getItem('lastWelcomeDate');
 
         // 构造首页状态快照（EchoHomeStatus）
@@ -1352,6 +1495,22 @@ export default function Dashboard() {
 
         const hasAnyEventOrFirstVisit =
           status.isFirstVisitToday || status.isStreak7Today;
+
+        // 🚨 刚专注完成的绝对优先文案：阻止任何其他首页文案插队
+        const justCompletedAt = localStorage.getItem(JUST_COMPLETED_FOCUS_FLAG);
+        const isRecentlyCompleted =
+          justCompletedAt &&
+          Date.now() - new Date(justCompletedAt).getTime() < 5 * 60 * 1000;
+
+        if (isRecentlyCompleted && spiritDialogRef.current) {
+          const { text } = pickSentenceFromPool('after_focus_first');
+          // @ts-ignore
+          spiritDialogRef.current.showTypedMessage?.(text, 'cute');
+          localStorage.removeItem(JUST_COMPLETED_FOCUS_FLAG);
+          localStorage.setItem('afterFocusFirstShownDate', today);
+          localStorage.setItem('lastWelcomeDate', today);
+          return;
+        }
 
         // ① 今日首次进入主页：按照语境必说话
         if (hasAnyEventOrFirstVisit) {

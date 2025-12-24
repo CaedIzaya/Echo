@@ -184,6 +184,15 @@ const WeeklyReportPage = ({ report, expired, requestedWeekStart, error, isCurren
     setHistoryList([]);
   }, []);
 
+  // 🔥 导航函数
+  const navigateToWeek = (weekStart: string) => {
+    router.push(`/reports/weekly?weekStart=${weekStart}`);
+  };
+
+  const goToCurrentWeek = () => {
+    router.push('/reports/weekly');
+  };
+
   return (
     <>
       <Head>
@@ -363,6 +372,40 @@ const WeeklyReportPage = ({ report, expired, requestedWeekStart, error, isCurren
               </div>
             </div>
           </section>
+
+          {/* 🔥 新增：本周完成的小目标 */}
+          {report.completedMilestones && report.completedMilestones.length > 0 && (
+            <section className="rounded-[2rem] bg-white/80 backdrop-blur-xl p-5 shadow-sm ring-1 ring-white/70 border border-slate-100/60 hover:shadow-[0_25px_60px_-35px_rgba(16,185,129,0.25)] transition-all hover:-translate-y-0.5">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                ✅ 本周完成的小目标
+              </h3>
+              <div className="space-y-2">
+                {report.completedMilestones.slice(0, 5).map((milestone, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-100/60"
+                  >
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 text-white text-xs font-bold flex items-center justify-center shadow-sm">
+                      {index + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
+                        {milestone.title}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {milestone.projectName} · {formatDateLabel(milestone.completedAt.split('T')[0])}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {report.completedMilestones.length > 5 && (
+                  <div className="text-center py-2">
+                    <span className="text-sm text-slate-500">等等</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* 🔥 新增：周报导航区域 */}
           <div className="rounded-[2rem] bg-white/80 backdrop-blur-xl p-5 shadow-sm ring-1 ring-white/70 border border-slate-100/60">

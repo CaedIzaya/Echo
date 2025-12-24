@@ -1128,6 +1128,42 @@ export default function Focus() {
       const rating = completedForStats ? localStorage.getItem('lastFocusRating') : null;
       const numericRating = rating ? parseFloat(rating) : undefined;
       
+      // 🔥 保存到数据库（用于周报统计）
+      if (session?.user?.id && sessionRef.current?.startTime) {
+        const startTime = new Date(sessionRef.current.startTime);
+        const endTime = new Date(startTime.getTime() + finalElapsedTime * 1000);
+        
+        console.log('💾 保存专注会话到数据库', {
+          userId: session.user.id,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          duration: minutes,
+          rating: numericRating,
+        });
+        
+        fetch('/api/focus-sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            duration: minutes,
+            note: sessionName || null,
+            rating: numericRating,
+            flowIndex: numericRating,
+            projectId: selectedGoal || null,
+          }),
+        }).then(response => {
+          if (response.ok) {
+            console.log('✅ 专注会话已保存到数据库');
+          } else {
+            console.error('❌ 保存专注会话失败', response.status);
+          }
+        }).catch(error => {
+          console.error('❌ 保存专注会话网络错误', error);
+        });
+      }
+      
       // 调用dashboard的回调函数更新统计数据
       if (typeof window !== 'undefined' && (window as any).reportFocusSessionComplete) {
         console.log('✅ 调用 reportFocusSessionComplete', { 
@@ -1211,6 +1247,13 @@ export default function Focus() {
     setShowEndOptions(false);
     setShowConfetti(false);
     cleanupInterval(); // 确保停止所有计时器
+    
+    // 🔥 标记专注完成和需要刷新数据
+    if (state === 'completed') {
+      localStorage.setItem('justCompletedFocusAt', Date.now().toString());
+      localStorage.setItem('needRefreshDashboard', 'true');
+    }
+    
     router.push('/dashboard');
   };
 

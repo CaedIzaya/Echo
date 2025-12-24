@@ -4,6 +4,25 @@ import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallba
 import { pickUniversalSentence } from '~/lib/echoSpiritDialogueV2';
 import { globalTimerManager } from '~/lib/performanceOptimizer';
 
+// 🔥 文案优先级定义
+export enum DialoguePriority {
+  CRITICAL = 100,  // 刚完成专注后的高优先级文案
+  HIGH = 80,       // 每日首次登录欢迎文案
+  MEDIUM = 60,     // 事件触发文案（浇水、施肥等）
+  LOW = 40,        // 通用人格文案（用户点击）
+  AUTO = 20,       // 自动定时文案
+}
+
+// 🔥 文案队列项
+interface DialogueQueueItem {
+  id: string;
+  text: string;
+  tone: 'cute' | 'chuunibyou' | 'philosophical' | 'awareness';
+  priority: DialoguePriority;
+  duration: number; // 毫秒
+  timestamp: number; // 入队时间戳
+}
+
 // 文案数据（欢迎 / 完成 / 定时陪伴仍沿用原有池；
 // 日常点击小精灵时的随机文案改由通用人格池驱动）
 const spiritMessages = {
@@ -214,97 +233,165 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const messageStartTimeRef = useRef<number>(0); // 记录文案开始显示的时间
   const periodicTimerRef = useRef<NodeJS.Timeout | null>(null); // 定时触发文案的定时器
   const lastPeriodicTimeRef = useRef<number>(0); // 记录上次定时触发的时间
+  
+  // 🔥 文案队列管理
+  const [dialogueQueue, setDialogueQueue] = useState<DialogueQueueItem[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false); // 是否正在播放文案
+  const currentPriorityRef = useRef<DialoguePriority | null>(null); // 当前播放文案的优先级
+  const queueIdCounterRef = useRef<number>(0); // 队列ID计数器
+
+  // 🔥 核心队列管理方法
+  
+  // 入队文案
+  const enqueueDialogue = useCallback((
+    text: string,
+    tone: 'cute' | 'chuunibyou' | 'philosophical' | 'awareness',
+    priority: DialoguePriority,
+    duration: number = 8000,
+  ) => {
+    const newItem: DialogueQueueItem = {
+      id: `dialogue_${++queueIdCounterRef.current}`,
+      text,
+      tone,
+      priority,
+      duration,
+      timestamp: Date.now(),
+    };
+
+    // 如果当前没有播放文案，直接播放
+    if (!isPlaying) {
+      playDialogue(newItem);
+      return;
+    }
+
+    // 如果有文案正在播放，检查优先级
+    const currentPriority = currentPriorityRef.current;
+    if (currentPriority === null) {
+      playDialogue(newItem);
+      return;
+    }
+
+    // 如果新文案优先级更高，立即播放（当前文案自动丢弃）
+    if (priority > currentPriority) {
+      console.log(`[SpiritDialog] 高优先级文案插队: ${priority} > ${currentPriority}`);
+      if (timerRef.current) {
+        globalTimerManager.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      playDialogue(newItem);
+      return;
+    }
+
+    // 优先级相同或更低，加入队列
+    console.log(`[SpiritDialog] 文案加入队列: priority=${priority}, text="${text.substring(0, 20)}..."`);
+    setDialogueQueue(prev => {
+      const newQueue = [...prev, newItem];
+      // 按优先级和时间戳排序
+      newQueue.sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return b.priority - a.priority; // 优先级高的在前
+        }
+        return a.timestamp - b.timestamp; // 同优先级按入队时间排序
+      });
+      return newQueue;
+    });
+  }, [isPlaying]);
+
+  // 播放文案
+  const playDialogue = useCallback((item: DialogueQueueItem) => {
+    console.log(`[SpiritDialog] 开始播放文案: priority=${item.priority}, text="${item.text.substring(0, 30)}..."`);
+    
+    setCurrentMessage(item.text);
+    setMessageType(item.tone);
+    setIsVisible(true);
+    setIsPlaying(true);
+    currentPriorityRef.current = item.priority;
+    messageStartTimeRef.current = Date.now();
+
+    if (onStateChange) {
+      onStateChange(spiritState);
+    }
+
+    // 设置定时器隐藏文案
+    if (timerRef.current) {
+      globalTimerManager.clearTimeout(timerRef.current);
+    }
+
+    timerRef.current = globalTimerManager.setTimeout(() => {
+      console.log(`[SpiritDialog] 文案播放完成`);
+      setIsVisible(false);
+      setCurrentMessage('');
+      setIsPlaying(false);
+      currentPriorityRef.current = null;
+      timerRef.current = null;
+
+      // 播放队列中的下一个
+      playNextFromQueue();
+    }, item.duration);
+  }, [onStateChange, spiritState]);
+
+  // 播放队列中的下一个文案
+  const playNextFromQueue = useCallback(() => {
+    setDialogueQueue(prev => {
+      if (prev.length === 0) {
+        return prev;
+      }
+
+      const [nextItem, ...rest] = prev;
+      // 使用setTimeout确保状态更新完成后再播放
+      setTimeout(() => {
+        playDialogue(nextItem);
+      }, 100);
+
+      return rest;
+    });
+  }, [playDialogue]);
 
   // 显示文案的函数（用户交互触发，5秒后自动隐藏）
   // 注意：这是用户点击小精灵后触发的对话框，保持5秒持续时间
   const showMessage = useCallback(() => {
-    // 清除之前的定时器
-    if (timerRef.current) {
-      globalTimerManager.clearTimeout(timerRef.current);
-      timerRef.current = null;
+    // 🔥 如果有文案正在播放，忽略点击
+    if (isPlaying) {
+      console.log('[SpiritDialog] 文案播放中，忽略用户点击');
+      return;
     }
-
     // 每次点击都从通用人格池（universal_pool）抽一句
     const { text } = pickUniversalSentence();
-    setCurrentMessage(text);
-    // 通用人格默认使用 cute 渐变风格，后续如需区分 A/B/C 可在 EchoSentenceResult 中扩展元信息
-    setMessageType('cute');
-    setIsVisible(true);
     
-    // 记录文案开始显示的时间
-    messageStartTimeRef.current = Date.now();
-    
-    // 通知父组件状态变化
-    if (onStateChange) {
-      onStateChange(spiritState);
-    }
-
-    // 5秒后自动隐藏文案（交互后的对话框，保持5秒）
-    timerRef.current = globalTimerManager.setTimeout(() => {
-      setIsVisible(false);
-      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
-      timerRef.current = null;
-    }, 5000);
-  }, [onStateChange, spiritState]);
+    // 使用队列系统，用户点击优先级为 LOW
+    enqueueDialogue(text, 'cute', DialoguePriority.LOW, 5000);
+  }, [isPlaying, enqueueDialogue]);
 
   // 显示欢迎文案的函数（非交互触发，8秒后自动隐藏）
   const showWelcomeMessage = useCallback(() => {
-    // 清除之前的定时器
-    if (timerRef.current) {
-      globalTimerManager.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-
     // 随机选择一条欢迎文案
     const welcomeMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
-    setCurrentMessage(welcomeMessage);
-    setMessageType('cute'); // 欢迎文案使用cute样式
-    setIsVisible(true);
     
-    // 记录文案开始显示的时间
-    messageStartTimeRef.current = Date.now();
-    
-    // 通知父组件状态变化
-    if (onStateChange) {
-      onStateChange(spiritState);
-    }
-
-    // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
-    timerRef.current = globalTimerManager.setTimeout(() => {
-      console.log('⏰ 欢迎文案8秒定时器触发，隐藏对话框');
-      setIsVisible(false);
-      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
-      timerRef.current = null;
-    }, 8000);
-  }, [onStateChange, spiritState]);
+    // 使用队列系统，欢迎文案优先级为 HIGH
+    enqueueDialogue(welcomeMessage, 'cute', DialoguePriority.HIGH, 8000);
+  }, [enqueueDialogue]);
 
   // 显示指定文案的函数（首页语境 / 事件层使用）
   const showTypedMessage = useCallback(
     (text: string, tone: 'cute' | 'chuunibyou' | 'philosophical' | 'awareness' = 'cute') => {
       if (!text) return;
 
-      if (timerRef.current) {
-        globalTimerManager.clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
+      // 🔥 判断是否为刚完成专注后的高优先级文案
+      // 检查是否存在 justCompletedFocusAt 标记（5分钟内）
+      const justCompletedAt = typeof window !== 'undefined' 
+        ? localStorage.getItem('justCompletedFocusAt') 
+        : null;
+      
+      const isJustCompleted = justCompletedAt && 
+        (Date.now() - parseInt(justCompletedAt)) < 5 * 60 * 1000;
 
-      setCurrentMessage(text);
-      setMessageType(tone);
-      setIsVisible(true);
-      messageStartTimeRef.current = Date.now();
-
-      if (onStateChange) {
-        onStateChange(spiritState);
-      }
-
-      // 统一采用 8 秒可见时长，和欢迎/完成/定时文案保持一致
-      timerRef.current = globalTimerManager.setTimeout(() => {
-        setIsVisible(false);
-        setCurrentMessage('');
-        timerRef.current = null;
-      }, 8000);
+      // 刚完成专注的文案使用 CRITICAL 优先级，其他使用 MEDIUM
+      const priority = isJustCompleted ? DialoguePriority.CRITICAL : DialoguePriority.MEDIUM;
+      
+      // 使用队列系统
+      enqueueDialogue(text, tone, priority, 8000);
     },
-    [onStateChange, spiritState],
+    [enqueueDialogue],
   );
 
   // 显示觉察机制文案（默认 10 秒）
@@ -312,93 +399,32 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     (text: string, durationMs: number = 10000) => {
       if (!text) return;
 
-      if (timerRef.current) {
-        globalTimerManager.clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-
-      setCurrentMessage(text);
-      setMessageType('awareness');
-      setIsVisible(true);
-      messageStartTimeRef.current = Date.now();
-
-      if (onStateChange) {
-        onStateChange(spiritState);
-      }
-
-      timerRef.current = globalTimerManager.setTimeout(() => {
-        setIsVisible(false);
-        setCurrentMessage('');
-        timerRef.current = null;
-      }, durationMs);
+      // 觉察机制文案使用 HIGH 优先级
+      enqueueDialogue(text, 'awareness', DialoguePriority.HIGH, durationMs);
     },
-    [onStateChange, spiritState],
+    [enqueueDialogue],
   );
 
   // 显示专注完成祝贺文案的函数（非交互触发，8秒后自动隐藏）
   const showCompletionMessage = useCallback(() => {
-    // 清除之前的定时器
-    if (timerRef.current) {
-      globalTimerManager.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-
     // 随机选择一条祝贺文案
     const completionMessage = completionMessages[Math.floor(Math.random() * completionMessages.length)];
-    setCurrentMessage(completionMessage);
-    setMessageType('philosophical'); // 祝贺文案使用philosophical样式
-    setIsVisible(true);
     
-    // 记录文案开始显示的时间
-    messageStartTimeRef.current = Date.now();
-    
-    // 通知父组件状态变化
-    if (onStateChange) {
-      onStateChange(spiritState);
-    }
-
-    // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
-    timerRef.current = globalTimerManager.setTimeout(() => {
-      console.log('⏰ 完成祝贺文案8秒定时器触发，隐藏对话框');
-      setIsVisible(false);
-      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
-      timerRef.current = null;
-    }, 8000);
-  }, [onStateChange, spiritState]);
+    // 完成祝贺文案使用 CRITICAL 优先级（最高）
+    enqueueDialogue(completionMessage, 'philosophical', DialoguePriority.CRITICAL, 8000);
+  }, [enqueueDialogue]);
 
   // 显示定时触发的陪伴文案（非交互触发，8秒后自动隐藏）
   const showPeriodicMessage = useCallback(() => {
-    // 清除之前的定时器
-    if (timerRef.current) {
-      globalTimerManager.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-
     // 随机选择一条定时文案
     const periodicMessage = periodicMessages[Math.floor(Math.random() * periodicMessages.length)];
-    setCurrentMessage(periodicMessage);
-    setMessageType('philosophical'); // 定时文案使用philosophical样式
-    setIsVisible(true);
-    
-    // 记录文案开始显示的时间
-    messageStartTimeRef.current = Date.now();
     
     // 记录本次定时触发的时间
     lastPeriodicTimeRef.current = Date.now();
     
-    // 通知父组件状态变化
-    if (onStateChange) {
-      onStateChange(spiritState);
-    }
-
-    // 8秒后自动隐藏文案（非交互对话框，持续时间更长）
-    timerRef.current = globalTimerManager.setTimeout(() => {
-      console.log('⏰ 定时陪伴文案8秒定时器触发，隐藏对话框');
-      setIsVisible(false);
-      setCurrentMessage(''); // 清空消息，确保组件完全隐藏
-      timerRef.current = null;
-    }, 8000);
-  }, [onStateChange, spiritState]);
+    // 定时文案使用 AUTO 优先级（最低）
+    enqueueDialogue(periodicMessage, 'philosophical', DialoguePriority.AUTO, 8000);
+  }, [enqueueDialogue]);
 
   // 通过ref暴露方法
   useImperativeHandle(ref, () => ({

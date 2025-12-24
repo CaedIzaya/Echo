@@ -353,6 +353,54 @@ export default function GoalSetting() {
         }
       }
 
+      // 🔥 保存到数据库（关键修复）
+      try {
+        console.log('💾 保存计划到数据库', {
+          name: newPlan.name,
+          isPrimary: newPlan.isPrimary,
+          milestones: newPlan.milestones?.length || 0,
+        });
+        
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: newPlan.id, // 保留本地生成的ID
+            name: newPlan.name,
+            description: newPlan.focusBranch,
+            icon: newPlan.icon,
+            color: newPlan.color,
+            dailyGoalMinutes: newPlan.dailyGoalMinutes,
+            targetDate: newPlan.targetDate || null,
+            isActive: true,
+            isPrimary: newPlan.isPrimary || false,
+            isCompleted: false,
+            milestones: (newPlan.milestones || []).map((m: any) => ({
+              id: m.id,
+              title: m.title,
+              isCompleted: false,
+              order: m.order || 1,
+            })),
+          }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ 计划已保存到数据库', data.project.id);
+          
+          // 更新本地数据为数据库返回的数据（包含数据库生成的ID）
+          newPlan.id = data.project.id;
+          if (newPlan.milestones) {
+            newPlan.milestones = data.project.milestones;
+          }
+        } else {
+          console.error('❌ 保存计划失败', response.status);
+        }
+      } catch (error) {
+        console.error('❌ 保存计划网络错误', error);
+      }
+      
+      // 保存到 localStorage（缓存）
       localStorage.setItem('userPlans', JSON.stringify(existingPlans));
 
       if (!allowReturn) {
@@ -363,7 +411,7 @@ export default function GoalSetting() {
             body: JSON.stringify({ plan: newPlan })
           });
         } catch (error) {
-          console.warn('API调用失败:', error);
+          console.warn('完成引导API调用失败:', error);
         }
       }
 
