@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 
+interface FinalGoal {
+  content: string;
+  createdAt: string;
+  isCompleted: boolean;
+  completedAt?: string;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -8,6 +15,7 @@ interface Project {
   icon: string;
   dailyGoalMinutes: number;
   milestones: Milestone[];
+  finalGoal?: FinalGoal;
   isActive: boolean;
   isPrimary?: boolean;
   isCompleted?: boolean;
