@@ -370,7 +370,7 @@ export default function GoalSetting() {
             description: newPlan.focusBranch,
             icon: newPlan.icon,
             dailyGoalMinutes: newPlan.dailyGoalMinutes,
-            targetDate: newPlan.targetDate || null,
+            targetDate: formData.targetDate || null,
             isActive: true,
             isPrimary: newPlan.isPrimary || false,
             isCompleted: false,
