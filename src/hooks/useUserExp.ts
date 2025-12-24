@@ -6,6 +6,22 @@ import { setProtectionMarker } from '~/lib/DataIntegritySystem';
 const STORAGE_KEY = 'userExp';
 const SYNC_KEY = 'userExpSynced';
 
+function readLocalExp(): number {
+  if (typeof window === 'undefined') return 0;
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const parsed = raw ? parseFloat(raw) : 0;
+  return Number.isFinite(parsed) ? Math.max(parsed, 0) : 0;
+}
+
+function getInitialExpState() {
+  const localExp = readLocalExp();
+  if (localExp > 0) {
+    const levelInfo = LevelManager.calculateLevel(localExp);
+    return { exp: localExp, level: levelInfo.currentLevel };
+  }
+  return { exp: 0, level: 1 };
+}
+
 /**
  * 用户经验管理 Hook
  * - 优先从数据库读取（跨设备同步）
@@ -14,8 +30,9 @@ const SYNC_KEY = 'userExpSynced';
  */
 export function useUserExp() {
   const { data: session, status } = useSession();
-  const [userExp, setUserExp] = useState<number>(0);
-  const [userLevel, setUserLevel] = useState<number>(1);
+  const initialState = getInitialExpState();
+  const [userExp, setUserExp] = useState<number>(initialState.exp);
+  const [userLevel, setUserLevel] = useState<number>(initialState.level);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -27,29 +44,29 @@ export function useUserExp() {
       const response = await fetch('/api/user/exp');
       if (response.ok) {
         const data = await response.json();
-        const dbExp = data.userExp || 0;
-        const dbLevel = data.userLevel || 1;
-        
-        // 🔥 新增：对比 localStorage 和数据库的值，选择更大的那个
-        const localExp = parseFloat(localStorage.getItem(STORAGE_KEY) || '0');
+        const dbExp = Number.isFinite(data.userExp) ? Math.max(data.userExp, 0) : 0;
+        const localExp = readLocalExp();
+        const useExp = Math.max(dbExp, localExp);
+        const levelInfo = LevelManager.calculateLevel(useExp);
         
         console.log('[useUserExp] 数据对比', {
           数据库经验: dbExp,
           本地经验: localExp,
+          采用经验值: useExp,
           使用数据源: localExp > dbExp ? 'localStorage (本地更高)' : 'database (数据库更高或相等)'
         });
+        
+        setUserExp(useExp);
+        setUserLevel(levelInfo.currentLevel);
+        localStorage.setItem(STORAGE_KEY, useExp.toString());
         
         // ✅ 如果 localStorage 的值大于数据库，说明数据库数据过期或同步失败
         if (localExp > dbExp) {
           console.warn('[useUserExp] ⚠️ 检测到数据不一致！localStorage经验值高于数据库');
           console.warn('[useUserExp] 🔧 使用localStorage数据并同步到数据库，防止经验值丢失');
           
-          setUserExp(localExp);
-          const levelInfo = LevelManager.calculateLevel(localExp);
-          setUserLevel(levelInfo.currentLevel);
-          localStorage.setItem(STORAGE_KEY, localExp.toString());
-          
           // 自动修复：同步到数据库
+          localStorage.setItem(SYNC_KEY, 'false');
           const syncResponse = await fetch('/api/user/exp/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -64,17 +81,14 @@ export function useUserExp() {
           }
         } else {
           // 数据库的值 >= localStorage，使用数据库的值
-          setUserExp(dbExp);
-          setUserLevel(dbLevel);
-          localStorage.setItem(STORAGE_KEY, dbExp.toString());
           localStorage.setItem(SYNC_KEY, 'true');
-          console.log('[useUserExp] ✅ 从数据库加载经验:', dbExp, '等级:', dbLevel);
+          console.log('[useUserExp] ✅ 从数据库加载经验:', useExp, '等级:', levelInfo.currentLevel);
         }
       }
     } catch (error) {
       console.error('[useUserExp] 加载失败，使用本地数据:', error);
       // 失败时使用 localStorage 的值
-      const localExp = parseFloat(localStorage.getItem(STORAGE_KEY) || '0');
+      const localExp = readLocalExp();
       if (localExp > 0) {
         setUserExp(localExp);
         const levelInfo = LevelManager.calculateLevel(localExp);
@@ -98,7 +112,7 @@ export function useUserExp() {
         loadFromDatabase();
       } else {
         // 已同步：先用 localStorage 显示，然后后台同步
-        const localExp = parseFloat(localStorage.getItem(STORAGE_KEY) || '0');
+        const localExp = readLocalExp();
         if (localExp > 0) {
           setUserExp(localExp);
           const levelInfo = LevelManager.calculateLevel(localExp);
@@ -111,7 +125,7 @@ export function useUserExp() {
       }
     } else {
       // 未登录：只使用 localStorage
-      const localExp = parseFloat(localStorage.getItem(STORAGE_KEY) || '0');
+      const localExp = readLocalExp();
       if (localExp > 0) {
         setUserExp(localExp);
         const levelInfo = LevelManager.calculateLevel(localExp);
@@ -141,6 +155,7 @@ export function useUserExp() {
       
       // 立即更新 localStorage（用户体验优先）
       localStorage.setItem(STORAGE_KEY, newExp.toString());
+      localStorage.setItem(SYNC_KEY, 'false');
       setUserExp(newExp);
       setUserLevel(levelInfo.currentLevel);
       
@@ -186,13 +201,14 @@ export function useUserExp() {
   const syncToDatabase = useCallback(async () => {
     if (!session?.user?.id) return false;
 
-    const localExp = parseFloat(localStorage.getItem(STORAGE_KEY) || '0');
+    const localExp = readLocalExp();
     if (localExp === 0) {
       // 没有本地数据，不需要同步
       return true;
     }
 
     try {
+      localStorage.setItem(SYNC_KEY, 'false');
       const response = await fetch('/api/user/exp/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

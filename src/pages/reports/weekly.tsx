@@ -179,30 +179,10 @@ const WeeklyReportPage = ({ report, expired, requestedWeekStart, error, isCurren
     return localAvatar ?? report.user.image ?? null;
   }, [localAvatar, report.user.image]);
 
-  // 🔥 新增：加载周报历史列表
+  // 周报历史入口关闭：仅允许通过邮箱内的邮件查看历史
   useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const response = await fetch('/api/weekly-reports/history');
-        if (response.ok) {
-          const data = await response.json();
-          setHistoryList(data.history || []);
-        }
-      } catch (error) {
-        console.error('[weekly-report] 加载历史列表失败:', error);
-      }
-    };
-    loadHistory();
+    setHistoryList([]);
   }, []);
-
-  // 🔥 导航函数
-  const navigateToWeek = (weekStart: string) => {
-    router.push(`/reports/weekly?weekStart=${weekStart}`);
-  };
-
-  const goToCurrentWeek = () => {
-    router.push('/reports/weekly');
-  };
 
   return (
     <>

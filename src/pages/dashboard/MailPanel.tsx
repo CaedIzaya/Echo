@@ -45,30 +45,7 @@ export default function MailPanel({ onClose }: MailPanelProps) {
         </button>
       </div>
 
-      {/* 🔥 新增：历史周报快捷入口 */}
-      <div className="p-4 bg-gradient-to-r from-emerald-50 to-cyan-50 border-b border-emerald-100">
-        <a
-          href="/reports/weekly"
-          className="flex items-center justify-between p-4 bg-white rounded-xl border-2 border-emerald-200 hover:border-emerald-300 hover:shadow-lg transition-all group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-white text-xl shadow-lg">
-              📊
-            </div>
-            <div>
-              <div className="font-bold text-gray-900 group-hover:text-emerald-600 transition">
-                查看周报历史
-              </div>
-              <div className="text-xs text-gray-500">
-                浏览最近4周的专注周报
-              </div>
-            </div>
-          </div>
-          <svg className="w-5 h-5 text-gray-400 group-hover:text-emerald-500 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </a>
-      </div>
+      {/* 历史周报入口已移除：仅允许通过邮件系统进入 */}
 
       {/* 列表内容 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
