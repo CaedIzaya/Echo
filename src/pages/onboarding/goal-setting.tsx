@@ -369,7 +369,6 @@ export default function GoalSetting() {
             name: newPlan.name,
             description: newPlan.focusBranch,
             icon: newPlan.icon,
-            color: newPlan.color,
             dailyGoalMinutes: newPlan.dailyGoalMinutes,
             targetDate: newPlan.targetDate || null,
             isActive: true,
