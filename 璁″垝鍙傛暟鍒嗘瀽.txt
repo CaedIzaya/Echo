@@ -1,0 +1,16 @@
+﻿# 璁″垝鍙傛暟瀵规瘮鍒嗘瀽
+
+## 鍒涘缓璁″垝娴佺▼涓殑鍙傛暟
+
+### 鐢ㄦ埛杈撳叆鐨勫弬鏁?
+1. focusBranch - 涓撴敞鏂瑰悜锛堜竴绾э級 - 鉂?缂哄け
+2. focusDetail - 鍏蜂綋鍒嗘敮锛堜簩绾э級 - 鉂?缂哄け  
+3. firstMilestone - 绗竴涓噷绋嬬 - 鉁?宸蹭繚瀛?4. projectName - 璁″垝鍚嶇О - 鉁?宸蹭繚瀛?5. dailyMinTime - 姣忔棩鐩爣鍒嗛挓鏁?- 鉁?宸蹭繚瀛?6. targetDate - 棰勬湡瀹屾垚鏃ユ湡 - 鉁?宸蹭繚瀛橈紙鍙€夛級
+
+## 闂锛氱己澶辩殑瀛楁
+
+focusBranch 鍜?focusDetail 娌℃湁淇濆瓨鍒版暟鎹簱锛?
+## 鎻愮ず璇嶅簱浣嶇疆
+
+涓昏鏂囦欢: src/lib/interestConfig.ts
+杈呭姪鏂囦欢: src/pages/onboarding/goal-setting.tsx (绗?0琛?MILESTONE_HINTS)
