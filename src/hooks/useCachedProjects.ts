@@ -17,6 +17,8 @@ interface Project {
   completedMilestones?: number;
   startDate?: string;
   avgFlowScore?: number;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 interface Milestone {
@@ -188,4 +190,5 @@ export function useCachedProjects(sessionStatus: string) {
     refresh,
   };
 }
+
 

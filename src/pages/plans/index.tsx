@@ -22,6 +22,8 @@ interface Project {
   isPrimary?: boolean;
   isCompleted?: boolean;
   isBlank?: boolean;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 interface Milestone {

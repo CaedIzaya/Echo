@@ -1448,27 +1448,71 @@ export default function Dashboard() {
           // userLevel 会自动同步
         }
         
-        // 🆕 检查是否需要生成周报邮件（每周一自动生成）
-        const currentWeekStart = getCurrentWeekStart();
-        const lastWeeklyMailCheck = localStorage.getItem('lastWeeklyMailCheck');
-        if (lastWeeklyMailCheck !== currentWeekStart) {
-          // 新的一周，检查并生成上周的周报邮件
-          console.log('📧 检测到新的一周，准备生成上周周报邮件');
-          
-          // 获取上周一的日期
-          const lastMonday = new Date(currentWeekStart);
-          lastMonday.setDate(lastMonday.getDate() - 7);
-          const lastWeekStart = lastMonday.toISOString().split('T')[0];
-          
-          // 生成周报邮件（异步，不阻塞页面）
-          generateWeeklyReportMail(lastWeekStart).catch(err => {
-            console.error('❌ 生成周报邮件失败:', err);
-          });
-          
-          // 标记已检查（避免重复生成）
-          localStorage.setItem('lastWeeklyMailCheck', currentWeekStart);
-          console.log('✅ 周报邮件检查标记已更新:', currentWeekStart);
-        }
+        // 🆕 检查是否需要生成周报邮件（基于用户注册周区间，每周一自动生成）
+        const checkAndGenerateWeeklyReport = async () => {
+          try {
+            // 获取用户注册日期
+            const userResponse = await fetch('/api/user/profile');
+            if (!userResponse.ok) {
+              console.warn('无法获取用户信息，跳过周报检查');
+              return;
+            }
+            const userData = await userResponse.json();
+            if (!userData.user?.createdAt) {
+              console.warn('用户注册日期不存在，跳过周报检查');
+              return;
+            }
+            
+            const userCreatedAt = new Date(userData.user.createdAt);
+            // 计算用户注册日期所在的周区间（周一-周日）
+            const { getWeekRange, formatDateKey } = await import('~/lib/weeklyReport');
+            const { start: registrationWeekStart } = getWeekRange(userCreatedAt);
+            const registrationWeekStartStr = formatDateKey(registrationWeekStart);
+            
+            // 获取当前周的开始日期
+            const currentWeekStart = getCurrentWeekStart();
+            const currentWeekStartDate = new Date(currentWeekStart + 'T00:00:00');
+            
+            // 计算应该发送周报的日期：注册周的下一个周一
+            const nextMondayAfterRegistration = new Date(registrationWeekStart);
+            nextMondayAfterRegistration.setDate(registrationWeekStart.getDate() + 7); // 注册周的下一个周一
+            
+            // 检查：如果当前周的开始日期 >= 注册周的下一个周一，且还未发送过该周报
+            const lastWeeklyMailCheck = localStorage.getItem('lastWeeklyMailCheck');
+            const shouldSendReport = 
+              currentWeekStartDate.getTime() >= nextMondayAfterRegistration.getTime() &&
+              lastWeeklyMailCheck !== currentWeekStart;
+            
+            if (shouldSendReport) {
+              console.log('📧 检测到需要生成周报邮件', {
+                注册日期: userCreatedAt.toISOString(),
+                注册周区间开始: registrationWeekStartStr,
+                应发送日期: formatDateKey(nextMondayAfterRegistration),
+                当前周开始: currentWeekStart
+              });
+              
+              // 生成注册周区间的周报邮件（使用注册周的开始日期）
+              await generateWeeklyReportMail(registrationWeekStartStr);
+              
+              // 标记已检查（避免重复生成）
+              localStorage.setItem('lastWeeklyMailCheck', currentWeekStart);
+              console.log('✅ 周报邮件检查标记已更新:', currentWeekStart);
+            } else {
+              console.log('ℹ️ 暂不需要生成周报', {
+                注册日期: userCreatedAt.toISOString(),
+                注册周区间开始: registrationWeekStartStr,
+                应发送日期: formatDateKey(nextMondayAfterRegistration),
+                当前周开始: currentWeekStart,
+                已检查: lastWeeklyMailCheck
+              });
+            }
+          } catch (error) {
+            console.error('❌ 检查周报邮件失败:', error);
+          }
+        };
+        
+        // 执行周报检查（异步，不阻塞页面）
+        checkAndGenerateWeeklyReport();
         
         const lastWelcomeDate = localStorage.getItem('lastWelcomeDate');
 

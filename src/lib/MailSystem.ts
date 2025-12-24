@@ -67,19 +67,6 @@ Echo 团队
     type: 'system',
     actionUrl: '/profile/security-questions',
     actionLabel: '去设置密保'
-  },
-  {
-    id: 'mail_weekly_report_demo',
-    sender: 'Echo 周报',
-    title: '本周专注周报 · 12/08 - 12/14',
-    content: `您的本周专注周报已生成~ 点击下方按钮查看。`,
-    date: '2025-12-15',
-    isRead: false,
-    type: 'report',
-    hasAttachment: false,
-    actionUrl: `/reports/weekly?weekStart=${formatYmd(addDays(getMonday(new Date()), -7))}`,
-    actionLabel: '查看周报',
-    expiresAt: addDays(new Date('2025-12-15T00:00:00.000Z'), MAIL_TTL_DAYS).toISOString(),
   }
 ];
 
@@ -101,13 +88,34 @@ export class MailSystem {
 
   private loadMails() {
     if (typeof window === 'undefined') {
-      this.mails = [...MOCK_MAILS];
+      this.mails = [];
       return;
     }
 
     // 从 localStorage 加载已读状态和自定义邮件
     const readStatus = JSON.parse(localStorage.getItem('mailReadStatus') || '{}');
     const customMails = JSON.parse(localStorage.getItem('customMails') || '[]');
+    
+    // 检查是否为新用户（首次加载时添加欢迎信）
+    const welcomeMailSent = localStorage.getItem('welcomeMailSent');
+    const mailsToLoad: Mail[] = [];
+    
+    // 如果是新用户且未发送过欢迎信，添加欢迎信
+    if (!welcomeMailSent) {
+      const welcomeMail = MOCK_MAILS.find(m => m.id === 'mail_001');
+      if (welcomeMail) {
+        // 设置欢迎信日期为今天
+        const today = formatYmd(new Date());
+        mailsToLoad.push({
+          ...welcomeMail,
+          date: today,
+          isRead: !!readStatus[welcomeMail.id]
+        });
+        // 标记欢迎信已发送
+        localStorage.setItem('welcomeMailSent', 'true');
+        console.log('[MailSystem] 新用户欢迎信已添加');
+      }
+    }
     
     const now = Date.now();
     const isExpired = (mail: Mail) => {
@@ -119,20 +127,14 @@ export class MailSystem {
       const expires = addDays(mailDate, MAIL_TTL_DAYS).getTime();
       return expires <= now;
     };
-
-    // 合并 Mock 数据、自定义邮件和已读状态 + 过滤过期邮件
-    const mockWithStatus = MOCK_MAILS.map(mail => ({
-      ...mail,
-      isRead: !!readStatus[mail.id]
-    }));
     
     const customWithStatus = customMails.map((mail: Mail) => ({
       ...mail,
       isRead: !!readStatus[mail.id]
     }));
     
-    // 合并并过滤过期邮件
-    const allMails = [...mockWithStatus, ...customWithStatus];
+    // 合并欢迎信和自定义邮件，过滤过期邮件
+    const allMails = [...mailsToLoad, ...customWithStatus];
     this.mails = allMails.filter(mail => !isExpired(mail));
     
     // 按日期倒序排序
