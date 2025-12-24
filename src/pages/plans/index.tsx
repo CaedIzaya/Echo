@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
+import { useCachedProjects } from '~/hooks/useCachedProjects';
 import PlanCard from './PlanCard';
 import PlanManagement from './PlanManagement';
 import CompletionDialog from './CompletionDialog';
@@ -36,7 +37,6 @@ export default function PlansPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const [pageState, setPageState] = useState<PageState>('browsing');
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [completionPlan, setCompletionPlan] = useState<Project | null>(null);
@@ -47,21 +47,17 @@ export default function PlansPage() {
   const [managingMilestonePlanId, setManagingMilestonePlanId] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Project | null>(null);
 
-  // 从localStorage加载计划数据
-  const [plans, setPlans] = useState<Project[]>(() => {
-    if (typeof window !== 'undefined') {
-      const savedPlans = localStorage.getItem('userPlans');
-      if (savedPlans) {
-        const parsed = JSON.parse(savedPlans);
-        // Ensure all plans have milestones array
-        return parsed.map((plan: Project) => ({
-          ...plan,
-          milestones: plan.milestones || []
-        }));
-      }
-    }
-    return [];
-  });
+  // 使用缓存 hook
+  const {
+    projects: plans,
+    setProjects: setPlans,
+    isLoading,
+    isSyncing,
+    updateProject,
+    deleteProject: deleteCachedProject,
+    addProject,
+    refresh,
+  } = useCachedProjects(sessionStatus);
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId);
 
@@ -78,7 +74,15 @@ export default function PlansPage() {
   }, [plans]);
 
   const completedPlans = useMemo(() => {
-    return plans.filter(p => p.isCompleted);
+    // 最多显示5个已完成计划，按完成时间倒序
+    return plans
+      .filter(p => p.isCompleted)
+      .sort((a, b) => {
+        const aTime = new Date(a.updatedAt || a.createdAt).getTime();
+        const bTime = new Date(b.updatedAt || b.createdAt).getTime();
+        return bTime - aTime; // 最新的在前
+      })
+      .slice(0, 5);
   }, [plans]);
 
   // 进入管理状态
@@ -99,78 +103,127 @@ export default function PlansPage() {
   };
 
   // 切换为主要计划
-  const handleSetPrimary = () => {
+  const handleSetPrimary = async () => {
     if (!selectedPlanId) return;
     
+    if (!confirm(`确定要将"${selectedPlan?.name}"设为主要计划吗？\n\n设为主要计划后，只有在专注这个计划时，统计数据才会增长。`)) {
+      return;
+    }
+    
+    // 更新所有计划的 isPrimary 状态
     const updatedPlans = plans.map(plan => ({
       ...plan,
       isPrimary: plan.id === selectedPlanId
     }));
-    
     setPlans(updatedPlans);
-    // 同步到localStorage
-    localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+    
+    // 调用 API 更新数据库
+    await updateProject(selectedPlanId, { isPrimary: true }, async () => {
+      await fetch(`/api/projects/${selectedPlanId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPrimary: true }),
+      });
+    });
     
     setPageState('browsing');
     setSelectedPlanId(null);
   };
 
   // 删除计划
-  const handleDeletePlan = () => {
+  const handleDeletePlan = async () => {
     if (!selectedPlanId) return;
     
     if (confirm(`确定要删除计划"${selectedPlan?.name}"吗？此操作不可恢复。`)) {
-      const updatedPlans = plans.filter(p => p.id !== selectedPlanId);
-      setPlans(updatedPlans);
-      // 同步到localStorage
-      localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      await deleteCachedProject(selectedPlanId);
       setSelectedPlanId(null);
       setPageState('browsing');
     }
   };
 
   // 完成计划
-  const handleCompletePlan = () => {
+  const handleCompletePlan = async () => {
     if (!selectedPlanId || !selectedPlan) return;
     
-    const updatedPlans = plans.map(plan => 
-      plan.id === selectedPlanId 
-        ? { ...plan, isCompleted: true, isPrimary: false }
-        : plan
-    );
+    if (!confirm(`确定要完成计划"${selectedPlan.name}"吗？\n\n完成后该计划将移至已完成列表，不再显示在活跃计划中。`)) {
+      return;
+    }
     
-    // 如果主要计划完成，需要切换主要计划
-    if (selectedPlan.isPrimary && updatedPlans.length > 1) {
-      const nextPrimary = updatedPlans.find(p => !p.isCompleted);
-      if (nextPrimary) {
-        nextPrimary.isPrimary = true;
+    try {
+      // 检查已完成计划数量，如果达到5个，删除最旧的
+      const currentCompleted = plans.filter(p => p.isCompleted);
+      if (currentCompleted.length >= 5) {
+        // 找到最旧的已完成计划
+        const oldestCompleted = currentCompleted.sort((a, b) => {
+          const aTime = new Date(a.updatedAt || a.createdAt).getTime();
+          const bTime = new Date(b.updatedAt || b.createdAt).getTime();
+          return aTime - bTime;
+        })[0];
+        
+        if (oldestCompleted) {
+          // 删除最旧的已完成计划
+          await deleteCachedProject(oldestCompleted.id);
+        }
       }
+      
+      // 更新当前计划为已完成
+      const response = await fetch(`/api/projects/${selectedPlanId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isCompleted: true, isPrimary: false }),
+      });
+
+      if (!response.ok) {
+        alert('完成计划失败，请重试');
+        return;
+      }
+
+      const updatedPlans = plans.map(plan => 
+        plan.id === selectedPlanId 
+          ? { ...plan, isCompleted: true, isPrimary: false }
+          : plan
+      );
+      
+      // 如果主要计划完成，需要切换主要计划
+      if (selectedPlan.isPrimary && updatedPlans.length > 1) {
+        const nextPrimary = updatedPlans.find(p => !p.isCompleted);
+        if (nextPrimary) {
+          nextPrimary.isPrimary = true;
+          // 也需要在数据库中更新
+          await fetch(`/api/projects/${nextPrimary.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isPrimary: true }),
+          });
+        }
+      }
+      
+      setPlans(updatedPlans);
+      
+      // 检查是否是第一次完成计划（首次成就）
+      const completedPlansCount = updatedPlans.filter((p: Project) => p.isCompleted).length;
+      if (completedPlansCount === 1) {
+        // 第一次完成计划，标记到 localStorage
+        localStorage.setItem('firstPlanCompleted', 'true');
+      }
+      
+      setCompletionPlan(selectedPlan);
+      setShowCompletionDialog(true);
+      setSelectedPlanId(null);
+      setPageState('browsing');
+    } catch (error) {
+      console.error('完成计划失败:', error);
+      alert('完成计划失败，请重试');
     }
-    
-    setPlans(updatedPlans);
-    // 同步到localStorage
-    localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
-    
-    // 检查是否是第一次完成计划（首次成就）
-    const completedPlansCount = updatedPlans.filter((p: Project) => p.isCompleted).length;
-    if (completedPlansCount === 1) {
-      // 第一次完成计划，标记到 localStorage
-      localStorage.setItem('firstPlanCompleted', 'true');
-    }
-    
-    setCompletionPlan(selectedPlan);
-    setShowCompletionDialog(true);
-    setSelectedPlanId(null);
-    setPageState('browsing');
   };
 
   // 庆祝弹窗处理
   const handleReviewJourney = () => {
+    if (completionPlan) {
+      router.push(`/plans/${completionPlan.id}/review`);
+    }
     setShowCompletionDialog(false);
     setCompletionPlan(null);
-    // 跳转到回顾页面
-    // router.push(`/plans/${completionPlan?.id}/review`);
-    alert('回顾功能待实现');
   };
 
   const handleSkipReview = () => {
@@ -219,9 +272,6 @@ export default function PlansPage() {
         updated = [...prev, planWithPrimary];
       }
       
-      // 同步到localStorage
-      localStorage.setItem('userPlans', JSON.stringify(updated));
-      
       return updated;
     });
   };
@@ -241,25 +291,25 @@ export default function PlansPage() {
   };
 
   // 保存编辑的计划
-  const handleSavePlan = (planId: string, updates: { name: string; focusBranch: string; dailyGoalMinutes: number }) => {
-    const updatedPlans = plans.map(plan => {
-      if (plan.id === planId) {
-        return {
-          ...plan,
+  const handleSavePlan = async (planId: string, updates: { name: string; focusBranch: string; dailyGoalMinutes: number }) => {
+    await updateProject(planId, {
+      name: updates.name,
+      focusBranch: updates.focusBranch,
+      dailyGoalMinutes: updates.dailyGoalMinutes,
+    }, async () => {
+      await fetch(`/api/projects/${planId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: updates.name,
-          focusBranch: updates.focusBranch,
+          description: updates.focusBranch,
           dailyGoalMinutes: updates.dailyGoalMinutes,
-        };
-      }
-      return plan;
+        }),
+      });
     });
     
-    setPlans(updatedPlans);
-    
-    // 保存到localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
-    }
+    setShowEditPlanModal(false);
+    setEditingPlan(null);
   };
 
   // 管理里程碑
@@ -283,13 +333,11 @@ export default function PlansPage() {
     });
 
     setPlans(updatedPlans);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
-    }
+    // finalGoal 是前端临时字段，不需要持久化到数据库
   };
 
   // 添加小目标
-  const handleAddMilestone = (title: string) => {
+  const handleAddMilestone = async (title: string) => {
     if (!milestoneTargetPlanId) return;
 
     const targetPlan = plans.find(p => p.id === milestoneTargetPlanId);
@@ -300,34 +348,45 @@ export default function PlansPage() {
       ? Math.max(...targetPlan.milestones.map(m => m.order))
       : 0;
 
-    const newMilestone = {
-      id: Date.now().toString(),
-      title,
-      isCompleted: false,
-      order: maxOrder + 1
-    };
-
     // 检查是否是第一次创建小目标（首次成就）- 在添加之前检查
     const allMilestonesBefore = plans.flatMap((p: Project) => p.milestones || []);
     const isFirstMilestone = allMilestonesBefore.length === 0;
 
-    const updatedPlans = plans.map(plan => 
-      plan.id === milestoneTargetPlanId
-        ? { ...plan, milestones: [...plan.milestones, newMilestone] }
-        : plan
-    );
+    try {
+      const response = await fetch(`/api/projects/${milestoneTargetPlanId}/milestones`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          order: maxOrder + 1,
+        }),
+      });
 
-    setPlans(updatedPlans);
-    // 同步到localStorage
-    localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      if (response.ok) {
+        const { milestone } = await response.json();
+        
+        const updatedPlans = plans.map(plan => 
+          plan.id === milestoneTargetPlanId
+            ? { ...plan, milestones: [...plan.milestones, milestone] }
+            : plan
+        );
 
-    // 如果是第一次创建小目标，标记到 localStorage
-    if (isFirstMilestone) {
-      localStorage.setItem('firstMilestoneCreated', 'true');
+        setPlans(updatedPlans);
+
+        // 如果是第一次创建小目标，标记到 localStorage
+        if (isFirstMilestone) {
+          localStorage.setItem('firstMilestoneCreated', 'true');
+        }
+
+        setShowAddMilestone(false);
+        setMilestoneTargetPlanId(null);
+      } else {
+        alert('添加小目标失败，请重试');
+      }
+    } catch (error) {
+      console.error('添加小目标失败:', error);
+      alert('添加小目标失败，请重试');
     }
-
-    setShowAddMilestone(false);
-    setMilestoneTargetPlanId(null);
   };
 
   // 认证检查
@@ -341,9 +400,6 @@ export default function PlansPage() {
       return;
     }
 
-    if (sessionStatus === 'authenticated') {
-      setIsLoading(false);
-    }
   }, [sessionStatus]);
 
   // 加载状态
@@ -451,7 +507,9 @@ export default function PlansPage() {
                   key={plan.id}
                   plan={plan}
                   isCompleted={true}
-                  onEdit={handleEditPlan}
+                  onDeleteCompleted={async (planId) => {
+                    await deleteCachedProject(planId);
+                  }}
                 />
               ))}
             </div>

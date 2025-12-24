@@ -56,6 +56,15 @@ const MILESTONE_HINTS = [
 // 时间选项
 const TIME_OPTIONS = [15, 30, 45, 60];
 
+// 通用精进分支建议（当用户手动输入分支时使用）
+const GENERIC_DETAIL_SUGGESTIONS = [
+  '基础入门',
+  '进阶技巧',
+  '实战演练',
+  '理论学习',
+  '创意实践',
+];
+
 export default function GoalSetting() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -77,6 +86,7 @@ export default function GoalSetting() {
   const [selectedBranchCategoryKey, setSelectedBranchCategoryKey] = useState<string | null>(null);
   const [selectedDetailItemId, setSelectedDetailItemId] = useState<string | null>(null);
   const [selectedDetailFromBubble, setSelectedDetailFromBubble] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { isReady, query } = router;
   const allowReturn = isReady && (query.from === 'plans' || query.allowReturn === '1');
@@ -285,6 +295,13 @@ export default function GoalSetting() {
       return;
     }
 
+    // 防止重复提交
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
       const newPlan = {
         id: Date.now().toString(),
@@ -424,6 +441,7 @@ export default function GoalSetting() {
     } catch (error) {
       console.error('提交失败:', error);
       alert('提交失败，请重试');
+      setIsSubmitting(false);
     }
   };
 
@@ -641,7 +659,14 @@ export default function GoalSetting() {
   // 渲染详细分支选择页面 (页面B)
   const renderDetailBranch = () => {
     // 在已选方向下，从 interestConfig 中读取 5 个具体分支（Item）
+    // 如果用户手动输入了分支（没有从泡泡选择），则使用通用建议
     const detailItems: InterestItem[] = selectedCategory?.items ?? [];
+    const isUsingGenericSuggestions = detailItems.length === 0;
+    
+    // 如果没有配置的分支，使用通用建议
+    const displaySuggestions = isUsingGenericSuggestions 
+      ? GENERIC_DETAIL_SUGGESTIONS 
+      : detailItems.map(item => item.name);
 
     // 复用气泡布局
     const bubbleLayouts = [
@@ -658,24 +683,31 @@ export default function GoalSetting() {
     return (
       <div className="relative w-full max-w-6xl mx-auto flex flex-col items-center">
         <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
-          具体精进于哪个分支呢？
+          具体专注于哪个方向（可跳过）
         </h2>
 
         {/* 桌面端布局 */}
         <div className="hidden md:flex relative w-full items-center justify-center gap-8 lg:gap-12 min-h-[450px]">
-          {/* 左侧3个泡泡 - 使用配置的具体分支 */}
+          {/* 左侧3个泡泡 - 使用配置的具体分支或通用建议 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {leftBubbles.map((layout) => {
               const item = detailItems[layout.index];
-              const label = item?.name || '';
-              const isSelected =
-                !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
+              const suggestion = displaySuggestions[layout.index] || '';
+              const label = isUsingGenericSuggestions ? suggestion : (item?.name || '');
+              const isSelected = !isUsingGenericSuggestions && !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
 
               return (
                 <button
                   key={layout.index}
-                  onClick={() => item && handleDetailSelectFromBubble(item)}
-                  disabled={!item}
+                  onClick={() => {
+                    if (isUsingGenericSuggestions && suggestion) {
+                      // 使用通用建议
+                      setFormData(prev => ({ ...prev, focusDetail: suggestion }));
+                    } else if (item) {
+                      handleDetailSelectFromBubble(item);
+                    }
+                  }}
+                  disabled={!label}
                   style={{
                     position: 'absolute',
                     transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
@@ -689,7 +721,7 @@ export default function GoalSetting() {
                     w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
                     ${isSelected
                       ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
-                      : item
+                      : label
                         ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
                         : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
                   `}
@@ -712,25 +744,32 @@ export default function GoalSetting() {
               type="text"
               value={formData.focusDetail}
               onChange={(e) => handleInputChange('focusDetail', e.target.value)}
-              placeholder="输入你的具体分支..."
+              placeholder="例如：漫画、CS2、四六级听力"
               className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl lg:text-2xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
               autoFocus
             />
           </div>
 
-          {/* 右侧2个泡泡 - 使用配置的具体分支 */}
+          {/* 右侧2个泡泡 - 使用配置的具体分支或通用建议 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {rightBubbles.map((layout) => {
               const item = detailItems[layout.index];
-              const label = item?.name || '';
-              const isSelected =
-                !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
+              const suggestion = displaySuggestions[layout.index] || '';
+              const label = isUsingGenericSuggestions ? suggestion : (item?.name || '');
+              const isSelected = !isUsingGenericSuggestions && !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
 
               return (
                 <button
                   key={layout.index}
-                  onClick={() => item && handleDetailSelectFromBubble(item)}
-                  disabled={!item}
+                  onClick={() => {
+                    if (isUsingGenericSuggestions && suggestion) {
+                      // 使用通用建议
+                      setFormData(prev => ({ ...prev, focusDetail: suggestion }));
+                    } else if (item) {
+                      handleDetailSelectFromBubble(item);
+                    }
+                  }}
+                  disabled={!label}
                   style={{
                     position: 'absolute',
                     transform: `translate(${layout.offsetX}px, ${layout.offsetY}px)`,
@@ -744,7 +783,7 @@ export default function GoalSetting() {
                     w-28 h-28 lg:w-32 lg:h-32 rounded-full border transition-all duration-500 ease-out backdrop-blur-sm
                     ${isSelected
                       ? 'bg-white text-slate-900 border-transparent scale-110 z-10'
-                      : item
+                      : label
                         ? 'bg-white/10 text-white/80 border-white/20 hover:bg-white/15 hover:border-white/40 hover:text-white cursor-pointer'
                         : 'bg-white/5 text-white/30 border-white/10 cursor-not-allowed opacity-30'}
                   `}
@@ -764,16 +803,22 @@ export default function GoalSetting() {
 
         {/* 移动端布局 */}
         <div className="md:hidden w-full flex flex-col items-center">
-          {/* 移动端：如果配置了分支，则用点击泡泡形式展示 */}
-          {detailItems.length > 0 && (
+          {/* 移动端：显示泡泡建议（配置的或通用的） */}
+          {displaySuggestions.length > 0 && (
             <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {detailItems.map((item, i) => {
-                const isSelected =
-                  selectedDetailFromBubble && selectedDetailItemId === item.id;
+              {displaySuggestions.map((suggestionText, i) => {
+                const item = isUsingGenericSuggestions ? null : detailItems[i];
+                const isSelected = !isUsingGenericSuggestions && !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
                 return (
                   <button
-                    key={item.id}
-                    onClick={() => handleDetailSelectFromBubble(item)}
+                    key={item?.id || `generic-${i}`}
+                    onClick={() => {
+                      if (isUsingGenericSuggestions) {
+                        setFormData(prev => ({ ...prev, focusDetail: suggestionText }));
+                      } else if (item) {
+                        handleDetailSelectFromBubble(item);
+                      }
+                    }}
                     style={{
                       animationDelay: `${i * 0.1}s`,
                       boxShadow: isSelected
@@ -789,7 +834,7 @@ export default function GoalSetting() {
                     `}
                   >
                     <span className="text-sm font-medium relative z-10 px-3">
-                      {item.name}
+                      {suggestionText}
                     </span>
                   </button>
                 );
@@ -803,7 +848,7 @@ export default function GoalSetting() {
               type="text"
               value={formData.focusDetail}
               onChange={(e) => handleInputChange('focusDetail', e.target.value)}
-              placeholder="输入你的具体分支..."
+              placeholder="例如：漫画、CS2、四六级听力"
               className="w-full bg-transparent border-b-2 border-teal-400/50 text-center text-xl text-white py-4 focus:outline-none focus:border-teal-300 placeholder-white/30 transition-all"
               autoFocus
             />
@@ -1070,6 +1115,18 @@ export default function GoalSetting() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-400/20 rounded-full blur-[140px] animate-pulse-slow-very-delayed" />
         </div>
 
+        {/* 提交加载遮罩 */}
+        {isSubmitting && (
+          <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center">
+            <svg className="animate-spin h-12 w-12 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-white text-lg font-light tracking-wider">正在创建计划...</p>
+            <p className="text-white/50 text-sm mt-2">请稍候，不要关闭页面</p>
+          </div>
+        )}
+
         {/* 内容区 */}
         <div className="relative z-10 w-full flex flex-col items-center min-h-screen justify-center px-4 py-12">
           {renderCurrentStep()}
@@ -1085,15 +1142,25 @@ export default function GoalSetting() {
 
             <button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isSubmitting}
               className={`
-                px-8 py-3 rounded-full text-sm tracking-[0.2em] uppercase transition-all duration-500
-                ${canProceed()
+                px-8 py-3 rounded-full text-sm tracking-[0.2em] uppercase transition-all duration-500 relative
+                ${canProceed() && !isSubmitting
                   ? 'bg-white text-slate-900 hover:scale-105 shadow-lg shadow-white/10'
                   : 'bg-white/5 text-white/20 cursor-not-allowed'}
               `}
             >
-              {currentStep === FormStep.Date ? '完成' : 'Next'}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  提交中...
+                </span>
+              ) : (
+                currentStep === FormStep.Date ? '完成' : '下一步'
+              )}
             </button>
           </div>
         </div>

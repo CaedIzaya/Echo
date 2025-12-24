@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // PUT: 更新计划
     if (req.method === 'PUT') {
-      const { name, description, icon, color, dailyGoalMinutes, targetDate, isActive } = req.body;
+      const { name, description, icon, color, dailyGoalMinutes, targetDate, isActive, isCompleted, isPrimary } = req.body;
 
       console.log('[projects] 更新计划:', id);
 
@@ -58,6 +58,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!existingProject) {
         return res.status(404).json({ error: '计划不存在或无权限' });
+      }
+
+      // 如果设置为主要计划，先取消其他计划的主要标记
+      if (isPrimary === true) {
+        await db.project.updateMany({
+          where: { 
+            userId: session.user.id,
+            isPrimary: true,
+            id: { not: id }
+          },
+          data: {
+            isPrimary: false,
+          }
+        });
       }
 
       // 更新计划
@@ -71,6 +85,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           dailyGoalMinutes: dailyGoalMinutes !== undefined ? dailyGoalMinutes : undefined,
           targetDate: targetDate !== undefined ? (targetDate ? new Date(targetDate) : null) : undefined,
           isActive: isActive !== undefined ? isActive : undefined,
+          isCompleted: isCompleted !== undefined ? isCompleted : undefined,
+          isPrimary: isPrimary !== undefined ? isPrimary : undefined,
         },
         include: {
           milestones: {

@@ -38,6 +38,7 @@ interface PlanCardProps {
   onAddMilestone?: (planId: string) => void;
   onEdit?: (planId: string) => void; // 编辑回调
   onManageMilestone?: (planId: string) => void; // 管理里程碑回调
+  onDeleteCompleted?: (planId: string) => void; // 删除已完成计划回调
 }
 
 export default function PlanCard({
@@ -50,6 +51,7 @@ export default function PlanCard({
   onAddMilestone,
   onEdit,
   onManageMilestone,
+  onDeleteCompleted,
 }: PlanCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -75,21 +77,49 @@ export default function PlanCard({
 
   if (isCompleted) {
     return (
-      <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-200 opacity-60">
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5 shadow-md border border-emerald-200 hover:shadow-lg transition-all">
         <div className="flex items-center gap-4">
-          <div className="text-4xl">{plan.icon}</div>
-          <div className="flex-1">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center text-3xl shadow-sm">
+            {plan.icon}
+          </div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-lg font-semibold text-gray-700">
+              <h3 className="text-lg font-semibold text-gray-800 truncate">
                 {plan.name || plan.focusBranch}
               </h3>
-              <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
-                已完成
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
+                ✓ 已完成
               </span>
             </div>
             <p className="text-sm text-gray-500">
-              {plan.dailyGoalMinutes}分钟/天 • {completedMilestones}/{totalMilestones}个小目标
+              {completedMilestones}/{totalMilestones}个小目标完成
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // 跳转到回顾页面
+                if (typeof window !== 'undefined') {
+                  window.location.href = `/plans/${plan.id}/review`;
+                }
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-xl font-medium text-sm hover:shadow-lg transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            >
+              查看回顾
+            </button>
+            {onDeleteCompleted && (
+              <button
+                onClick={() => {
+                  if (confirm(`确定要删除已完成的计划"${plan.name}"吗？\n\n此操作不可恢复，但不会影响您的统计数据。`)) {
+                    onDeleteCompleted(plan.id);
+                  }
+                }}
+                className="w-10 h-10 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-xl transition-all hover:scale-105 active:scale-95"
+                title="删除已完成计划"
+              >
+                🗑️
+              </button>
+            )}
           </div>
         </div>
       </div>

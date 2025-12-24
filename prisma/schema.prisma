@@ -85,19 +85,28 @@ model User {
 }
 
 model Project {
-  id                String         @id @default(cuid())
-  name              String
-  description       String?
-  icon              String
-  color             String?
-  dailyGoalMinutes  Int            @default(25)
-  targetDate        DateTime?
-  isActive          Boolean        @default(true)
-  isPrimary         Boolean        @default(false)  // 是否为主要计划
-  isCompleted       Boolean        @default(false)  // 是否已完成
-  userId            String
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                    String         @id @default(cuid())
+  name                  String
+  description           String?
+  icon                  String
+  color                 String?
+  dailyGoalMinutes      Int            @default(25)
+  targetDate            DateTime?
+  isActive              Boolean        @default(true)
+  isPrimary             Boolean        @default(false)  // 是否为主要计划
+  isCompleted           Boolean        @default(false)  // 是否已完成
+  userId                String
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  
+  // 统计字段（仅在作为主要计划时增长）
+  totalFocusMinutes     Int            @default(0)      // 专注总时长（分钟）
+  streakDays            Int            @default(0)      // 连续天数
+  lastStreakDate        String?                         // 最后一次更新连续天数的日期
+  completedMilestones   Int            @default(0)      // 完成的小目标数
+  startDate             DateTime?                       // 起始日期（首次作为主要计划的日期）
+  avgFlowScore          Float?                          // 平均心流指数
+  
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   milestones        Milestone[]
   focusSessions     FocusSession[]
