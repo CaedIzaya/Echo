@@ -122,9 +122,14 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
     [data?.todayHasFocus, hasFocusOverride]
   );
   
+  // 🐛 修复：双重检查，确保小结内容不为空才认为"已写小结"
   const hasSummary = useMemo(
-    () => !!data?.todayHasSummary,
-    [data?.todayHasSummary]
+    () => {
+      const hasFlag = !!data?.todayHasSummary;
+      const hasText = data?.todaySummary?.text && data.todaySummary.text.trim().length > 0;
+      return hasFlag && hasText;
+    },
+    [data?.todayHasSummary, data?.todaySummary?.text]
   );
 
   if (loading) {
@@ -142,7 +147,7 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium mb-4">今日小结</p>
           <p className="text-gray-600 text-sm">
-            今天还没有专注，有没有兴趣现在开始？
+            今天还没有痕迹哦，要不要现在开始五分钟？
           </p>
         </div>
         <a 
@@ -162,7 +167,7 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
   if (hasFocus && !hasSummary) {
     return (
       <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-3xl p-6 shadow-lg text-white h-full flex flex-col justify-between relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl transform translate-x-10 -translate-y-10 group-hover:bg白/20 transition-all"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl transform translate-x-10 -translate-y-10 group-hover:bg-white/20 transition-all"></div>
         
         <div className="relative z-10">
           <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium mb-4">今日小结</p>

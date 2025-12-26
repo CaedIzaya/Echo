@@ -146,7 +146,7 @@ const LandingNavbar = ({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Echo</p>
-            <p className="text-xl font-bold text-slate-900">数字静默</p>
+            <p className="text-xl font-bold text-slate-900">FOCUS</p>
           </div>
         </div>
 
@@ -240,20 +240,20 @@ const LandingHero = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500" />
             </span>
-            <span className="text-sm font-medium text-teal-700">Echo · 数字静默</span>
+            <span className="text-sm font-medium text-teal-700">Echo · FOCUS</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
-          在这里,
+          随时专注
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400">
-            重遇自我
+            重拾自我
             </span>
           </h1>
 
           <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
-            <p>你不是不努力，只是需要一个安静的地方。</p>
-            <p>Echo 是一个陪你轻轻开始的专注空间。</p>
+            <p>你不是不努力，只是时间被切得太碎。</p>
+            <p>Echo 给你一个随时开始的理由。</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -441,28 +441,68 @@ const FeatureGrid = () => (
   </section>
 );
 
+const EchoPrinciples = [
+  {
+    emoji: '1️⃣',
+    title: '排名与比较',
+    description: '只关注自己的成长，为自己而专注。',
+    accent: 'from-emerald-50 via-white to-teal-50/60 border-emerald-100/70',
+  },
+  {
+    emoji: '2️⃣',
+    title: '惩罚与情绪绑架',
+    description: '心树不会枯萎，Lumi 不会失望，连胜不会中断。',
+    accent: 'from-cyan-50 via-white to-sky-50/60 border-cyan-100/70',
+  },
+  {
+    emoji: '3️⃣',
+    title: '替你定义何为"正确"',
+    description: '没有"应该坚持多久"，只有你自己的步伐。',
+    accent: 'from-teal-50 via-white to-emerald-50/60 border-teal-100/70',
+  },
+] as const;
+
 const MotivationSection = () => (
   <section className="pb-20 bg-white">
     <div className="max-w-6xl mx-auto px-6">
-      <div className="rounded-[32px] border border-emerald-100/70 bg-gradient-to-br from-emerald-50 via-white to-cyan-50/70 shadow-lg p-10 md:p-12 relative overflow-hidden">
-        <div className="absolute -right-16 -top-12 w-64 h-64 bg-emerald-200/30 blur-3xl" />
-        <div className="absolute -left-20 -bottom-20 w-72 h-72 bg-cyan-200/25 blur-3xl" />
-        <div className="relative space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-emerald-100 text-sm font-semibold text-emerald-700">
-          </div>
-          <p className="text-2xl md:text-3xl font-bold text-slate-900 leading-relaxed">
-            你可能会担心：“不逼我，我肯定会摆烂。”<br />
-            但最难的不是坚持，是开始。我们会一起跨过这一步。
-          </p>
-          <div className="grid md:grid-cols-2 gap-4 text-slate-700 text-base leading-relaxed">
-            <p className="bg-white/80 border border-emerald-100 rounded-2xl p-4 shadow-sm">
-              哪怕今天只有 5 分钟，你也会清楚地看到：你不是在混日子。
-            </p>
-            <p className="bg-white/80 border border-cyan-100 rounded-2xl p-4 shadow-sm">
-              这一点，会慢慢改变你对生活的感觉——从“难以开始”变成“轻轻就能动起来”。
-            </p>
-          </div>
+      {/* 标题区域 */}
+      <div className="text-center mb-12">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-100/70 text-sm font-semibold text-emerald-700 mb-4">
+          <span>Echo 的绝对规则</span>
         </div>
+        <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+          我们绝不
+        </h2>
+        <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+          这是 Echo 的绝对规则和宪法，也是我们唯一束缚的事情
+        </p>
+      </div>
+
+      {/* 三大绝不卡片 */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {EchoPrinciples.map((principle, index) => (
+          <div
+            key={index}
+            className={`rounded-[28px] border-2 bg-gradient-to-br ${principle.accent} p-8 shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden`}
+          >
+            {/* 背景装饰 */}
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/40 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+            <div className="absolute -left-8 -bottom-8 w-32 h-32 bg-white/40 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+            
+            {/* 内容 */}
+            <div className="relative">
+              <div className="text-4xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
+                {principle.emoji}
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3 leading-tight">
+                {principle.title}
+              </h3>
+              <p className="text-slate-700 leading-relaxed">
+                {principle.description}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   </section>

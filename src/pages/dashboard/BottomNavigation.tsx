@@ -1,11 +1,31 @@
 import { useRouter } from 'next/router';
+import { useState, useEffect } from 'react';
 
 interface BottomNavigationProps {
   active: 'home' | 'focus' | 'plans' | 'heart-tree';
+  hasFocusedToday?: boolean; // 今天是否有专注记录
 }
 
-export default function BottomNavigation({ active }: BottomNavigationProps) {
+export default function BottomNavigation({ active, hasFocusedToday = false }: BottomNavigationProps) {
   const router = useRouter();
+  const [showFocusDot, setShowFocusDot] = useState(false);
+
+  // 检查今天是否显示蓝绿点点
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const visitedFocusPageToday = localStorage.getItem(`focusPageVisited_${today}`) === 'true';
+    
+    // 如果今天没有专注记录 且 今天还没有访问过专注页面，则显示点点
+    setShowFocusDot(!hasFocusedToday && !visitedFocusPageToday);
+  }, [hasFocusedToday]);
+
+  // 点击专注按钮时，标记为已访问，点点消失
+  const handleFocusClick = () => {
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem(`focusPageVisited_${today}`, 'true');
+    setShowFocusDot(false);
+    router.push('/focus');
+  };
 
   const navItems = [
     { 
@@ -56,13 +76,20 @@ export default function BottomNavigation({ active }: BottomNavigationProps) {
         {navItems.map((item) => (
           <button
             key={item.key}
-            onClick={() => router.push(item.path)}
-            className={`flex flex-col items-center px-4 py-2 rounded-2xl transition-all duration-200 ${
+            onClick={() => item.key === 'focus' ? handleFocusClick() : router.push(item.path)}
+            className={`flex flex-col items-center px-4 py-2 rounded-2xl transition-all duration-200 relative ${
               active === item.key 
                 ? 'text-teal-500 bg-teal-50 scale-105' 
                 : 'text-gray-500 hover:text-teal-500 hover:bg-teal-50/50'
             }`}
           >
+            {/* 蓝绿色提示点：仅在专注按钮上显示，当今天没有专注时 */}
+            {item.key === 'focus' && showFocusDot && (
+              <span className="absolute top-1.5 right-2 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-gradient-to-br from-teal-400 to-cyan-500"></span>
+              </span>
+            )}
             <span className="mb-1">{item.icon}</span>
             <span className="text-xs font-semibold">{item.label}</span>
           </button>

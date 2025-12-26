@@ -595,7 +595,8 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
       <div className="absolute top-[12%] right-[15%] w-32 h-10 bg-white/70 rounded-full blur-xl animate-pulse" style={{ animationDuration: '12s' }} />
       <div className="absolute top-[20%] left-[35%] w-20 h-6 bg-white/50 rounded-full blur-lg animate-pulse" style={{ animationDuration: '10s' }} />
 
-      <div className="p-6 pt-4 relative z-10">
+      {/* PC端：最大宽度控制，确保能正好占满屏幕 */}
+      <div className="max-w-7xl mx-auto p-6 pt-4 relative z-10">
         {/* 头部信息（按需求去除文案） */}
         <div className="mb-0 text-center" />
 
@@ -604,7 +605,7 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
           const levelView = getHeartTreeLevelView(expState);
           const hasBuff = getFertilizerMultiplier(expState) > 1;
           return (
-            <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 mb-8 shadow-[0_8px_32px_rgba(0,0,0,0.05)] border border-white/40 transition-all hover:bg-white/50">
+            <div className="bg-white/40 backdrop-blur-md rounded-3xl p-5 md:p-6 mb-6 md:mb-8 shadow-[0_8px_32px_rgba(0,0,0,0.05)] border border-white/40 transition-all hover:bg-white/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="text-3xl filter drop-shadow-sm">🌳</div>
@@ -643,10 +644,10 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
           );
         })()}
 
-        {/* 树容器 */}
-        <div className="relative mb-6 flex items-center justify-center min-h-[320px] md:min-h-[500px]">
+        {/* 树容器 - PC端优化尺寸，确保与等级条和按钮协调 */}
+        <div className="relative mb-6 flex items-center justify-center min-h-[320px] md:min-h-[420px]">
           {/* 树 */}
-          <div className="relative z-0 w-full max-w-lg md:max-w-3xl transition-all duration-700">
+          <div className="relative z-0 w-full max-w-sm md:max-w-2xl transition-all duration-700">
             {renderTree()}
           </div>
         </div>
@@ -665,23 +666,23 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
           </div>
         )}
 
-        {/* 操作按钮 */}
-        <div className="flex flex-row gap-4">
+        {/* 操作按钮 - PC端优化，确保与其他元素协调 */}
+        <div className="flex flex-row gap-4 md:gap-6 max-w-3xl mx-auto">
           {/* 浇水按钮 */}
           <button
             onClick={handleWater}
             disabled={waterOpportunities <= 0 || isWatering}
-            className={`flex-1 px-6 py-5 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
+            className={`flex-1 px-4 md:px-8 py-4 md:py-6 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
               waterOpportunities > 0 && !isWatering
                 ? 'bg-gradient-to-br from-sky-400/90 to-blue-500/90 hover:from-sky-500 hover:to-blue-600 active:scale-95 border-sky-300/50'
                 : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
             }`}
           >
             <div className="flex items-center justify-center gap-3">
-              <span className="text-2xl filter drop-shadow-md">💧</span>
+              <span className="text-2xl md:text-3xl filter drop-shadow-md">💧</span>
               <div className="text-left">
-                <div className="text-sm">浇水</div>
-                <div className="text-[10px] opacity-80 font-medium">
+                <div className="text-sm md:text-base">浇水</div>
+                <div className="text-[10px] md:text-xs opacity-80 font-medium">
                   可用：{waterOpportunities}
                 </div>
               </div>
@@ -692,17 +693,17 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
           <button
             onClick={handleFertilize}
             disabled={fertilizeOpportunities <= 0 || isFertilizing}
-            className={`flex-1 px-6 py-5 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
+            className={`flex-1 px-4 md:px-8 py-4 md:py-6 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
               fertilizeOpportunities > 0 && !isFertilizing
                 ? 'bg-gradient-to-br from-emerald-400/90 to-green-500/90 hover:from-emerald-500 hover:to-green-600 active:scale-95 border-emerald-300/50'
                 : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
             }`}
           >
             <div className="flex items-center justify-center gap-3">
-              <span className="text-2xl filter drop-shadow-md">✨</span>
+              <span className="text-2xl md:text-3xl filter drop-shadow-md">✨</span>
               <div className="text-left">
-                <div className="text-sm">施肥</div>
-                <div className="text-[10px] opacity-80 font-medium">
+                <div className="text-sm md:text-base">施肥</div>
+                <div className="text-[10px] md:text-xs opacity-80 font-medium">
                   可用：{fertilizeOpportunities}
                 </div>
               </div>

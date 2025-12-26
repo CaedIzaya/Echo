@@ -1839,7 +1839,7 @@ export default function Focus() {
                     const dailyCompleted = isDailyGoalMet && !isGolden;
                     endFocus(sessionCompleted, dailyCompleted);
                   }}
-                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold hover:shadow-lg transition-all"
+                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:shadow-lg transition-all"
                 >
                   确认结束
                 </button>
@@ -1995,7 +1995,7 @@ export default function Focus() {
         {/* 如果正在显示选择按钮 */}
         {showEndOptions && (
           <div className={`min-h-screen flex flex-col md:flex-row items-center justify-center p-6 bg-gradient-to-br transition-all duration-700 ${
-            completed ? 'from-teal-500 to-cyan-600' : 'from-purple-500 to-pink-600'
+            completed ? 'from-teal-500 to-cyan-600' : 'from-emerald-400 to-teal-500'
           }`}>
           <div className="text-center max-w-md w-full z-10">
             <div className="text-6xl mb-6">
@@ -2078,7 +2078,7 @@ export default function Focus() {
       {/* 显示完成信息 */}
       {!showEndOptions && (
         <div className={`min-h-screen flex items-center justify-center p-6 bg-gradient-to-br ${
-          completed ? 'from-teal-500 to-cyan-600' : 'from-purple-500 to-pink-600'
+          completed ? 'from-teal-500 to-cyan-600' : 'from-emerald-400 to-teal-500'
         }`}>
           <div className="text-center">
             <div className="text-6xl mb-6">

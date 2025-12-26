@@ -68,10 +68,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return `${taskName} ${minutes} 分钟`;
       }).filter(Boolean); // 过滤掉空值
 
+      // 🐛 修复：只有当小结内容不为空时，才认为用户已写小结
+      const hasMeaningfulSummary = summary && summary.text && summary.text.trim().length > 0;
+
+      // 🎯 判定标准：专注时间≥1分钟才算"已专注"（过滤测试/误触记录）
       return res.status(200).json({
-        todayHasFocus: totalFocusMinutes > 0,
-        todayHasSummary: !!summary,
-        todaySummary: summary
+        todayHasFocus: totalFocusMinutes >= 1,
+        todayHasSummary: hasMeaningfulSummary,
+        todaySummary: hasMeaningfulSummary
           ? {
               date: todayDate,
               text: summary.text,

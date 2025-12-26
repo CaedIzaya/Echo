@@ -1177,8 +1177,8 @@ export default function Dashboard() {
     }
 
     if (authKey === 'unauthenticated') {
-      console.log('❌ 未认证，重定向');
-      window.location.href = '/auth/signin';
+      console.log('❌ 未认证，重定向到首页');
+      router.push('/');
       return;
     }
 
@@ -1933,7 +1933,12 @@ export default function Dashboard() {
                   <div className="flex flex-col gap-4">
                     <div>
                       <h1 className="text-2xl md:text-4xl font-semibold tracking-tight text-zinc-900 mb-2">
-                        {progress >= 1 ? '今天的时间，已经被你夺回。' : '准备好专注于真正重要的事了吗？'}
+                        {progress >= 1 
+                          ? '今天的时间，已经被你夺回。' 
+                          : todayStats.minutes > 0 && todayStats.minutes < (primaryPlan?.dailyGoalMinutes || 0)
+                            ? '状态绝佳！有没有兴趣再专注一把？'
+                            : '让我们坐下来，准备好开始了吗？'
+                        }
                       </h1>
                       <p className="text-sm text-zinc-500">
                         今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
@@ -2227,7 +2232,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <BottomNavigation active="home" />
+      <BottomNavigation active="home" hasFocusedToday={todayStats.minutes > 0} />
       
       {/* 成就面板 */}
       {showAchievementPanel && (

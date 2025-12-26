@@ -398,7 +398,7 @@ export default function PlansPage() {
     }
 
     if (sessionStatus === 'unauthenticated') {
-      window.location.href = '/auth/signin';
+      router.push('/');
       return;
     }
 
