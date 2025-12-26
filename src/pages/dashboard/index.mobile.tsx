@@ -35,6 +35,12 @@ import {
   clamp
 } from '~/lib/flowEngine';
 import { HeartTreeManager } from '~/lib/HeartTreeSystem';
+import {
+  gainHeartTreeExp,
+  grantFertilizerBuff,
+  loadHeartTreeExpState,
+  EXP_STREAK_DAY,
+} from '~/lib/HeartTreeExpSystem';
 import { MailSystem } from '~/lib/MailSystem';
 
 interface Project {
