@@ -730,21 +730,31 @@ export default function Dashboard() {
       const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || MIN_FOCUS_MINUTES;
       const yesterdayCompletedGoal = yesterdayMinutes >= dailyGoalMinutes;
       
-      console.log('🎯 连续天数检查', {
+      // 🔥 连续天数在完成目标时已实时更新，这里只需检查昨天是否已更新
+      const yesterdayStreakUpdated = localStorage.getItem(`streakUpdated_${yesterdayDate}`) === 'true';
+      
+      console.log('🎯(M) 连续天数检查', {
         昨日日期: yesterdayDate,
         昨日时长: yesterdayMinutes,
         目标时长: dailyGoalMinutes,
-        是否完成: yesterdayCompletedGoal,
+        昨日是否完成: yesterdayCompletedGoal,
+        昨日是否已更新: yesterdayStreakUpdated,
         当前连续: stats.streakDays,
-        将变为: yesterdayCompletedGoal ? stats.streakDays + 1 : stats.streakDays,
-        主要计划: primaryPlan?.name || '无'
+        提示: yesterdayStreakUpdated ? '昨日已实时更新，无需重复处理' : '昨日未完成目标，连续天数不变'
       });
       
-      // 如果昨天完成了目标，累计天数+1；如果没完成，累计天数不变（不会减少）
-      const newStreakDays = yesterdayCompletedGoal 
-        ? stats.streakDays + 1 
-        : stats.streakDays;
-      updateStats({ streakDays: newStreakDays });
+      // 如果昨天完成了目标但没有实时更新（兼容旧逻辑），则在这里更新
+      if (yesterdayCompletedGoal && !yesterdayStreakUpdated) {
+        const newStreakDays = stats.streakDays + 1;
+        console.log('🔥(M) 补充更新昨日连续天数 +1', {
+          原值: stats.streakDays,
+          新值: newStreakDays,
+          原因: '昨日完成目标但未实时更新'
+        });
+        updateStats({ streakDays: newStreakDays });
+        localStorage.setItem(`streakUpdated_${yesterdayDate}`, 'true');
+      }
+      // 如果昨天没完成目标，连续天数不变（不会减少）
       
       // 保存今日日期标记
       localStorage.setItem('lastFocusDate', today);
@@ -862,6 +872,56 @@ export default function Dashboard() {
             HeartTreeManager.addRewardOnGoalComplete();
             localStorage.setItem(`heartTreeDailyGoalReward_${today}`, 'true');
             console.log('🌳(M) 心树每日目标达成奖励：浇水 + 施肥 各 +1');
+          }
+          
+          // 🔥 连续天数更新：当天首次完成目标时，立即 +1
+          const streakUpdatedToday = localStorage.getItem(`streakUpdated_${today}`) === 'true';
+          if (!streakUpdatedToday) {
+            const newStreakDays = stats.streakDays + 1;
+            console.log('🔥(M) 连续专注天数 +1', {
+              原值: stats.streakDays,
+              新值: newStreakDays,
+              日期: today,
+              原因: '完成主要计划最小专注时长目标'
+            });
+            
+            // 更新前端状态
+            setStats(prev => ({ ...prev, streakDays: newStreakDays }));
+            updateStats({ streakDays: newStreakDays });
+            
+            // 标记今天已更新，防止重复
+            localStorage.setItem(`streakUpdated_${today}`, 'true');
+            
+            // 同步到数据库
+            if (session?.user?.id) {
+              fetch('/api/user/stats/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  streakDays: newStreakDays,
+                  lastStreakDate: today,
+                }),
+              }).then(res => {
+                if (res.ok) {
+                  console.log('✅(M) 连续天数已同步到数据库');
+                } else {
+                  console.warn('⚠️(M) 连续天数同步失败');
+                }
+              }).catch(err => {
+                console.error('❌(M) 连续天数同步出错:', err);
+              });
+            }
+            
+            // 心树 EXP：累计天数奖励
+            gainHeartTreeExp(EXP_STREAK_DAY);
+            console.log('🌳(M) 心树 EXP +', EXP_STREAK_DAY, '（累计专注', newStreakDays, '天）');
+            
+            // 关键节点：7 / 14 / 30 天 → 授予一次施肥 Buff（7天，+30% EXP）
+            if ([7, 14, 30].includes(newStreakDays)) {
+              const state = loadHeartTreeExpState();
+              grantFertilizerBuff(state);
+              console.log('🌱(M) 心树获得施肥 Buff！（累计', newStreakDays, '天）');
+            }
           }
         }
       } catch (e) {
@@ -2101,7 +2161,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   <div className="flex-1 flex items-center justify-center">
-                    <p className="text-3xl font-bold text-zinc-900 leading-none">{Math.max(1, stats.streakDays)}<span className="text-sm text-zinc-500 ml-1">天</span></p>
+                    <p className="text-3xl font-bold text-zinc-900 leading-none">{stats.streakDays}<span className="text-sm text-zinc-500 ml-1">天</span></p>
                   </div>
                   <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden mt-auto">
                     <div className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full w-1/2"></div>
