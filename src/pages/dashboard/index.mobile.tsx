@@ -781,7 +781,7 @@ export default function Dashboard() {
         console.log('✅ 经验值保护验证通过', { userExp: afterUserExp });
       }
       
-      console.log('🔄 日期已更新', { today, newStreakDays });
+      console.log('🔄 日期已更新', { today, streakDays: stats.streakDays });
     }
     
     // 更新今日数据
