@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 
 interface Milestone {
@@ -11,7 +13,7 @@ interface ManageMilestonesModalProps {
   visible: boolean;
   planId: string;
   planName: string;
-  milestones: Milestone[];
+  milestones?: Milestone[]; // 可选，避免 SSR 错误
   onClose: () => void;
   onSave: (milestones: Milestone[], priorityIds: string[]) => void;
   onDelete: (milestoneId: string) => void;
@@ -22,24 +24,26 @@ export default function ManageMilestonesModal({
   visible,
   planId,
   planName,
-  milestones,
+  milestones = [], // 默认空数组，避免 SSR 错误
   onClose,
   onSave,
   onDelete,
   onAdd,
 }: ManageMilestonesModalProps) {
-  const [localMilestones, setLocalMilestones] = useState<Milestone[]>(milestones);
+  const [localMilestones, setLocalMilestones] = useState<Milestone[]>(milestones || []);
   const [priorityIds, setPriorityIds] = useState<string[]>([]);
   const [showAddInput, setShowAddInput] = useState(false);
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
 
   // 初始化优先级（从 localStorage 读取）
   useEffect(() => {
-    if (visible && milestones.length > 0) {
+    if (typeof window === 'undefined') return; // SSR 保护
+    
+    if (visible && milestones && milestones.length > 0) {
       const savedPriority = localStorage.getItem(`plan_${planId}_priority_milestones`);
       if (savedPriority) {
         try {
-          const savedIds = JSON.parse(savedPriority);
+          const savedIds: string[] = JSON.parse(savedPriority);
           // 验证这些ID是否仍然存在于当前里程碑中
           const validIds = savedIds.filter((id: string) => 
             milestones.some(m => m.id === id && !m.isCompleted)
@@ -54,10 +58,12 @@ export default function ManageMilestonesModal({
 
   // 当里程碑变化时更新本地状态
   useEffect(() => {
-    setLocalMilestones(milestones);
+    if (milestones) {
+      setLocalMilestones(milestones);
+    }
   }, [milestones]);
 
-  const activeMilestones = localMilestones.filter(m => !m.isCompleted);
+  const activeMilestones = (localMilestones || []).filter(m => !m.isCompleted);
 
   // 切换优先级
   const togglePriority = (milestoneId: string) => {
@@ -84,6 +90,8 @@ export default function ManageMilestonesModal({
 
   // 处理保存
   const handleSave = () => {
+    if (typeof window === 'undefined') return; // SSR 保护
+    
     // 保存优先级到 localStorage
     localStorage.setItem(`plan_${planId}_priority_milestones`, JSON.stringify(priorityIds));
     
@@ -92,7 +100,7 @@ export default function ManageMilestonesModal({
       .map(id => localMilestones.find(m => m.id === id))
       .filter(Boolean) as Milestone[];
     
-    const otherMilestones = localMilestones.filter(
+    const otherMilestones = (localMilestones || []).filter(
       m => !priorityIds.includes(m.id)
     );
 
@@ -108,7 +116,8 @@ export default function ManageMilestonesModal({
     onClose();
   };
 
-  if (!visible) return null;
+  // SSR 保护：如果 milestones 未定义，不渲染
+  if (!visible || !milestones) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">

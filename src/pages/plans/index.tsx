@@ -7,7 +7,7 @@ import PlanManagement from './PlanManagement';
 import CompletionDialog from './CompletionDialog';
 import AddMilestoneModal from './AddMilestoneModal';
 import EditPlanModal from './EditPlanModal';
-import ManageMilestonesModal from './ManageMilestonesModal';
+import ManageMilestonesModal from '~/components/plans/ManageMilestonesModal';
 import MilestoneManager, { FinalGoal } from '~/components/milestone/MilestoneManager';
 import BottomNavigation from '../dashboard/BottomNavigation';
 
