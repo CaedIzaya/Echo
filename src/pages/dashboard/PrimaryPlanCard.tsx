@@ -21,9 +21,20 @@ interface PrimaryPlanCardProps {
   onMilestoneToggle?: (milestoneId: string) => void;
   onBulkMilestoneToggle?: (milestoneIds: string[]) => void;
   onGoalCountIncrement?: (count: number) => void;
+  selectedGoalMilestoneId?: string | null; // 今日选中的小目标ID
+  todayMinutes?: number; // 今日已专注时长
+  onQuickStart?: () => void; // 快速启动回调
 }
 
-export default function PrimaryPlanCard({ plan, onMilestoneToggle, onBulkMilestoneToggle, onGoalCountIncrement }: PrimaryPlanCardProps) {
+export default function PrimaryPlanCard({ 
+  plan, 
+  onMilestoneToggle, 
+  onBulkMilestoneToggle, 
+  onGoalCountIncrement,
+  selectedGoalMilestoneId,
+  todayMinutes = 0,
+  onQuickStart
+}: PrimaryPlanCardProps) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]); // 多选支持
   const [isExpanded, setIsExpanded] = useState(false); // 展开/收起状态
@@ -179,15 +190,26 @@ export default function PrimaryPlanCard({ plan, onMilestoneToggle, onBulkMilesto
           <div className="space-y-2">
             {activeMilestones.map((milestone) => {
               const isSelected = selectedIds.includes(milestone.id);
+              const isGoalOfTheDay = selectedGoalMilestoneId === milestone.id;
               return (
                 <label
                   key={milestone.id}
-                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300 ${
-                    isSelected
+                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300 relative ${
+                    isGoalOfTheDay
+                      ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-400 shadow-md animate-breathing'
+                      : isSelected
                       ? 'bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-teal-300 shadow-sm'
                       : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
                   }`}
                 >
+                  {/* 今日目标标记 */}
+                  {isGoalOfTheDay && (
+                    <div className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-xs px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-bounce-gentle">
+                      <span>⭐</span>
+                      <span className="font-semibold">今日目标</span>
+                    </div>
+                  )}
+                  
                   <input
                     type="checkbox"
                     checked={isSelected}
@@ -203,7 +225,9 @@ export default function PrimaryPlanCard({ plan, onMilestoneToggle, onBulkMilesto
                       </div>
                     )}
                     <span className={`text-sm font-medium transition-all duration-300 ${
-                      isSelected 
+                      isGoalOfTheDay
+                        ? 'text-amber-900 font-semibold'
+                        : isSelected 
                         ? 'text-gray-900 line-through decoration-teal-500 decoration-2' 
                         : 'text-gray-700'
                     }`}>
@@ -246,6 +270,19 @@ export default function PrimaryPlanCard({ plan, onMilestoneToggle, onBulkMilesto
 
       {/* 操作按钮 */}
       <div className="space-y-3">
+        {/* 快速启动按钮 - 仅在有选中目标且今天还没专注时显示 */}
+        {selectedGoalMilestoneId && todayMinutes === 0 && onQuickStart && (
+          <button 
+            onClick={onQuickStart}
+            className="w-full px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 text-white rounded-full hover:from-amber-600 hover:to-yellow-700 font-medium transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 animate-pulse-gentle"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            快速启动（{plan?.dailyGoalMinutes || 30}分钟）
+          </button>
+        )}
+        
         <button 
           onClick={() => router.push('/plans')}
           className="w-full px-6 py-3 bg-teal-500 text-white rounded-full hover:bg-teal-600 font-medium transition shadow-sm"
@@ -278,11 +315,46 @@ export default function PrimaryPlanCard({ plan, onMilestoneToggle, onBulkMilesto
             transform: translateY(0);
           }
         }
+        @keyframes breathing {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+          }
+        }
+        @keyframes bounce-gentle {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-3px);
+          }
+        }
+        @keyframes pulse-gentle {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.9;
+            transform: scale(1.02);
+          }
+        }
         .animate-check-mark {
           animation: check-mark 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .animate-fade-in {
           animation: fade-in 0.3s ease-out;
+        }
+        .animate-breathing {
+          animation: breathing 2s ease-in-out infinite;
+        }
+        .animate-bounce-gentle {
+          animation: bounce-gentle 2s ease-in-out infinite;
+        }
+        .animate-pulse-gentle {
+          animation: pulse-gentle 2s ease-in-out infinite;
         }
       `}</style>
     </div>

@@ -117,6 +117,10 @@ export default function OnboardingPage() {
   };
 
   const handleSkip = () => {
+    // 🌟 用户选择"稍后再说"，标记为新用户首次进入，以便 Dashboard 显示启动激励
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('isNewUserFirstEntry', 'true');
+    }
     router.push('/dashboard');
   };
 

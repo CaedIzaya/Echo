@@ -108,20 +108,27 @@ export function useDashboardData() {
       const synced = localStorage.getItem(SYNC_KEY);
       const lastSyncAt = localStorage.getItem('dashboardDataSyncedAt');
       
-      // 检查是否需要同步
+      // 🌟 优化：检查是否需要同步（更严格的条件）
       const needSync = !synced || !lastSyncAt || isDataStale(lastSyncAt);
       
       if (needSync) {
-        console.log('[useDashboardData] 需要同步数据（首次加载或数据过期）');
+        console.log('[useDashboardData] 📊 需要同步数据（首次加载或数据过期）');
         loadFromDatabase();
       } else {
-        console.log('[useDashboardData] 使用缓存数据');
+        console.log('[useDashboardData] ⚡ 使用缓存数据（性能优化）');
         setData(prev => ({ ...prev, isLoading: false }));
         
-        // 后台静默同步
-        setTimeout(() => {
-          loadFromDatabase();
-        }, 2000);
+        // 🌟 优化：仅在数据接近过期时后台同步（45分钟后）
+        const lastSync = new Date(lastSyncAt);
+        const now = new Date();
+        const minutesSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
+        
+        if (minutesSinceSync > 45) {
+          console.log('[useDashboardData] 🔄 后台静默同步（数据接近过期）');
+          setTimeout(() => {
+            loadFromDatabase();
+          }, 3000); // 延迟3秒，避免阻塞初始渲染
+        }
       }
     } else {
       // 未登录，使用缓存数据

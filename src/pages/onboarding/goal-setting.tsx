@@ -433,6 +433,11 @@ export default function GoalSetting() {
 
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('forceOnboarding');
+        
+        // 🌟 标记为新用户首次进入，以便 Dashboard 显示启动激励
+        if (!allowReturn) {
+          localStorage.setItem('isNewUserFirstEntry', 'true');
+        }
       }
 
       setTimeout(() => {

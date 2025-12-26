@@ -56,23 +56,30 @@ export function useAchievements() {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      const synced = localStorage.getItem(SYNC_KEY);
+      // 🌟 优化：立即显示 localStorage 数据
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const idsArray = JSON.parse(stored) as string[];
+          const ids = new Set<string>(idsArray);
+          setAchievedIds(ids);
+        } catch (e) {
+          console.error('[useAchievements] 解析失败:', e);
+        }
+      }
+      setIsLoading(false);
       
-      if (!synced) {
+      // 🌟 优化：仅在未同步或超过24小时时才查询数据库（极低频数据）
+      const synced = localStorage.getItem(SYNC_KEY);
+      const lastSyncAt = localStorage.getItem('achievementsSyncedAt');
+      
+      const needSync = !synced || !lastSyncAt || isAchievementDataStale(lastSyncAt);
+      
+      if (needSync) {
+        console.log('[useAchievements] 📊 成就数据需要同步（首次或超过24小时）');
         loadFromDatabase();
       } else {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          try {
-            const idsArray = JSON.parse(stored) as string[];
-            const ids = new Set<string>(idsArray);
-            setAchievedIds(ids);
-          } catch (e) {
-            console.error('[useAchievements] 解析失败:', e);
-          }
-        }
-        setIsLoading(false);
-        loadFromDatabase(); // 后台同步
+        console.log('[useAchievements] ⚡ 跳过数据库查询（缓存有效，极低频数据）');
       }
     } else {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -105,21 +112,30 @@ export function useAchievements() {
       setAchievedIds(newIds);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(newIds)));
 
-      // 如果已登录，同步到数据库
+      // 🌟 优化：延迟同步到数据库（成就是极低频数据，不阻塞UI）
       if (session?.user?.id) {
-        const response = await fetch('/api/achievements/unlock', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ achievementId, category }),
-        });
+        localStorage.setItem(SYNC_KEY, 'false');
+        
+        setTimeout(async () => {
+          try {
+            const response = await fetch('/api/achievements/unlock', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ achievementId, category }),
+            });
 
-        if (!response.ok) {
-          const error = await response.json();
-          console.error('[useAchievements] 保存到数据库失败:', error);
-        } else {
-          console.log('[useAchievements] 成就解锁成功:', achievementId);
-          localStorage.setItem(SYNC_KEY, 'true');
-        }
+            if (!response.ok) {
+              const error = await response.json();
+              console.error('[useAchievements] 保存到数据库失败:', error);
+            } else {
+              console.log('[useAchievements] ✅ 成就已同步到数据库:', achievementId);
+              localStorage.setItem(SYNC_KEY, 'true');
+              localStorage.setItem('achievementsSyncedAt', new Date().toISOString());
+            }
+          } catch (error) {
+            console.error('[useAchievements] 同步异常:', error);
+          }
+        }, 800); // 延迟800ms，避免阻塞
       }
 
       return true; // 新解锁
@@ -198,5 +214,19 @@ export function useAchievements() {
     syncToDatabase,
     reload: loadFromDatabase,
   };
+}
+
+// 检查成就数据是否过期（24小时）
+function isAchievementDataStale(lastSyncAt: string): boolean {
+  try {
+    const lastSync = new Date(lastSyncAt);
+    const now = new Date();
+    const hoursSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60);
+    
+    // 成就数据超过24小时视为过期（极低频数据）
+    return hoursSinceSync > 24;
+  } catch {
+    return true;
+  }
 }
 

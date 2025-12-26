@@ -13,6 +13,7 @@ import SecurityGuideCard from './SecurityGuideCard';
 import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
+import StartupMotivation from './StartupMotivation';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import type { Achievement } from '~/lib/AchievementSystem';
 import { useMailSystem, MailSystem } from '~/lib/MailSystem';
@@ -619,6 +620,23 @@ export default function Dashboard() {
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
   const [showStreakInfo, setShowStreakInfo] = useState(false);
   const [showFlowInfo, setShowFlowInfo] = useState(false);
+  
+  // 启动激励相关状态
+  const [showStartupMotivation, setShowStartupMotivation] = useState(false);
+  const [selectedGoalMilestoneId, setSelectedGoalMilestoneId] = useState<string | null>(() => {
+    // 从 localStorage 读取今日选中的小目标
+    if (typeof window !== 'undefined') {
+      const today = getTodayDate();
+      const savedDate = localStorage.getItem('todaySelectedGoalDate');
+      const savedId = localStorage.getItem('todaySelectedGoalId');
+      
+      // 如果是今天选中的，恢复状态
+      if (savedDate === today && savedId) {
+        return savedId;
+      }
+    }
+    return null;
+  }); // 今日选中的小目标ID
 
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
@@ -635,6 +653,76 @@ export default function Dashboard() {
   const incrementCompletedGoals = (count: number) => {
     updateStats({
       completedGoals: stats.completedGoals + count
+    });
+  };
+
+  // 🌟 启动激励 - 确认小目标
+  const handleConfirmGoal = (milestoneId: string) => {
+    console.log('📌 确认今日小目标:', milestoneId);
+    setSelectedGoalMilestoneId(milestoneId);
+    // 标记小目标为"被选中状态"
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('todaySelectedGoalId', milestoneId);
+      localStorage.setItem('todaySelectedGoalDate', getTodayDate());
+    }
+  };
+
+  // 🌟 启动激励 - 快速启动（直接进入专注）
+  const handleQuickStartFromMotivation = () => {
+    // 如果有计划，使用计划的每日目标时长；如果没有计划（自由专注），默认15分钟
+    const dailyGoal = primaryPlan?.dailyGoalMinutes || 15;
+    console.log('⚡ 快速启动专注，目标时长:', dailyGoal, primaryPlan ? '(计划目标)' : '(自由专注默认)');
+    router.push(`/focus?duration=${dailyGoal}&quickStart=true`);
+  };
+
+  // 🌟 启动激励 - 添加小目标到计划
+  const handleAddMilestoneFromMotivation = async (title: string) => {
+    if (!primaryPlan) {
+      console.error('没有主计划，无法添加小目标');
+      return;
+    }
+
+    const newMilestone = {
+      id: `milestone-${Date.now()}`,
+      title: title.trim(),
+      isCompleted: false,
+      order: (primaryPlan.milestones?.length || 0) + 1
+    };
+
+    console.log('📝 添加小目标到计划:', { planId: primaryPlan.id, title });
+
+    // 更新本地状态
+    setPrimaryPlan(prev => {
+      if (!prev) return prev;
+      
+      const updatedMilestones = [...(prev.milestones || []), newMilestone];
+      const updatedPlan = {
+        ...prev,
+        milestones: updatedMilestones
+      };
+
+      // 🔥 保存到数据库
+      if (session?.user?.id && prev.id) {
+        updateMilestonesToDB(prev.id, updatedMilestones).then(success => {
+          if (success) {
+            console.log('✅ 小目标已同步到数据库');
+          } else {
+            console.error('❌ 同步小目标失败');
+          }
+        });
+      }
+
+      // 同步到 localStorage
+      if (typeof window !== 'undefined') {
+        const savedPlans = localStorage.getItem('userPlans');
+        const plans = savedPlans ? JSON.parse(savedPlans) : [];
+        const updatedPlans = plans.map((p: Project) => 
+          p.id === updatedPlan.id ? updatedPlan : p
+        );
+        localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      }
+
+      return updatedPlan;
     });
   };
 
@@ -790,6 +878,16 @@ export default function Dashboard() {
       // 更新完成的小目标计数（触发成就检查）
       incrementCompletedGoals(milestoneIds.length);
 
+      // 🌟 如果完成的小目标中包含今日选中的小目标，清除选中状态
+      if (selectedGoalMilestoneId && milestoneIds.includes(selectedGoalMilestoneId)) {
+        setSelectedGoalMilestoneId(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('todaySelectedGoalId');
+          localStorage.removeItem('todaySelectedGoalDate');
+        }
+        console.log('✅ 今日选中的小目标已完成，清除选中状态');
+      }
+
       // 清除动画状态
       setTimeout(() => {
         setCompletingMilestoneId(null);
@@ -907,6 +1005,9 @@ export default function Dashboard() {
       minutes, 
       rating
     });
+    
+    // 🌟 性能优化标记：批量更新开始
+    const batchUpdates: any = {};
     
     // 专注完成后，小精灵保持idle状态（不设置excited）
     // 用户点击时会随机播放happy或excited动画
@@ -1125,24 +1226,30 @@ export default function Dashboard() {
             // 标记今天已更新，防止重复
             localStorage.setItem(`streakUpdated_${today}`, 'true');
             
-            // 同步到数据库
+            // 🌟 优化：延迟同步到数据库（中频数据，每天最多一次）
             if (session?.user?.id) {
-              fetch('/api/user/stats/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  streakDays: newStreakDays,
-                  lastStreakDate: today,
-                }),
-              }).then(res => {
-                if (res.ok) {
-                  console.log('✅ 连续天数已同步到数据库');
-                } else {
-                  console.warn('⚠️ 连续天数同步失败');
-                }
-              }).catch(err => {
-                console.error('❌ 连续天数同步出错:', err);
-              });
+              batchUpdates.streakDays = newStreakDays;
+              batchUpdates.lastStreakDate = today;
+              
+              // 延迟3秒同步，避免阻塞UI
+              setTimeout(() => {
+                fetch('/api/user/stats/update', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    streakDays: newStreakDays,
+                    lastStreakDate: today,
+                  }),
+                }).then(res => {
+                  if (res.ok) {
+                    console.log('✅ 连续天数已同步到数据库（延迟同步）');
+                  } else {
+                    console.warn('⚠️ 连续天数同步失败');
+                  }
+                }).catch(err => {
+                  console.error('❌ 连续天数同步出错:', err);
+                });
+              }, 3000);
             }
             
             // 心树 EXP：累计天数奖励
@@ -1162,7 +1269,12 @@ export default function Dashboard() {
       }
     }
     
-    console.log('✅ 统计数据已更新完成');
+    // 🌟 性能优化：标记需要刷新 Dashboard 数据（延迟刷新，避免阻塞）
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('needRefreshDashboard', 'true');
+    }
+    
+    console.log('✅ 统计数据已更新完成（已标记延迟刷新）');
   };
 
   // 更新用户经验值（优化后的经验值系统）
@@ -1361,6 +1473,22 @@ export default function Dashboard() {
     }
   }, []); // 只在组件挂载时执行一次
 
+  // 🌟 监听日期变化，清除昨日选中的小目标
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const today = getTodayDate();
+    const savedDate = localStorage.getItem('todaySelectedGoalDate');
+    
+    // 如果是新的一天，清除昨日选中的小目标
+    if (savedDate && savedDate !== today) {
+      localStorage.removeItem('todaySelectedGoalId');
+      localStorage.removeItem('todaySelectedGoalDate');
+      setSelectedGoalMilestoneId(null);
+      console.log('📅 新的一天，清除昨日选中的小目标');
+    }
+  }, []); // 只在组件挂载时检查一次
+
   // 🔥 监听数据库数据变化，同步更新状态
   useEffect(() => {
     if (dashboardDataLoading) return;
@@ -1416,16 +1544,19 @@ export default function Dashboard() {
     }
   }, [projectsLoading, dbPrimaryProject, dbProjects]);
   
-  // 🔥 检测专注完成标记，触发数据刷新
+  // 🌟 优化：检测专注完成标记，智能触发数据刷新
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const needRefresh = localStorage.getItem('needRefreshDashboard');
     if (needRefresh === 'true') {
-      console.log('[Dashboard] 🔄 检测到新数据，刷新统计...');
+      console.log('[Dashboard] 🔄 检测到专注完成，刷新统计数据...');
+      
+      // 🌟 优化：延迟刷新，避免阻塞专注完成的UI反馈
       setTimeout(() => {
         refreshDashboardData();
-      }, 1000);
+      }, 2000); // 延迟2秒，让用户先看到完成动画
+      
       localStorage.removeItem('needRefreshDashboard');
     }
   }, [refreshDashboardData]);
@@ -1494,8 +1625,33 @@ export default function Dashboard() {
           return;
         }
         
-        // 检查每日登录经验值奖励（每天只奖励一次）
+        // 🌟 启动激励逻辑：当日首次进入 App，且当日尚未开始任何一次专注
         const today = getTodayDate();
+        const lastStartupMotivationDate = localStorage.getItem('lastStartupMotivationDate');
+        const hasCompletedOnboarding = session?.user?.hasCompletedOnboarding;
+        const isNewUser = localStorage.getItem('isNewUserFirstEntry') === 'true';
+        
+        // 检查是否应该显示启动激励
+        // 条件：1. 今天还没显示过 2. 今天还没有专注过 3. 已完成 onboarding
+        // 特殊情况：新用户首次进入（刚完成 onboarding）也应该显示
+        const shouldShowMotivation = (
+          (lastStartupMotivationDate !== today && todayStats.minutes === 0 && hasCompletedOnboarding) ||
+          (isNewUser && hasCompletedOnboarding)
+        );
+        
+        if (shouldShowMotivation) {
+          console.log('🌟 触发启动激励弹窗', { isNewUser, hasCompletedOnboarding });
+          setShowStartupMotivation(true);
+          localStorage.setItem('lastStartupMotivationDate', today);
+          
+          // 清除新用户标记
+          if (isNewUser) {
+            localStorage.removeItem('isNewUserFirstEntry');
+          }
+          return;
+        }
+        
+        // 检查每日登录经验值奖励（每天只奖励一次）
         const lastLoginDate = localStorage.getItem('lastLoginDate');
         if (lastLoginDate !== today) {
           // 今日首次登录，给予经验值奖励
@@ -2043,7 +2199,34 @@ export default function Dashboard() {
   const effectiveSpiritState = 'idle';
 
   const planMilestones = primaryPlan?.milestones ?? [];
-  const activeMilestones = planMilestones.filter((milestone) => !milestone.isCompleted); // 只显示未完成的小目标
+  const allActiveMilestones = planMilestones.filter((milestone) => !milestone.isCompleted); // 只显示未完成的小目标
+  
+  // 🌟 读取优先级小目标，优先显示在前三个位置
+  const priorityMilestoneIds = (() => {
+    if (!primaryPlan?.id || typeof window === 'undefined') return [];
+    try {
+      const savedPriority = localStorage.getItem(`plan_${primaryPlan.id}_priority_milestones`);
+      if (savedPriority) {
+        const ids: string[] = JSON.parse(savedPriority);
+        // 验证这些ID是否仍然存在于当前里程碑中
+        return ids.filter((id: string) => 
+          allActiveMilestones.some(m => m.id === id)
+        ).slice(0, 3);
+      }
+    } catch (e) {
+      console.error('读取优先级失败:', e);
+    }
+    return [];
+  })();
+  
+  // 重新排序：优先级在前，其他在后
+  const activeMilestones = [
+    ...priorityMilestoneIds
+      .map(id => allActiveMilestones.find(m => m.id === id))
+      .filter(Boolean) as typeof allActiveMilestones,
+    ...allActiveMilestones.filter(m => !priorityMilestoneIds.includes(m.id))
+  ];
+  
   const completedMilestones = planMilestones.filter((milestone) => milestone.isCompleted).length;
   const planProgressPercent = planMilestones.length > 0 ? Math.round((completedMilestones / planMilestones.length) * 100) : 0;
   const totalFocusHours = Math.floor(totalFocusMinutes / 60);
@@ -2222,19 +2405,30 @@ export default function Dashboard() {
           {activeMilestones.map((milestone, index) => {
             const isSelected = selectedMilestoneIds.has(milestone.id);
             const isCompleting = completingMilestoneId === milestone.id;
+            const isGoalOfTheDay = selectedGoalMilestoneId === milestone.id;
             const isLast = index === activeMilestones.length - 1;
             return (
               <div 
                 key={milestone.id} 
-                className={`space-y-2 transition-all duration-500 ${
+                className={`space-y-2 transition-all duration-500 relative ${
                   isCompleting ? 'opacity-0 transform scale-95' : 'opacity-100'
                 }`}
               >
+                {/* 今日目标标记 */}
+                {isGoalOfTheDay && (
+                  <div className="absolute -top-2 -right-2 z-10 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-xs px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-bounce-gentle">
+                    <span>⭐</span>
+                    <span className="font-semibold">今日目标</span>
+                  </div>
+                )}
+                
                 <button
                   onClick={() => handleMilestoneToggle(milestone.id)}
                   disabled={isCompleting}
                   className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
-                    isCompleting
+                    isGoalOfTheDay
+                      ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-400 animate-breathing'
+                      : isCompleting
                       ? 'bg-emerald-50 border-emerald-200'
                       : isSelected
                       ? 'bg-emerald-50 border-emerald-300 hover:border-emerald-400'
@@ -2297,13 +2491,47 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="mt-6 pt-4 border-t border-zinc-200">
-          <button
-            onClick={() => router.push('/plans')}
-            className="w-full px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-sm font-medium transition-all"
-          >
-            前往管理计划
-          </button>
+        <div className="mt-6 pt-4 border-t border-zinc-200 space-y-3">
+          {/* 快速启动按钮 - 仅在有选中目标且今天还没专注时显示 */}
+          {selectedGoalMilestoneId && todayStats.minutes === 0 && (
+            <button 
+              onClick={handleQuickStartFromMotivation}
+              className="w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 text-white rounded-xl hover:from-amber-600 hover:to-yellow-700 font-medium transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 animate-pulse-gentle"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              快速启动（{primaryPlan?.dailyGoalMinutes || 15}分钟）
+            </button>
+          )}
+          
+          {/* 两个并排按钮：快速开始 和 添加小目标 */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleQuickStartFromMotivation}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-medium transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              快速开始
+            </button>
+            <button
+              onClick={() => {
+                if (primaryPlan) {
+                  setShowStartupMotivation(true);
+                } else {
+                  router.push('/plans');
+                }
+              }}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-sm font-medium transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              添加小目标
+            </button>
+          </div>
         </div>
 
       </>
@@ -2433,12 +2661,23 @@ export default function Dashboard() {
               今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
             </p>
             
-            <button
-              onClick={handleStartFocus}
-              className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30"
-            >
-              开始专注
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={handleStartFocus}
+                className="flex-1 px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30"
+              >
+                开始专注
+              </button>
+              
+              {/* 🌟 目标设定按钮 - 与开始专注按钮大小一致 */}
+              <button
+                onClick={() => setShowStartupMotivation(true)}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30"
+                title="目标设定"
+              >
+                目标设定
+              </button>
+            </div>
           </div>
 
           {/* 2. 计划 Check 卡片 (Mobile) */}
@@ -2646,6 +2885,15 @@ export default function Dashboard() {
                   >
                     开始专注
                   </button>
+                  
+                  {/* 🌟 目标设定按钮 - 与开始专注按钮大小一致 */}
+                  <button
+                    onClick={() => setShowStartupMotivation(true)}
+                    className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
+                    title="目标设定"
+                  >
+                    目标设定
+                  </button>
                 </div>
               </div>
               {/* 小精灵 */}
@@ -2822,6 +3070,57 @@ export default function Dashboard() {
       {showQuickSearchGuide && (
         <QuickSearchGuide onClose={() => setShowQuickSearchGuide(false)} />
       )}
+      
+      {/* 🌟 启动激励弹窗 */}
+      {showStartupMotivation && (
+        <StartupMotivation
+          primaryPlan={primaryPlan}
+          dailyGoalMinutes={primaryPlan?.dailyGoalMinutes || 30}
+          onClose={() => setShowStartupMotivation(false)}
+          onConfirmGoal={handleConfirmGoal}
+          onQuickStart={handleQuickStartFromMotivation}
+          onAddMilestone={handleAddMilestoneFromMotivation}
+        />
+      )}
+      
+      {/* 动画样式 */}
+      <style jsx>{`
+        @keyframes breathing {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+          }
+        }
+        @keyframes bounce-gentle {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-3px);
+          }
+        }
+        @keyframes pulse-gentle {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.9;
+            transform: scale(1.02);
+          }
+        }
+        :global(.animate-breathing) {
+          animation: breathing 2s ease-in-out infinite;
+        }
+        :global(.animate-bounce-gentle) {
+          animation: bounce-gentle 2s ease-in-out infinite;
+        }
+        :global(.animate-pulse-gentle) {
+          animation: pulse-gentle 2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

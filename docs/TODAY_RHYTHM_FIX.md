@@ -397,3 +397,5 @@ console.log('是否达标:', hasMetGoal);
 **状态：** ✅ 已完成并测试
 
 
+
+

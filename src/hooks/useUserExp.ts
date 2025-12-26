@@ -104,24 +104,27 @@ export function useUserExp() {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      // 检查是否已同步
+      // 🌟 优化：检查缓存时间戳，避免频繁查询
       const synced = localStorage.getItem(SYNC_KEY);
+      const lastSyncAt = localStorage.getItem('userExpSyncedAt');
       
-      if (!synced) {
-        // 未同步：从数据库加载
+      // 先立即显示 localStorage 数据（用户体验优先）
+      const localExp = readLocalExp();
+      if (localExp > 0) {
+        setUserExp(localExp);
+        const levelInfo = LevelManager.calculateLevel(localExp);
+        setUserLevel(levelInfo.currentLevel);
+      }
+      setIsLoading(false);
+      
+      // 🌟 优化：仅在未同步或超过1小时时才查询数据库
+      const needSync = !synced || !lastSyncAt || isExpDataStale(lastSyncAt);
+      
+      if (needSync) {
+        console.log('[useUserExp] 📊 经验值需要同步（首次或超过1小时）');
         loadFromDatabase();
       } else {
-        // 已同步：先用 localStorage 显示，然后后台同步
-        const localExp = readLocalExp();
-        if (localExp > 0) {
-          setUserExp(localExp);
-          const levelInfo = LevelManager.calculateLevel(localExp);
-          setUserLevel(levelInfo.currentLevel);
-        }
-        setIsLoading(false);
-        
-        // 后台同步数据库（确保最新）
-        loadFromDatabase();
+        console.log('[useUserExp] ⚡ 使用缓存经验值（性能优化）');
       }
     } else {
       // 未登录：只使用 localStorage
@@ -164,22 +167,33 @@ export function useUserExp() {
         setProtectionMarker('exp_milestone');
       }
 
-      // 如果已登录，同步到数据库
+      // 🌟 优化：延迟同步到数据库，避免阻塞UI
       if (session?.user?.id) {
-        const response = await fetch('/api/user/exp/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userExp: newExp }),
-        });
+        // 标记为待同步状态
+        localStorage.setItem(SYNC_KEY, 'false');
+        
+        // 延迟同步（500ms后）
+        setTimeout(async () => {
+          try {
+            const response = await fetch('/api/user/exp/update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userExp: newExp }),
+            });
 
-        if (!response.ok) {
-          const error = await response.json();
-          console.error('[useUserExp] 保存到数据库失败:', error);
-          // 数据库保存失败，但 localStorage 已更新，仍然算成功
-        } else {
-          console.log('[useUserExp] 保存到数据库成功');
-          localStorage.setItem(SYNC_KEY, 'true');
-        }
+            if (!response.ok) {
+              const error = await response.json();
+              console.error('[useUserExp] 保存到数据库失败:', error);
+              // 数据库保存失败，但 localStorage 已更新，仍然算成功
+            } else {
+              console.log('[useUserExp] ✅ 经验值已同步到数据库');
+              localStorage.setItem(SYNC_KEY, 'true');
+              localStorage.setItem('userExpSyncedAt', new Date().toISOString());
+            }
+          } catch (error) {
+            console.error('[useUserExp] 同步异常:', error);
+          }
+        }, 500);
       }
 
       return true;
@@ -238,5 +252,19 @@ export function useUserExp() {
     syncToDatabase,
     reload: loadFromDatabase,
   };
+}
+
+// 检查经验值数据是否过期（1小时）
+function isExpDataStale(lastSyncAt: string): boolean {
+  try {
+    const lastSync = new Date(lastSyncAt);
+    const now = new Date();
+    const hoursSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60);
+    
+    // 经验值数据超过1小时视为过期（低频数据）
+    return hoursSinceSync > 1;
+  } catch {
+    return true;
+  }
 }
 

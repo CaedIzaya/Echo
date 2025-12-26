@@ -7,6 +7,7 @@ import PlanManagement from './PlanManagement';
 import CompletionDialog from './CompletionDialog';
 import AddMilestoneModal from './AddMilestoneModal';
 import EditPlanModal from './EditPlanModal';
+import ManageMilestonesModal from './ManageMilestonesModal';
 import MilestoneManager, { FinalGoal } from '~/components/milestone/MilestoneManager';
 import BottomNavigation from '../dashboard/BottomNavigation';
 
@@ -47,6 +48,8 @@ export default function PlansPage() {
   const [showEditPlanModal, setShowEditPlanModal] = useState(false);
   const [showMilestoneManager, setShowMilestoneManager] = useState(false);
   const [managingMilestonePlanId, setManagingMilestonePlanId] = useState<string | null>(null);
+  const [showManageMilestonesModal, setShowManageMilestonesModal] = useState(false);
+  const [managingMilestonesPlanId, setManagingMilestonesPlanId] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Project | null>(null);
 
   // 使用缓存 hook
@@ -314,10 +317,88 @@ export default function PlansPage() {
     setEditingPlan(null);
   };
 
-  // 管理里程碑
+  // 管理里程碑（最终目标）
   const handleManageMilestone = (planId: string) => {
     setManagingMilestonePlanId(planId);
     setShowMilestoneManager(true);
+  };
+
+  // 管理小目标
+  const handleManageMilestones = (planId: string) => {
+    setManagingMilestonesPlanId(planId);
+    setShowManageMilestonesModal(true);
+  };
+
+  // 保存小目标管理（更新顺序和优先级）
+  const handleSaveMilestones = async (reorderedMilestones: Milestone[], priorityIds: string[]) => {
+    if (!managingMilestonesPlanId) return;
+
+    const targetPlan = plans.find(p => p.id === managingMilestonesPlanId);
+    if (!targetPlan) return;
+
+    try {
+      // 更新到数据库
+      const response = await fetch(`/api/projects/${managingMilestonesPlanId}/milestones`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          milestones: reorderedMilestones.map(m => ({
+            id: m.id,
+            title: m.title,
+            isCompleted: m.isCompleted,
+            order: m.order,
+          })),
+        }),
+      });
+
+      if (response.ok) {
+        // 更新本地状态
+        const updatedPlans = plans.map(plan =>
+          plan.id === managingMilestonesPlanId
+            ? { ...plan, milestones: reorderedMilestones }
+            : plan
+        );
+        setPlans(updatedPlans);
+        console.log('✅ 小目标管理已保存');
+      } else {
+        alert('保存失败，请重试');
+      }
+    } catch (error) {
+      console.error('保存小目标管理失败:', error);
+      alert('保存失败，请重试');
+    }
+  };
+
+  // 删除小目标
+  const handleDeleteMilestone = async (milestoneId: string) => {
+    if (!managingMilestonesPlanId) return;
+
+    const targetPlan = plans.find(p => p.id === managingMilestonesPlanId);
+    if (!targetPlan) return;
+
+    try {
+      const response = await fetch(`/api/projects/${managingMilestonesPlanId}/milestones/${milestoneId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const updatedPlans = plans.map(plan =>
+          plan.id === managingMilestonesPlanId
+            ? {
+                ...plan,
+                milestones: plan.milestones.filter(m => m.id !== milestoneId),
+              }
+            : plan
+        );
+        setPlans(updatedPlans);
+        console.log('✅ 小目标已删除');
+      } else {
+        alert('删除失败，请重试');
+      }
+    } catch (error) {
+      console.error('删除小目标失败:', error);
+      alert('删除失败，请重试');
+    }
   };
 
   // 保存里程碑
@@ -339,10 +420,11 @@ export default function PlansPage() {
   };
 
   // 添加小目标
-  const handleAddMilestone = async (title: string) => {
-    if (!milestoneTargetPlanId) return;
+  const handleAddMilestone = async (title: string, targetPlanId?: string) => {
+    const planId = targetPlanId || milestoneTargetPlanId;
+    if (!planId) return;
 
-    const targetPlan = plans.find(p => p.id === milestoneTargetPlanId);
+    const targetPlan = plans.find(p => p.id === planId);
     if (!targetPlan) return;
 
     // 获取下一个order
@@ -355,7 +437,7 @@ export default function PlansPage() {
     const isFirstMilestone = allMilestonesBefore.length === 0;
 
     try {
-      const response = await fetch(`/api/projects/${milestoneTargetPlanId}/milestones`, {
+        const response = await fetch(`/api/projects/${planId}/milestones`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -476,6 +558,7 @@ export default function PlansPage() {
                 onAddMilestone={handleOpenAddMilestone}
                 onEdit={handleEditPlan}
                 onManageMilestone={handleManageMilestone}
+                onManageMilestones={handleManageMilestones}
               />
             ))}
           </div>
@@ -570,6 +653,23 @@ export default function PlansPage() {
         initialGoal={plans.find(p => p.id === managingMilestonePlanId)?.finalGoal}
         planName={plans.find(p => p.id === managingMilestonePlanId)?.name}
       />
+
+      {/* 管理小目标弹窗 */}
+      {managingMilestonesPlanId && (
+        <ManageMilestonesModal
+          visible={showManageMilestonesModal}
+          planId={managingMilestonesPlanId}
+          planName={plans.find(p => p.id === managingMilestonesPlanId)?.name || ''}
+          milestones={plans.find(p => p.id === managingMilestonesPlanId)?.milestones || []}
+          onClose={() => {
+            setShowManageMilestonesModal(false);
+            setManagingMilestonesPlanId(null);
+          }}
+          onSave={handleSaveMilestones}
+          onDelete={handleDeleteMilestone}
+          onAdd={handleAddMilestone}
+        />
+      )}
 
       <BottomNavigation active="plans" />
 

@@ -332,11 +332,17 @@ export default function Focus() {
       
       // 只有在初始加载或shouldResetSelection为true时才重置计划选择
       if (shouldResetSelection || isInitialLoadRef.current) {
+        // 🌟 检查是否是快速启动模式
+        const urlParams = new URLSearchParams(window.location.search);
+        const isQuickStart = urlParams.get('quickStart') === 'true';
+        const durationParam = urlParams.get('duration');
+        
         if (primary) {
           setSelectedPlanId(primary.id);
           setSessionName(primary.name);
-          setPlannedMinutes(primary.dailyGoalMinutes || 30);
-          setCustomDuration(primary.dailyGoalMinutes || 30);
+          const targetDuration = durationParam ? parseInt(durationParam) : (primary.dailyGoalMinutes || 30);
+          setPlannedMinutes(targetDuration);
+          setCustomDuration(targetDuration);
           // 加载主要计划的小目标 - 过滤已完成的目标
           if (primary.milestones) {
             console.log('📋 加载小目标，总数:', primary.milestones.length);
@@ -344,19 +350,56 @@ export default function Focus() {
             console.log('✅ 未完成的小目标:', uncompleted.length);
             setPlanMilestones(uncompleted);
           }
+          
+          // 🌟 如果是快速启动，自动选中今日目标（如果有）
+          if (isQuickStart) {
+            const todayGoalId = localStorage.getItem('todaySelectedGoalId');
+            const todayGoalDate = localStorage.getItem('todaySelectedGoalDate');
+            const today = new Date().toLocaleDateString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            }).replace(/\//g, '-');
+            
+            if (todayGoalId && todayGoalDate === today && primary.milestones) {
+              const todayGoal = primary.milestones.find((m: any) => m.id === todayGoalId);
+              if (todayGoal && !todayGoal.isCompleted) {
+                setSelectedGoal(todayGoalId);
+                console.log('📌 快速启动，自动选中今日目标:', todayGoal.title);
+              }
+            }
+          }
         } else {
           setSelectedPlanId('free');
           setSessionName(mockPlans.name);
-          setPlannedMinutes(30);
-          setCustomDuration(30);
+          const targetDuration = durationParam ? parseInt(durationParam) : 15;
+          setPlannedMinutes(targetDuration);
+          setCustomDuration(targetDuration);
           setPlanMilestones([]);
         }
         isInitialLoadRef.current = false; // 标记已完成初始加载
       }
+      
+      // 🌟 返回是否是快速启动模式
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('quickStart') === 'true';
     };
 
     // 初始加载
-    loadPlans();
+    const isQuickStart = loadPlans();
+    
+    // 🌟 如果是快速启动，延迟后自动开始倒计时
+    if (isQuickStart) {
+      console.log('⚡ 快速启动模式，准备自动开始...');
+      const timer = setTimeout(() => {
+        if (state === 'preparing' && sessionRef.current) {
+          console.log('⚡ 快速启动 - 自动开始倒计时');
+          startFocus();
+        }
+      }, 800); // 延迟800ms确保数据加载完成
+      
+      return () => clearTimeout(timer);
+    }
     
     // 如果不在专注状态，清理旧的状态
     if (state === 'preparing') {

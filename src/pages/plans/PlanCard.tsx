@@ -37,7 +37,8 @@ interface PlanCardProps {
   onSelect?: (planId: string) => void;
   onAddMilestone?: (planId: string) => void;
   onEdit?: (planId: string) => void; // 编辑回调
-  onManageMilestone?: (planId: string) => void; // 管理里程碑回调
+  onManageMilestone?: (planId: string) => void; // 管理里程碑回调（最终目标）
+  onManageMilestones?: (planId: string) => void; // 管理小目标回调
   onDeleteCompleted?: (planId: string) => void; // 删除已完成计划回调
 }
 
@@ -51,6 +52,7 @@ export default function PlanCard({
   onAddMilestone,
   onEdit,
   onManageMilestone,
+  onManageMilestones,
   onDeleteCompleted,
 }: PlanCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -235,20 +237,18 @@ export default function PlanCard({
                 );
               })()}
 
-              {/* 快速添加小目标 & 管理里程碑 */}
+              {/* 管理小目标 & 管理里程碑 */}
               {!plan.isBlank && (
                 <div className="flex flex-wrap gap-4 mt-2">
-                  {canAddMilestone && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddMilestone?.(plan.id);
-                      }}
-                      className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
-                    >
-                      ➕ 添加小目标
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onManageMilestones?.(plan.id);
+                    }}
+                    className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
+                  >
+                    📝 管理小目标
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

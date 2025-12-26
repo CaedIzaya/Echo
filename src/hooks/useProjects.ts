@@ -84,9 +84,12 @@ export function useProjects() {
         // 更新状态
         setProjects(dbProjects);
         
-        // 写入缓存
+        // 🌟 优化：写入缓存并记录时间戳
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProjects));
         localStorage.setItem(SYNC_KEY, 'true');
+        localStorage.setItem('projectsSyncedAt', new Date().toISOString());
+        
+        console.log('[useProjects] 💾 计划数据已缓存（1小时有效期）');
         
       } else {
         console.error('[useProjects] 加载失败', response.status);
@@ -109,24 +112,27 @@ export function useProjects() {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      // 先显示缓存数据
+      // 🌟 优化：立即显示缓存数据
       const cached = loadFromCache();
       if (cached.length > 0) {
         setProjects(cached);
         setIsLoading(false);
+        console.log('[useProjects] ⚡ 使用缓存计划数据（性能优化）');
       }
       
-      // 检查是否需要同步
+      // 🌟 优化：检查同步时间戳，避免频繁查询
       const synced = localStorage.getItem(SYNC_KEY);
+      const lastSyncAt = localStorage.getItem('projectsSyncedAt');
       
-      if (!synced) {
-        // 未同步：从数据库加载
+      // 计划数据缓存1小时（极低频数据）
+      const needSync = !synced || !lastSyncAt || isProjectDataStale(lastSyncAt);
+      
+      if (needSync) {
+        console.log('[useProjects] 📊 计划数据需要同步（首次或超过1小时）');
         loadFromDatabase();
       } else {
-        // 已同步：后台刷新
-        setTimeout(() => {
-          loadFromDatabase();
-        }, 1000);
+        console.log('[useProjects] ⚡ 跳过数据库查询（缓存有效）');
+        // 不进行后台同步，除非用户主动刷新
       }
     } else {
       // 未登录：只使用缓存
@@ -212,11 +218,12 @@ export function useProjects() {
         p.id === projectId ? updatedProject : p
       ));
       
-      // 更新缓存
+      // 🌟 优化：立即更新缓存，延迟标记同步时间
       const allProjects = projects.map(p => 
         p.id === projectId ? updatedProject : p
       );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(allProjects));
+      localStorage.setItem('projectsSyncedAt', new Date().toISOString());
       
       return true;
       
@@ -377,4 +384,18 @@ export function useProjects() {
     syncToDatabase,
     reload: loadFromDatabase,
   };
+}
+
+// 检查计划数据是否过期（1小时）
+function isProjectDataStale(lastSyncAt: string): boolean {
+  try {
+    const lastSync = new Date(lastSyncAt);
+    const now = new Date();
+    const hoursSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60);
+    
+    // 计划数据超过1小时视为过期（极低频数据）
+    return hoursSinceSync > 1;
+  } catch {
+    return true;
+  }
 }
