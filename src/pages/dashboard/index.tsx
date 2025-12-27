@@ -25,9 +25,8 @@ import { useAchievements } from '~/hooks/useAchievements';
 import { useDataSync } from '~/hooks/useDataSync';
 import { useDashboardData } from '~/hooks/useDashboardData';
 import { useProjects } from '~/hooks/useProjects';
-import { useDashboardPreload } from '~/hooks/useDashboardPreload';
-import DashboardLoading from '~/components/DashboardLoading';
 import { syncToDatabase } from '~/lib/realtimeSync';
+import { userStorageJSON, getUserStorage, setUserStorage } from '~/lib/userStorage';
 import { 
   pickHomeSentence, 
   pickSentenceFromPool,
@@ -339,9 +338,6 @@ export default function Dashboard() {
     return 'unknown';
   }, [sessionStatus, userId]);
   
-  // 🔥 数据预加载系统
-  const { data: preloadedData, progress: preloadProgress } = useDashboardPreload(userId);
-  
   const [isLoading, setIsLoading] = useState(true);
   const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 小精灵状态
   const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success'>('idle'); // 用于对话框的状态
@@ -367,8 +363,7 @@ export default function Dashboard() {
   const getTodayStats = (): TodayStats => {
     if (typeof window === 'undefined') return { minutes: 0, date: '' };
     const today = getTodayDate();
-    const todayStatsData = localStorage.getItem('todayStats');
-    const allTodayStats = todayStatsData ? JSON.parse(todayStatsData) : {};
+    const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
     return allTodayStats[today] || { minutes: 0, date: today };
   };
   
@@ -412,56 +407,38 @@ export default function Dashboard() {
     localStorage.setItem('totalFocusMinutes', minutes.toString());
   };
 
-  // 保存今日数据（自动同步到数据库）
+  // 保存今日数据（使用用户隔离存储）
   const saveTodayStats = (minutes: number) => {
     if (typeof window === 'undefined') return;
     const today = getTodayDate();
-    const todayStatsData = localStorage.getItem('todayStats');
-    const allTodayStats = todayStatsData ? JSON.parse(todayStatsData) : {};
+    const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
     allTodayStats[today] = { minutes, date: today };
-    localStorage.setItem('todayStats', JSON.stringify(allTodayStats));
+    userStorageJSON.set('todayStats', allTodayStats);
     
-    // 🔥 实时同步：todayStats通过focus-sessions已经在数据库，这里触发刷新
-    console.log('📊 今日统计已更新，将在下次刷新时从数据库同步');
+    console.log('📊 今日统计已更新（用户隔离存储）');
   };
   
-  // 保存本周数据（自动同步到数据库）
+  // 保存本周数据（使用用户隔离存储）
   const saveWeeklyStats = (totalMinutes: number, weekStart: string) => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('weeklyStats', JSON.stringify({ totalMinutes, weekStart }));
+    userStorageJSON.set('weeklyStats', { totalMinutes, weekStart });
     
-    // 🔥 实时同步：weeklyStats通过focus-sessions已经在数据库，这里触发刷新
-    console.log('📊 本周统计已更新，将在下次刷新时从数据库同步');
+    console.log('📊 本周统计已更新（用户隔离存储）');
   };
 
-  // 🔥 优化：直接使用数据库数据（预加载已完成）
+  // 今日数据状态 - 🔥 优先使用数据库数据
   const [todayStats, setTodayStats] = useState<TodayStats>(() => {
-    // 优先使用预加载的数据库数据
-    if (preloadedData.isComplete && preloadedData.todayMinutes >= 0) {
-      return {
-        minutes: preloadedData.todayMinutes,
-        date: new Date().toISOString().split('T')[0],
-      };
-    }
-    // fallback到数据库Hook数据
     if (!dashboardDataLoading && dashboardData.todayMinutes >= 0) {
       return {
         minutes: dashboardData.todayMinutes,
         date: dashboardData.todayDate,
       };
     }
-    // 最后fallback到缓存
     return getTodayStats();
   });
 
   // 本周数据状态 - 🔥 优先使用数据库数据
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>(() => {
-    if (preloadedData.isComplete && preloadedData.weeklyMinutes >= 0) {
-      return {
-        totalMinutes: preloadedData.weeklyMinutes,
-        weekStart: getCurrentWeekStart(),
-      };
-    }
     if (!dashboardDataLoading && dashboardData.weeklyMinutes >= 0) {
       return {
         totalMinutes: dashboardData.weeklyMinutes,
@@ -473,9 +450,6 @@ export default function Dashboard() {
 
   // 总专注时长状态 - 🔥 优先使用数据库数据
   const [totalFocusMinutes, setTotalFocusMinutes] = useState<number>(() => {
-    if (preloadedData.isComplete && preloadedData.totalMinutes !== undefined) {
-      return preloadedData.totalMinutes;
-    }
     if (!dashboardDataLoading && dashboardData.totalMinutes >= 0) {
       return dashboardData.totalMinutes;
     }
@@ -518,8 +492,7 @@ export default function Dashboard() {
     
     // 否则使用缓存
     if (typeof window !== 'undefined') {
-      const savedPlans = localStorage.getItem('userPlans');
-      const plans = savedPlans ? JSON.parse(savedPlans) : [];
+      const plans = userStorageJSON.get<any[]>('userPlans', []);
       return plans.find((p: Project) => p.isPrimary) || null;
     }
     return null;
@@ -745,7 +718,7 @@ export default function Dashboard() {
         const updatedPlans = plans.map((p: Project) => 
           p.id === updatedPlan.id ? updatedPlan : p
         );
-        localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+        userStorageJSON.set('userPlans', updatedPlans);
       }
 
       return updatedPlan;
@@ -869,7 +842,7 @@ export default function Dashboard() {
           const updatedPlans = plans.map((p: Project) => 
             p.id === updatedPlan.id ? updatedPlan : p
           );
-          localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+          userStorageJSON.set('userPlans', updatedPlans);
         }
 
         return updatedPlan;
@@ -1056,8 +1029,7 @@ export default function Dashboard() {
       
       // 归档昨日数据
       const yesterdayDate = lastFocusDate || today;
-      const yesterdayStatsData = localStorage.getItem('todayStats');
-      const allTodayStats = yesterdayStatsData ? JSON.parse(yesterdayStatsData) : {};
+      const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
       const yesterdayMinutes = allTodayStats[yesterdayDate]?.minutes || 0;
       
       console.log('📅 新的一天开始！', {
@@ -1469,10 +1441,9 @@ export default function Dashboard() {
       // 2. 从历史 todayStats 恢复（累计所有历史日期的专注时长）
       // 注意：如果 flowMetrics 已恢复，todayStats 可能包含重复数据
       // 但为了完整性，我们仍然尝试恢复（实际使用时可以根据需要调整）
-      const todayStatsData = localStorage.getItem('todayStats');
-      if (todayStatsData) {
+      const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
+      if (allTodayStats && Object.keys(allTodayStats).length > 0) {
         try {
-          const allTodayStats = JSON.parse(todayStatsData);
           let historicalTotal = 0;
           for (const date in allTodayStats) {
             if (allTodayStats[date]?.minutes) {
@@ -1632,7 +1603,6 @@ export default function Dashboard() {
     console.log('🔍 Dashboard 加载检查', { 
       authKey,
       sessionStatus,
-      preloadComplete: preloadedData.isComplete,
       timestamp: new Date().toISOString()
     });
 
@@ -1648,15 +1618,6 @@ export default function Dashboard() {
     }
 
     if (authKey.startsWith('authenticated_')) {
-      // ✅ 优化：只在需要预加载且未完成时等待
-      if (preloadedData.shouldPreload && !preloadedData.isComplete) {
-        console.log('⏳ 首次登录，数据预加载中...', {
-          progress: `${preloadProgress.loaded}/${preloadProgress.total}`,
-          currentTask: preloadProgress.currentTask
-        });
-        return;
-      }
-      
       console.log('✅ 用户已认证，显示 Dashboard');
       setIsLoading(false);
       
@@ -1852,7 +1813,7 @@ export default function Dashboard() {
         }
       }, 800); // 延迟800ms确保页面渲染完成
     }
-  }, [authKey, preloadedData.isComplete, preloadProgress]);
+  }, [authKey]);
 
   // ============================================
   // 空闲鼓励触发逻辑（上线1分钟后未开始专注时轻引导）
@@ -1879,7 +1840,7 @@ export default function Dashboard() {
       // 重新获取当前的今日专注时长
       const currentTodayStats = (() => {
         try {
-          const data = localStorage.getItem('todayStats');
+          const data = getUserStorage('todayStats');
           if (!data) return { minutes: 0, date: today };
           const parsed = JSON.parse(data);
           const todayData = parsed[today];
@@ -2585,9 +2546,9 @@ export default function Dashboard() {
     );
   };
 
-  // 🔥 优化：只在首次登录且需要预加载时才显示加载界面
-  if (isLoading || (preloadedData.shouldPreload && !preloadedData.isComplete)) {
-    return <DashboardLoading progress={preloadProgress} message={preloadProgress.currentTask} />;
+  // 简单的loading检查（不阻塞，快速显示）
+  if (isLoading) {
+    return null; // 或者显示一个极简的loading，但通常会很快通过
   }
 
   return (
