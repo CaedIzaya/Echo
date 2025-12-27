@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallback, CSSProperties } from 'react';
 import { pickUniversalSentence } from '~/lib/echoSpiritDialogueV2';
 import { globalTimerManager } from '~/lib/performanceOptimizer';

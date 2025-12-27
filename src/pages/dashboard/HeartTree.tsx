@@ -45,6 +45,8 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
   const [isFertilizing, setIsFertilizing] = useState(false);
   const [waterOpportunities, setWaterOpportunities] = useState(props.completedMilestonesToday || 0);
   const [fertilizeOpportunities, setFertilizeOpportunities] = useState(props.newAchievementsToday || 0);
+  const [showWaterExplanation, setShowWaterExplanation] = useState(false);
+  const [showFertilizeExplanation, setShowFertilizeExplanation] = useState(false);
   const { setSafeTimeout, clearSafeTimeout } = useSafeTimeout();
   const { treeName, isLoading: isLoadingName } = useHeartTreeName();
 
@@ -669,46 +671,86 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
         {/* 操作按钮 - PC端优化，确保与其他元素协调 */}
         <div className="flex flex-row gap-4 md:gap-6 max-w-3xl mx-auto">
           {/* 浇水按钮 */}
-          <button
-            onClick={handleWater}
-            disabled={waterOpportunities <= 0 || isWatering}
-            className={`flex-1 px-4 md:px-8 py-4 md:py-6 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
-              waterOpportunities > 0 && !isWatering
-                ? 'bg-gradient-to-br from-sky-400/90 to-blue-500/90 hover:from-sky-500 hover:to-blue-600 active:scale-95 border-sky-300/50'
-                : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-3">
-              <span className="text-2xl md:text-3xl filter drop-shadow-md">💧</span>
-              <div className="text-left">
-                <div className="text-sm md:text-base">浇水</div>
-                <div className="text-[10px] md:text-xs opacity-80 font-medium">
-                  可用：{waterOpportunities}
+          <div className="flex-1 relative">
+            <button
+              onClick={handleWater}
+              disabled={waterOpportunities <= 0 || isWatering}
+              className={`w-full px-4 md:px-8 py-4 md:py-6 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border relative ${
+                waterOpportunities > 0 && !isWatering
+                  ? 'bg-gradient-to-br from-sky-400/90 to-blue-500/90 hover:from-sky-500 hover:to-blue-600 active:scale-95 border-sky-300/50'
+                  : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl md:text-3xl filter drop-shadow-md">💧</span>
+                <div className="text-left">
+                  <div className="text-sm md:text-base">浇水</div>
+                  <div className="text-[10px] md:text-xs opacity-80 font-medium">
+                    可用：{waterOpportunities}
+                  </div>
                 </div>
               </div>
-            </div>
-          </button>
+            </button>
+            {/* 半透明问号 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowWaterExplanation(!showWaterExplanation);
+              }}
+              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/50 hover:bg-white/70 backdrop-blur-sm flex items-center justify-center text-gray-600 text-sm font-bold transition-all hover:scale-110 z-10"
+            >
+              ?
+            </button>
+            {/* 解释文本 */}
+            {showWaterExplanation && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white/90 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-sky-100 z-20 animate-fade-in">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  浇水：来自一次专注
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* 施肥按钮 */}
-          <button
-            onClick={handleFertilize}
-            disabled={fertilizeOpportunities <= 0 || isFertilizing}
-            className={`flex-1 px-4 md:px-8 py-4 md:py-6 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border ${
-              fertilizeOpportunities > 0 && !isFertilizing
-                ? 'bg-gradient-to-br from-emerald-400/90 to-green-500/90 hover:from-emerald-500 hover:to-green-600 active:scale-95 border-emerald-300/50'
-                : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-3">
-              <span className="text-2xl md:text-3xl filter drop-shadow-md">✨</span>
-              <div className="text-left">
-                <div className="text-sm md:text-base">施肥</div>
-                <div className="text-[10px] md:text-xs opacity-80 font-medium">
-                  可用：{fertilizeOpportunities}
+          <div className="flex-1 relative">
+            <button
+              onClick={handleFertilize}
+              disabled={fertilizeOpportunities <= 0 || isFertilizing}
+              className={`w-full px-4 md:px-8 py-4 md:py-6 rounded-3xl font-bold text-white transition-all shadow-xl backdrop-blur-sm border relative ${
+                fertilizeOpportunities > 0 && !isFertilizing
+                  ? 'bg-gradient-to-br from-emerald-400/90 to-green-500/90 hover:from-emerald-500 hover:to-green-600 active:scale-95 border-emerald-300/50'
+                  : 'bg-gray-400/30 cursor-not-allowed border-gray-300/20'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl md:text-3xl filter drop-shadow-md">✨</span>
+                <div className="text-left">
+                  <div className="text-sm md:text-base">施肥</div>
+                  <div className="text-[10px] md:text-xs opacity-80 font-medium">
+                    可用：{fertilizeOpportunities}
+                  </div>
                 </div>
               </div>
-            </div>
-          </button>
+            </button>
+            {/* 半透明问号 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFertilizeExplanation(!showFertilizeExplanation);
+              }}
+              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/50 hover:bg-white/70 backdrop-blur-sm flex items-center justify-center text-gray-600 text-sm font-bold transition-all hover:scale-110 z-10"
+            >
+              ?
+            </button>
+            {/* 解释文本 */}
+            {showFertilizeExplanation && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white/90 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-emerald-100 z-20 animate-fade-in">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  施肥：来自一段持续投入
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
 

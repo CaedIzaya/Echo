@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import ProgressRing from './dashboard/ProgressRing';
@@ -146,7 +144,7 @@ const LandingNavbar = ({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Echo</p>
-            <p className="text-xl font-bold text-slate-900">FOCUS</p>
+            <p className="text-xl font-bold text-slate-900">数字静默</p>
           </div>
         </div>
 
@@ -240,20 +238,20 @@ const LandingHero = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500" />
             </span>
-            <span className="text-sm font-medium text-teal-700">Echo · FOCUS</span>
+            <span className="text-sm font-medium text-teal-700">Echo · 数字静默</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
-          随时专注
+          在这里,
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400">
-            重拾自我
+            重遇自我
             </span>
           </h1>
 
           <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
-            <p>你不是不努力，只是时间被切得太碎。</p>
-            <p>Echo 给你一个随时开始的理由。</p>
+            <p>你不是不努力，只是需要一个安静的地方。</p>
+            <p>Echo 是一个陪你轻轻开始的专注空间。</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">

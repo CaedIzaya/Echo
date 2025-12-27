@@ -48,7 +48,7 @@ export function getNamingGuideText(): string {
  * 固定的欢迎文案
  */
 export function getFirstMeetingText(heartTreeName: string): string {
-  return '你来了，我等候多时了\n现在，让我们一起安静成长吧\n我不会枯萎，你随时都能来看我';
+  return `从今天起，我叫${heartTreeName}\n你的专注和能量，会让我慢慢成长\n如果你愿意，我们可以一起长出新的年轮和树枝`;
 }
 
 
