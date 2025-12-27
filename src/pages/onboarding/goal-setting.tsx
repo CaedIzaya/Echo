@@ -8,6 +8,8 @@ import {
   InterestCategory,
   InterestItem,
 } from '~/lib/interestConfig';
+import LoadingOverlay from '~/components/LoadingOverlay';
+import { userStorageJSON } from '~/lib/userStorage';
 
 interface Interest {
   id: string;
@@ -414,18 +416,26 @@ export default function GoalSetting() {
         console.error('❌ 保存计划网络错误', error);
       }
       
-      // 保存到 localStorage（缓存）
-      localStorage.setItem('userPlans', JSON.stringify(existingPlans));
+      // 保存到用户隔离的localStorage（缓存）
+      userStorageJSON.set('userPlans', existingPlans);
 
-      if (!allowReturn) {
+      // ✅ 关键修复：只有在新用户首次创建计划时，才标记onboarding完成
+      if (!allowReturn && !isEditMode) {
         try {
-          await fetch('/api/user/complete-onboarding', {
+          console.log('📝 标记 onboarding 完成...');
+          const onboardingResponse = await fetch('/api/user/complete-onboarding', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan: newPlan })
           });
+          
+          if (onboardingResponse.ok) {
+            console.log('✅ Onboarding 已标记为完成');
+          } else {
+            console.error('❌ 标记 onboarding 完成失败');
+          }
         } catch (error) {
-          console.warn('完成引导API调用失败:', error);
+          console.error('❌ 完成引导API调用失败:', error);
+          // 不阻塞用户流程，继续跳转
         }
       }
 
@@ -449,6 +459,11 @@ export default function GoalSetting() {
   };
 
   if (!isAuthorized || !focusedInterest) return null;
+  
+  // 显示loading遮罩
+  if (isSubmitting) {
+    return <LoadingOverlay message="正在创建计划..." />;
+  }
 
   // 渲染分支选择页面
   const renderBranch = () => {

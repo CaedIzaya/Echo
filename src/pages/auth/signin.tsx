@@ -1,6 +1,8 @@
 import { signIn } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import LoadingOverlay from "~/components/LoadingOverlay";
+import { setCurrentUserId, migrateToUserStorage } from "~/lib/userStorage";
 
 export default function SignIn() {
   const router = useRouter();
@@ -109,6 +111,16 @@ export default function SignIn() {
       const session = await response.json();
       console.log("登录后获取的 session:", session);
       
+      // 🔥 设置用户ID，启用数据隔离
+      if (session?.user?.id) {
+        setCurrentUserId(session.user.id);
+        console.log('✅ 登录成功，已设置用户ID:', session.user.id);
+        
+        // 迁移旧数据到用户隔离存储（首次登录）
+        const migrationKeys = ['userPlans', 'todayStats', 'weeklyStats', 'focusSession', 'achievedAchievements'];
+        migrateToUserStorage(migrationKeys);
+      }
+      
       if (session?.user?.hasCompletedOnboarding) {
         console.log("用户已完成 onboarding，跳转到仪表盘");
         router.push("/dashboard");
@@ -198,6 +210,14 @@ export default function SignIn() {
           });
           
           if (loginResult?.ok) {
+            // 🔥 注册成功后，获取用户ID并设置
+            const sessionResponse = await fetch('/api/auth/session');
+            const sessionData = await sessionResponse.json();
+            if (sessionData?.user?.id) {
+              setCurrentUserId(sessionData.user.id);
+              console.log('✅ 注册成功，已设置用户ID:', sessionData.user.id);
+            }
+            
             if (typeof window !== "undefined") {
               sessionStorage.setItem("forceOnboarding", "true");
             }
@@ -556,6 +576,9 @@ export default function SignIn() {
           animation: signin-wave-flow 25s linear infinite;
         }
       `}</style>
+      
+      {/* 加载遮罩 */}
+      {isLoading && <LoadingOverlay message={isLogin ? "登录中..." : "注册中..."} />}
     </div>
   );
 }

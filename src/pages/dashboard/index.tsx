@@ -25,6 +25,9 @@ import { useAchievements } from '~/hooks/useAchievements';
 import { useDataSync } from '~/hooks/useDataSync';
 import { useDashboardData } from '~/hooks/useDashboardData';
 import { useProjects } from '~/hooks/useProjects';
+import { useDashboardPreload } from '~/hooks/useDashboardPreload';
+import DashboardLoading from '~/components/DashboardLoading';
+import { syncToDatabase } from '~/lib/realtimeSync';
 import { 
   pickHomeSentence, 
   pickSentenceFromPool,
@@ -336,6 +339,9 @@ export default function Dashboard() {
     return 'unknown';
   }, [sessionStatus, userId]);
   
+  // 🔥 数据预加载系统
+  const { data: preloadedData, progress: preloadProgress } = useDashboardPreload(userId);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 小精灵状态
   const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success'>('idle'); // 用于对话框的状态
@@ -406,7 +412,7 @@ export default function Dashboard() {
     localStorage.setItem('totalFocusMinutes', minutes.toString());
   };
 
-  // 保存今日数据
+  // 保存今日数据（自动同步到数据库）
   const saveTodayStats = (minutes: number) => {
     if (typeof window === 'undefined') return;
     const today = getTodayDate();
@@ -414,46 +420,66 @@ export default function Dashboard() {
     const allTodayStats = todayStatsData ? JSON.parse(todayStatsData) : {};
     allTodayStats[today] = { minutes, date: today };
     localStorage.setItem('todayStats', JSON.stringify(allTodayStats));
+    
+    // 🔥 实时同步：todayStats通过focus-sessions已经在数据库，这里触发刷新
+    console.log('📊 今日统计已更新，将在下次刷新时从数据库同步');
   };
   
-  // 保存本周数据
+  // 保存本周数据（自动同步到数据库）
   const saveWeeklyStats = (totalMinutes: number, weekStart: string) => {
     if (typeof window === 'undefined') return;
     localStorage.setItem('weeklyStats', JSON.stringify({ totalMinutes, weekStart }));
+    
+    // 🔥 实时同步：weeklyStats通过focus-sessions已经在数据库，这里触发刷新
+    console.log('📊 本周统计已更新，将在下次刷新时从数据库同步');
   };
 
-  // 今日数据状态 - 🔥 优先使用数据库数据
+  // 🔥 优化：直接使用数据库数据（预加载已完成）
   const [todayStats, setTodayStats] = useState<TodayStats>(() => {
-    const cached = getTodayStats();
-    // 如果有数据库数据且不在加载中，使用数据库数据
+    // 优先使用预加载的数据库数据
+    if (preloadedData.isComplete && preloadedData.todayMinutes >= 0) {
+      return {
+        minutes: preloadedData.todayMinutes,
+        date: new Date().toISOString().split('T')[0],
+      };
+    }
+    // fallback到数据库Hook数据
     if (!dashboardDataLoading && dashboardData.todayMinutes >= 0) {
       return {
         minutes: dashboardData.todayMinutes,
         date: dashboardData.todayDate,
       };
     }
-    return cached;
+    // 最后fallback到缓存
+    return getTodayStats();
   });
 
   // 本周数据状态 - 🔥 优先使用数据库数据
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>(() => {
-    const cached = getWeeklyStats();
+    if (preloadedData.isComplete && preloadedData.weeklyMinutes >= 0) {
+      return {
+        totalMinutes: preloadedData.weeklyMinutes,
+        weekStart: getCurrentWeekStart(),
+      };
+    }
     if (!dashboardDataLoading && dashboardData.weeklyMinutes >= 0) {
       return {
         totalMinutes: dashboardData.weeklyMinutes,
         weekStart: dashboardData.weekStart,
       };
     }
-    return cached;
+    return getWeeklyStats();
   });
 
   // 总专注时长状态 - 🔥 优先使用数据库数据
   const [totalFocusMinutes, setTotalFocusMinutes] = useState<number>(() => {
-    const cached = getTotalFocusMinutes();
+    if (preloadedData.isComplete && preloadedData.totalMinutes !== undefined) {
+      return preloadedData.totalMinutes;
+    }
     if (!dashboardDataLoading && dashboardData.totalMinutes >= 0) {
       return dashboardData.totalMinutes;
     }
-    return cached;
+    return getTotalFocusMinutes();
   });
 
   // 从localStorage加载统计数据（其他数据）- 🔥 streakDays 优先使用数据库
@@ -1160,6 +1186,17 @@ export default function Dashboard() {
       week: { totalMinutes: newWeeklyMinutes, weekStart: currentWeekStartDate },
       total: { totalMinutes: newTotalMinutes }
     });
+    
+    // 🔥 关键修复：专注完成后，延迟刷新数据库数据，确保跨设备一致性
+    setTimeout(async () => {
+      try {
+        console.log('🔄 专注完成，从数据库刷新统计数据（确保跨设备一致）...');
+        await refreshDashboardData(); // 从数据库重新加载todayStats、weeklyStats等
+        console.log('✅ 统计数据已从数据库刷新');
+      } catch (error) {
+        console.error('❌ 刷新统计数据失败:', error);
+      }
+    }, 3000); // 延迟3秒，确保数据库已写入
 
     // 更新行为得分（用于临时心流倍率）
   const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
@@ -1590,16 +1627,17 @@ export default function Dashboard() {
     }
   }, []); // 只在组件挂载时检查一次
 
-  // 简化的认证检查 - 不加载任何数据
+  // 🔥 优化的认证和数据加载检查
   useEffect(() => {
-    console.log('🔍 useEffect 触发（简化版 - 无API调用）', { 
+    console.log('🔍 Dashboard 加载检查', { 
       authKey,
       sessionStatus,
+      preloadComplete: preloadedData.isComplete,
       timestamp: new Date().toISOString()
     });
 
     if (authKey === 'loading') {
-      console.log('⏳ Session 加载中，跳过');
+      console.log('⏳ Session 加载中，等待...');
       return;
     }
 
@@ -1610,7 +1648,16 @@ export default function Dashboard() {
     }
 
     if (authKey.startsWith('authenticated_')) {
-      console.log('✅ 用户已通过认证，展示内容（无API调用）');
+      // ✅ 优化：只在需要预加载且未完成时等待
+      if (preloadedData.shouldPreload && !preloadedData.isComplete) {
+        console.log('⏳ 首次登录，数据预加载中...', {
+          progress: `${preloadProgress.loaded}/${preloadProgress.total}`,
+          currentTask: preloadProgress.currentTask
+        });
+        return;
+      }
+      
+      console.log('✅ 用户已认证，显示 Dashboard');
       setIsLoading(false);
       
       // 延迟一会确保页面已渲染完成
@@ -1805,7 +1852,7 @@ export default function Dashboard() {
         }
       }, 800); // 延迟800ms确保页面渲染完成
     }
-  }, [authKey]);
+  }, [authKey, preloadedData.isComplete, preloadProgress]);
 
   // ============================================
   // 空闲鼓励触发逻辑（上线1分钟后未开始专注时轻引导）
@@ -2537,6 +2584,11 @@ export default function Dashboard() {
       </>
     );
   };
+
+  // 🔥 优化：只在首次登录且需要预加载时才显示加载界面
+  if (isLoading || (preloadedData.shouldPreload && !preloadedData.isComplete)) {
+    return <DashboardLoading progress={preloadProgress} message={preloadProgress.currentTask} />;
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 relative pb-24">

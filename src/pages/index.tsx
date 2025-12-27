@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import ProgressRing from './dashboard/ProgressRing';
 import EchoSpirit from './dashboard/EchoSpirit';
+import { setCurrentUserId, migrateToUserStorage } from '~/lib/userStorage';
 
 const FOCUS_QUOTES = [
   { text: 'Attention is the rarest and purest form of generosity.', author: 'Simone Weil' },
@@ -814,6 +815,16 @@ export default function Home() {
       if (session?.user) {
         setAuthStatus(`已登录: ${session.user.email}`);
         console.log("首页：用户已登录，检查 onboarding 状态:", session.user.hasCompletedOnboarding);
+        
+        // 设置当前用户ID，启用用户隔离存储
+        if (session.user.id) {
+          setCurrentUserId(session.user.id);
+          
+          // 迁移旧数据到用户隔离存储（首次登录）
+          const migrationKeys = ['userPlans', 'todayStats', 'weeklyStats', 'focusSession'];
+          migrateToUserStorage(migrationKeys);
+        }
+        
         handleAuthenticatedUser(session);
       } else {
         setAuthStatus('未登录');
@@ -833,6 +844,12 @@ export default function Home() {
   };
 
   const handleAuthenticatedUser = (session: any) => {
+    // 设置当前用户ID，启用用户隔离存储
+    if (session?.user?.id) {
+      setCurrentUserId(session.user.id);
+      console.log('✅ 已设置用户ID:', session.user.id);
+    }
+    
     // 短暂延迟让用户看到状态
     setTimeout(() => {
       const forceOnboarding = shouldForceOnboarding();
@@ -872,18 +889,14 @@ export default function Home() {
         return;
       }
 
+      // ✅ 修复：只有真正完成onboarding才跳转dashboard
       if (session.user.hasCompletedOnboarding) {
         router.push('/dashboard');
         return;
       }
-
-      markOnboardingCompleteSilently()
-        .catch(() => {
-          // 已记录日志，忽略错误
-        })
-        .finally(() => {
-          router.push('/dashboard');
-        });
+      
+      // 如果没有完成onboarding，跳转到onboarding页面
+      router.push('/onboarding');
     }, 1000);
   };
 
