@@ -146,7 +146,7 @@ const LandingNavbar = ({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Echo</p>
-            <p className="text-xl font-bold text-slate-900">FOCUS</p>
+            <p className="text-xl font-bold text-slate-900">回心</p>
           </div>
         </div>
 
@@ -240,7 +240,7 @@ const LandingHero = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500" />
             </span>
-            <span className="text-sm font-medium text-teal-700">Echo · FOCUS</span>
+            <span className="text-sm font-medium text-teal-700">Echo · 回心</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
@@ -929,7 +929,7 @@ export default function Home() {
       <div className="min-h-screen bg-gradient-to-br from-teal-600 via-cyan-600 to-sky-500 text-white flex flex-col items-center justify-center relative overflow-hidden font-sans">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.12),transparent_60%)]" />
         <div className="relative z-10 flex flex-col items-center gap-10 px-6 text-center">
-          <p className="text-xs tracking-[0.4em] uppercase text-white/70">Echo Focus</p>
+          <p className="text-xs tracking-[0.4em] uppercase text-white/70">Echo 回心</p>
           <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">专注准备中...</h1>
           <div className="flex items-end justify-center gap-3 h-10">
             {[0, 1, 2].map((dot) => (
