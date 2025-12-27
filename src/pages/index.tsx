@@ -145,11 +145,7 @@ const LandingNavbar = ({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Echo</p>
-<<<<<<< HEAD
-            <p className="text-xl font-bold text-slate-900">数字静默</p>
-=======
             <p className="text-xl font-bold text-slate-900">回心</p>
->>>>>>> 265f839f688da58bde7f9a79a39def56990599ec
           </div>
         </div>
 
@@ -243,11 +239,7 @@ const LandingHero = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500" />
             </span>
-<<<<<<< HEAD
-            <span className="text-sm font-medium text-teal-700">Echo · 数字静默</span>
-=======
             <span className="text-sm font-medium text-teal-700">Echo · 回心</span>
->>>>>>> 265f839f688da58bde7f9a79a39def56990599ec
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
