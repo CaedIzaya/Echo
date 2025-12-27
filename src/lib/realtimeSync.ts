@@ -86,7 +86,7 @@ class RealtimeSyncManager {
     }
     
     // 触发同步（延迟执行，批量处理）
-    this.scheduleSyncn();
+    this.scheduleSync();
   }
   
   /**
@@ -290,4 +290,6 @@ export const syncedStorage = {
 };
 
 export default realtimeSyncManager;
+
+
 
