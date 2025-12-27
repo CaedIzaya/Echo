@@ -363,7 +363,7 @@ export default function Dashboard() {
   const getTodayStats = (): TodayStats => {
     if (typeof window === 'undefined') return { minutes: 0, date: '' };
     const today = getTodayDate();
-    const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
+    const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {}) || {};
     return allTodayStats[today] || { minutes: 0, date: today };
   };
   
@@ -411,7 +411,7 @@ export default function Dashboard() {
   const saveTodayStats = (minutes: number) => {
     if (typeof window === 'undefined') return;
     const today = getTodayDate();
-    const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
+    const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {}) || {};
     allTodayStats[today] = { minutes, date: today };
     userStorageJSON.set('todayStats', allTodayStats);
     
@@ -492,7 +492,7 @@ export default function Dashboard() {
     
     // 否则使用缓存
     if (typeof window !== 'undefined') {
-      const plans = userStorageJSON.get<any[]>('userPlans', []);
+      const plans = userStorageJSON.get<any[]>('userPlans', []) || [];
       return plans.find((p: Project) => p.isPrimary) || null;
     }
     return null;
@@ -1029,7 +1029,7 @@ export default function Dashboard() {
       
       // 归档昨日数据
       const yesterdayDate = lastFocusDate || today;
-      const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
+      const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {}) || {};
       const yesterdayMinutes = allTodayStats[yesterdayDate]?.minutes || 0;
       
       console.log('📅 新的一天开始！', {
@@ -1441,8 +1441,8 @@ export default function Dashboard() {
       // 2. 从历史 todayStats 恢复（累计所有历史日期的专注时长）
       // 注意：如果 flowMetrics 已恢复，todayStats 可能包含重复数据
       // 但为了完整性，我们仍然尝试恢复（实际使用时可以根据需要调整）
-      const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {});
-      if (allTodayStats && Object.keys(allTodayStats).length > 0) {
+      const allTodayStats = userStorageJSON.get<Record<string, any>>('todayStats', {}) || {};
+      if (Object.keys(allTodayStats).length > 0) {
         try {
           let historicalTotal = 0;
           for (const date in allTodayStats) {

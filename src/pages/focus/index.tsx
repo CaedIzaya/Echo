@@ -292,7 +292,7 @@ export default function Focus() {
       setCustomDuration(plan.dailyGoalMinutes || 30);
         
         // 从用户隔离存储加载计划的小目标 - 只加载未完成的
-        const savedPlans = userStorageJSON.get<any[]>('userPlans', []);
+        const savedPlans = userStorageJSON.get<any[]>('userPlans', []) || [];
         const selectedPlan = savedPlans.find((p: any) => p.id === value);
         if (selectedPlan && selectedPlan.milestones) {
           // 过滤掉已完成的小目标
@@ -324,7 +324,7 @@ export default function Focus() {
     const loadPlans = (shouldResetSelection: boolean = false) => {
       console.log('🔄 重新加载计划数据...', { shouldResetSelection });
       // 加载可用计划 - 过滤掉已完成的计划
-      const allPlans = userStorageJSON.get<any[]>('userPlans', []);
+      const allPlans = userStorageJSON.get<any[]>('userPlans', []) || [];
       const activePlans = allPlans.filter((p: any) => !p.isCompleted);
       setAvailablePlans(activePlans);
       const primary = activePlans.find((p:any) => p.isPrimary);
@@ -858,7 +858,7 @@ export default function Focus() {
 
     // 如果是选择计划（非自由时间），将自定义小目标添加到计划中
     if (selectedPlanId !== 'free' && customGoals.length > 0) {
-      const savedPlans = userStorageJSON.get<any[]>('userPlans', []);
+      const savedPlans = userStorageJSON.get<any[]>('userPlans', []) || [];
       const updatedPlans = savedPlans.map((p: any) => {
         if (p.id === selectedPlanId) {
           // 找到当前小目标的最大order值

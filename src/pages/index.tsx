@@ -894,7 +894,7 @@ export default function Home() {
         router.push('/dashboard');
         return;
       }
-      
+
       // 如果没有完成onboarding，跳转到onboarding页面
       router.push('/onboarding');
     }, 1000);
