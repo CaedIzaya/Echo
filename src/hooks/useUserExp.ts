@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { LevelManager } from '~/lib/LevelSystem';
 import { setProtectionMarker } from '~/lib/DataIntegritySystem';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 const STORAGE_KEY = 'userExp';
 const SYNC_KEY = 'userExpSynced';
 
 function readLocalExp(): number {
   if (typeof window === 'undefined') return 0;
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = getUserStorage(STORAGE_KEY);
   const parsed = raw ? parseFloat(raw) : 0;
   return Number.isFinite(parsed) ? Math.max(parsed, 0) : 0;
 }
@@ -58,15 +59,15 @@ export function useUserExp() {
         
         setUserExp(useExp);
         setUserLevel(levelInfo.currentLevel);
-        localStorage.setItem(STORAGE_KEY, useExp.toString());
+        setUserStorage(STORAGE_KEY, useExp.toString());
         
-        // ✅ 如果 localStorage 的值大于数据库，说明数据库数据过期或同步失败
+        // ✅ 如果用户localStorage的值大于数据库，说明数据库数据过期或同步失败
         if (localExp > dbExp) {
-          console.warn('[useUserExp] ⚠️ 检测到数据不一致！localStorage经验值高于数据库');
+          console.warn('[useUserExp] ⚠️ 检测到数据不一致！用户localStorage经验值高于数据库');
           console.warn('[useUserExp] 🔧 使用localStorage数据并同步到数据库，防止经验值丢失');
           
           // 自动修复：同步到数据库
-          localStorage.setItem(SYNC_KEY, 'false');
+          setUserStorage(SYNC_KEY, 'false');
           const syncResponse = await fetch('/api/user/exp/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -75,14 +76,16 @@ export function useUserExp() {
           
           if (syncResponse.ok) {
             console.log('[useUserExp] ✅ 数据已修复并同步到数据库');
-            localStorage.setItem(SYNC_KEY, 'true');
+            setUserStorage(SYNC_KEY, 'true');
+            setUserStorage('userExpSyncedAt', new Date().toISOString());
           } else {
             console.error('[useUserExp] ❌ 同步到数据库失败，但本地数据已保留');
           }
         } else {
           // 数据库的值 >= localStorage，使用数据库的值
-          localStorage.setItem(SYNC_KEY, 'true');
-          console.log('[useUserExp] ✅ 从数据库加载经验:', useExp, '等级:', levelInfo.currentLevel);
+          setUserStorage(SYNC_KEY, 'true');
+          setUserStorage('userExpSyncedAt', new Date().toISOString());
+          console.log('[useUserExp] ✅ 从数据库加载经验:', useExp, '等级:', levelInfo.currentLevel, '（用户:', session.user.id, '）');
         }
       }
     } catch (error) {
@@ -99,44 +102,38 @@ export function useUserExp() {
     }
   }, [session?.user?.id]);
 
-  // 初始化：优先从数据库加载
+  // 初始化：数据库优先
   useEffect(() => {
     if (status === 'loading') return;
 
-    if (status === 'authenticated') {
-      // 🌟 优化：检查缓存时间戳，避免频繁查询
-      const synced = localStorage.getItem(SYNC_KEY);
-      const lastSyncAt = localStorage.getItem('userExpSyncedAt');
+    if (status === 'authenticated' && session?.user?.id) {
+      // 🔥 新策略：从数据库加载，确保用户隔离
+      const synced = getUserStorage(SYNC_KEY);
+      const lastSyncAt = getUserStorage('userExpSyncedAt');
       
-      // 先立即显示 localStorage 数据（用户体验优先）
-      const localExp = readLocalExp();
-      if (localExp > 0) {
-        setUserExp(localExp);
-        const levelInfo = LevelManager.calculateLevel(localExp);
-        setUserLevel(levelInfo.currentLevel);
-      }
-      setIsLoading(false);
-      
-      // 🌟 优化：仅在未同步或超过1小时时才查询数据库
       const needSync = !synced || !lastSyncAt || isExpDataStale(lastSyncAt);
       
       if (needSync) {
-        console.log('[useUserExp] 📊 经验值需要同步（首次或超过1小时）');
+        console.log('[useUserExp] 📊 从数据库加载经验值（首次或超过1小时）');
         loadFromDatabase();
       } else {
-        console.log('[useUserExp] ⚡ 使用缓存经验值（性能优化）');
+        // 使用用户缓存
+        const localExp = readLocalExp();
+        if (localExp > 0) {
+          setUserExp(localExp);
+          const levelInfo = LevelManager.calculateLevel(localExp);
+          setUserLevel(levelInfo.currentLevel);
+        }
+        setIsLoading(false);
+        console.log('[useUserExp] ⚡ 使用用户缓存经验值');
       }
     } else {
-      // 未登录：只使用 localStorage
-      const localExp = readLocalExp();
-      if (localExp > 0) {
-        setUserExp(localExp);
-        const levelInfo = LevelManager.calculateLevel(localExp);
-        setUserLevel(levelInfo.currentLevel);
-      }
+      // 未登录：清空数据
+      setUserExp(0);
+      setUserLevel(1);
       setIsLoading(false);
     }
-  }, [status, loadFromDatabase]);
+  }, [status, session?.user?.id, loadFromDatabase]);
 
   // 更新经验值
   const updateUserExp = useCallback(async (newExp: number) => {
@@ -156,9 +153,9 @@ export function useUserExp() {
       // 计算等级
       const levelInfo = LevelManager.calculateLevel(newExp);
       
-      // 立即更新 localStorage（用户体验优先）
-      localStorage.setItem(STORAGE_KEY, newExp.toString());
-      localStorage.setItem(SYNC_KEY, 'false');
+      // 1. 立即更新用户隔离的localStorage（用户体验优先）
+      setUserStorage(STORAGE_KEY, newExp.toString());
+      setUserStorage(SYNC_KEY, 'false');
       setUserExp(newExp);
       setUserLevel(levelInfo.currentLevel);
       
@@ -167,33 +164,27 @@ export function useUserExp() {
         setProtectionMarker('exp_milestone');
       }
 
-      // 🌟 优化：延迟同步到数据库，避免阻塞UI
+      // 2. 立即同步到数据库（不延迟）
       if (session?.user?.id) {
-        // 标记为待同步状态
-        localStorage.setItem(SYNC_KEY, 'false');
-        
-        // 延迟同步（500ms后）
-        setTimeout(async () => {
-          try {
-            const response = await fetch('/api/user/exp/update', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userExp: newExp }),
-            });
+        try {
+          const response = await fetch('/api/user/exp/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userExp: newExp }),
+          });
 
-            if (!response.ok) {
-              const error = await response.json();
-              console.error('[useUserExp] 保存到数据库失败:', error);
-              // 数据库保存失败，但 localStorage 已更新，仍然算成功
-            } else {
-              console.log('[useUserExp] ✅ 经验值已同步到数据库');
-              localStorage.setItem(SYNC_KEY, 'true');
-              localStorage.setItem('userExpSyncedAt', new Date().toISOString());
-            }
-          } catch (error) {
-            console.error('[useUserExp] 同步异常:', error);
+          if (!response.ok) {
+            const error = await response.json();
+            console.error('[useUserExp] ❌ 保存到数据库失败:', error);
+            // 数据库保存失败，但 localStorage 已更新，仍然算成功
+          } else {
+            console.log('[useUserExp] ✅ 经验值已同步到数据库');
+            setUserStorage(SYNC_KEY, 'true');
+            setUserStorage('userExpSyncedAt', new Date().toISOString());
           }
-        }, 500);
+        } catch (error) {
+          console.error('[useUserExp] ❌ 同步异常:', error);
+        }
       }
 
       return true;
@@ -222,7 +213,7 @@ export function useUserExp() {
     }
 
     try {
-      localStorage.setItem(SYNC_KEY, 'false');
+      setUserStorage(SYNC_KEY, 'false');
       const response = await fetch('/api/user/exp/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,14 +221,15 @@ export function useUserExp() {
       });
 
       if (response.ok) {
-        console.log('[useUserExp] 同步到数据库成功');
-        localStorage.setItem(SYNC_KEY, 'true');
+        console.log('[useUserExp] ✅ 同步到数据库成功');
+        setUserStorage(SYNC_KEY, 'true');
+        setUserStorage('userExpSyncedAt', new Date().toISOString());
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error('[useUserExp] 同步失败:', error);
+      console.error('[useUserExp] ❌ 同步失败:', error);
       return false;
     }
   }, [session?.user?.id]);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { getUserStorage, setUserStorage, userStorageJSON } from '~/lib/userStorage';
 
 const STORAGE_KEY = 'achievedAchievements';
 const SYNC_KEY = 'achievementsSynced';
@@ -16,7 +17,7 @@ export function useAchievements() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUnlocking, setIsUnlocking] = useState(false);
 
-  // 从数据库加载成就
+  // 从数据库加载成就（数据库优先）
   const loadFromDatabase = useCallback(async () => {
     if (!session?.user?.id) return;
 
@@ -26,24 +27,25 @@ export function useAchievements() {
         const data = await response.json() as { achievements: Array<{ id: string; category: string; unlockedAt: string }> };
         const ids = new Set<string>(data.achievements.map((a) => a.id));
         
-        // 更新状态和 localStorage
+        // 更新状态和用户隔离的localStorage
         setAchievedIds(ids);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(ids)));
-        localStorage.setItem(SYNC_KEY, 'true');
+        userStorageJSON.set(STORAGE_KEY, Array.from(ids));
+        setUserStorage(SYNC_KEY, 'true');
+        setUserStorage('achievementsSyncedAt', new Date().toISOString());
         
-        console.log('[useAchievements] 从数据库加载成就:', ids.size, '个');
+        console.log('[useAchievements] ✅ 从数据库加载成就:', ids.size, '个（用户:', session.user.id, '）');
       }
     } catch (error) {
-      console.error('[useAchievements] 加载失败:', error);
-      // 失败时使用 localStorage 的值
-      const stored = localStorage.getItem(STORAGE_KEY);
+      console.error('[useAchievements] ❌ 加载失败:', error);
+      // 失败时使用用户隔离的localStorage
+      const stored = getUserStorage(STORAGE_KEY);
       if (stored) {
         try {
           const idsArray = JSON.parse(stored) as string[];
           const ids = new Set<string>(idsArray);
           setAchievedIds(ids);
         } catch (e) {
-          console.error('[useAchievements] 解析 localStorage 失败:', e);
+          console.error('[useAchievements] 解析失败:', e);
         }
       }
     } finally {
@@ -51,52 +53,38 @@ export function useAchievements() {
     }
   }, [session?.user?.id]);
 
-  // 初始化
+  // 初始化（数据库优先）
   useEffect(() => {
     if (status === 'loading') return;
 
-    if (status === 'authenticated') {
-      // 🌟 优化：立即显示 localStorage 数据
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const idsArray = JSON.parse(stored) as string[];
-          const ids = new Set<string>(idsArray);
-          setAchievedIds(ids);
-        } catch (e) {
-          console.error('[useAchievements] 解析失败:', e);
-        }
-      }
-      setIsLoading(false);
-      
-      // 🌟 优化：仅在未同步或超过24小时时才查询数据库（极低频数据）
-      const synced = localStorage.getItem(SYNC_KEY);
-      const lastSyncAt = localStorage.getItem('achievementsSyncedAt');
+    if (status === 'authenticated' && session?.user?.id) {
+      // 🔥 新策略：从数据库加载，确保数据正确
+      const synced = getUserStorage(SYNC_KEY);
+      const lastSyncAt = getUserStorage('achievementsSyncedAt');
       
       const needSync = !synced || !lastSyncAt || isAchievementDataStale(lastSyncAt);
       
       if (needSync) {
-        console.log('[useAchievements] 📊 成就数据需要同步（首次或超过24小时）');
+        console.log('[useAchievements] 📊 从数据库加载成就（首次或超过24小时）');
         loadFromDatabase();
       } else {
-        console.log('[useAchievements] ⚡ 跳过数据库查询（缓存有效，极低频数据）');
+        // 先用缓存，后台刷新
+        const storedArray = userStorageJSON.get<string[]>(STORAGE_KEY);
+        if (storedArray) {
+          const ids = new Set<string>(storedArray);
+          setAchievedIds(ids);
+        }
+        setIsLoading(false);
+        console.log('[useAchievements] ⚡ 使用用户缓存');
       }
     } else {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const idsArray = JSON.parse(stored) as string[];
-          const ids = new Set<string>(idsArray);
-          setAchievedIds(ids);
-        } catch (e) {
-          console.error('[useAchievements] 解析失败:', e);
-        }
-      }
+      // 未登录，清空数据
+      setAchievedIds(new Set());
       setIsLoading(false);
     }
-  }, [status, loadFromDatabase]);
+  }, [status, session?.user?.id, loadFromDatabase]);
 
-  // 解锁成就
+  // 解锁成就（立即同步到数据库）
   const unlockAchievement = useCallback(async (achievementId: string, category: string) => {
     if (achievedIds.has(achievementId)) {
       console.log('[useAchievements] 成就已解锁:', achievementId);
@@ -106,41 +94,35 @@ export function useAchievements() {
     setIsUnlocking(true);
 
     try {
-      // 立即更新 localStorage
+      // 1. 立即更新本地状态和用户localStorage
       const newIds = new Set(achievedIds);
       newIds.add(achievementId);
       setAchievedIds(newIds);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(newIds)));
+      userStorageJSON.set(STORAGE_KEY, Array.from(newIds));
 
-      // 🌟 优化：延迟同步到数据库（成就是极低频数据，不阻塞UI）
+      // 2. 立即同步到数据库
       if (session?.user?.id) {
-        localStorage.setItem(SYNC_KEY, 'false');
+        setUserStorage(SYNC_KEY, 'false');
         
-        setTimeout(async () => {
-          try {
-            const response = await fetch('/api/achievements/unlock', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ achievementId, category }),
-            });
+        const response = await fetch('/api/achievements/unlock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ achievementId, category }),
+        });
 
-            if (!response.ok) {
-              const error = await response.json();
-              console.error('[useAchievements] 保存到数据库失败:', error);
-            } else {
-              console.log('[useAchievements] ✅ 成就已同步到数据库:', achievementId);
-              localStorage.setItem(SYNC_KEY, 'true');
-              localStorage.setItem('achievementsSyncedAt', new Date().toISOString());
-            }
-          } catch (error) {
-            console.error('[useAchievements] 同步异常:', error);
-          }
-        }, 800); // 延迟800ms，避免阻塞
+        if (!response.ok) {
+          const error = await response.json();
+          console.error('[useAchievements] ❌ 保存到数据库失败:', error);
+        } else {
+          console.log('[useAchievements] ✅ 成就已同步到数据库:', achievementId);
+          setUserStorage(SYNC_KEY, 'true');
+          setUserStorage('achievementsSyncedAt', new Date().toISOString());
+        }
       }
 
       return true; // 新解锁
     } catch (error) {
-      console.error('[useAchievements] 解锁失败:', error);
+      console.error('[useAchievements] ❌ 解锁失败:', error);
       return false;
     } finally {
       setIsUnlocking(false);
@@ -172,16 +154,15 @@ export function useAchievements() {
   const syncToDatabase = useCallback(async () => {
     if (!session?.user?.id) return false;
 
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
+    const storedArray = userStorageJSON.get<string[]>(STORAGE_KEY);
+    if (!storedArray || storedArray.length === 0) {
       return true;
     }
 
     try {
-      const ids = JSON.parse(stored) as string[];
       let successCount = 0;
 
-      for (const id of ids) {
+      for (const id of storedArray) {
         // 假设 category 为 'common'，实际应该从成就定义中获取
         const response = await fetch('/api/achievements/unlock', {
           method: 'POST',
@@ -194,11 +175,12 @@ export function useAchievements() {
         }
       }
 
-      console.log(`[useAchievements] 同步成功 ${successCount}/${ids.length} 个成就`);
-      localStorage.setItem(SYNC_KEY, 'true');
+      console.log(`[useAchievements] ✅ 同步成功 ${successCount}/${storedArray.length} 个成就`);
+      setUserStorage(SYNC_KEY, 'true');
+      setUserStorage('achievementsSyncedAt', new Date().toISOString());
       return true;
     } catch (error) {
-      console.error('[useAchievements] 同步失败:', error);
+      console.error('[useAchievements] ❌ 同步失败:', error);
       return false;
     }
   }, [session?.user?.id]);
