@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 const STORAGE_KEY = 'heartTreeNameV1';
 const SYNC_KEY = 'heartTreeNameSynced';
@@ -17,7 +16,7 @@ export function useHeartTreeName() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 从数据库加载心树名字（数据库优先）
+  // 从数据库加载心树名字
   const loadFromDatabase = useCallback(async () => {
     if (!session?.user?.id) return;
 
@@ -27,17 +26,17 @@ export function useHeartTreeName() {
         const data = await response.json();
         const name = data.heartTreeName || '心树';
         
-        // 更新状态和用户隔离的localStorage
+        // 更新状态和 localStorage
         setTreeName(name);
-        setUserStorage(STORAGE_KEY, name);
-        setUserStorage(SYNC_KEY, 'true');
+        localStorage.setItem(STORAGE_KEY, name);
+        localStorage.setItem(SYNC_KEY, 'true');
         
-        console.log('[useHeartTreeName] ✅ 从数据库加载心树名字:', name, '（用户:', session.user.id, '）');
+        console.log('[useHeartTreeName] 从数据库加载心树名字:', name);
       }
     } catch (error) {
-      console.error('[useHeartTreeName] ❌ 加载失败:', error);
-      // 失败时使用用户隔离的localStorage
-      const localName = getUserStorage(STORAGE_KEY);
+      console.error('[useHeartTreeName] 加载失败:', error);
+      // 失败时使用 localStorage 的值
+      const localName = localStorage.getItem(STORAGE_KEY);
       if (localName) {
         setTreeName(localName);
       }
@@ -46,36 +45,37 @@ export function useHeartTreeName() {
     }
   }, [session?.user?.id]);
 
-  // 初始化：数据库优先
+  // 初始化：优先从数据库加载
   useEffect(() => {
     if (status === 'loading') return;
 
-    if (status === 'authenticated' && session?.user?.id) {
-      // 🔥 新策略：从数据库加载，确保用户隔离
-      const synced = getUserStorage(SYNC_KEY);
+    if (status === 'authenticated') {
+      // 检查是否已同步
+      const synced = localStorage.getItem(SYNC_KEY);
       
       if (!synced) {
         // 未同步：从数据库加载
         loadFromDatabase();
       } else {
-        // 已同步：先用用户缓存，然后后台同步
-        const localName = getUserStorage(STORAGE_KEY);
+        // 已同步：先用 localStorage 显示，然后后台同步
+        const localName = localStorage.getItem(STORAGE_KEY);
         if (localName) {
           setTreeName(localName);
         }
         setIsLoading(false);
         
         // 后台同步数据库（确保最新）
-        setTimeout(() => {
-          loadFromDatabase();
-        }, 3000);
+        loadFromDatabase();
       }
     } else {
-      // 未登录：使用默认值
-      setTreeName('心树');
+      // 未登录：只使用 localStorage
+      const localName = localStorage.getItem(STORAGE_KEY);
+      if (localName) {
+        setTreeName(localName);
+      }
       setIsLoading(false);
     }
-  }, [status, session?.user?.id, loadFromDatabase]);
+  }, [status, loadFromDatabase]);
 
   // 更新心树名字
   const updateTreeName = useCallback(async (newName: string) => {
@@ -92,12 +92,12 @@ export function useHeartTreeName() {
     setIsSaving(true);
 
     try {
-      // 1. 立即更新用户隔离的localStorage
+      // 立即更新 localStorage（用户体验优先）
       const trimmedName = newName.trim();
-      setUserStorage(STORAGE_KEY, trimmedName);
+      localStorage.setItem(STORAGE_KEY, trimmedName);
       setTreeName(trimmedName);
 
-      // 2. 如果已登录，立即同步到数据库
+      // 如果已登录，同步到数据库
       if (session?.user?.id) {
         const response = await fetch('/api/heart-tree/update-name', {
           method: 'POST',
@@ -107,17 +107,18 @@ export function useHeartTreeName() {
 
         if (!response.ok) {
           const error = await response.json();
-          console.error('[useHeartTreeName] ❌ 保存到数据库失败:', error);
+          console.error('[useHeartTreeName] 保存到数据库失败:', error);
           // 数据库保存失败，但 localStorage 已更新，仍然算成功
+          // 下次登录时会从 localStorage 同步到数据库
         } else {
-          console.log('[useHeartTreeName] ✅ 保存到数据库成功');
-          setUserStorage(SYNC_KEY, 'true');
+          console.log('[useHeartTreeName] 保存到数据库成功');
+          localStorage.setItem(SYNC_KEY, 'true');
         }
       }
 
       return true;
     } catch (error) {
-      console.error('[useHeartTreeName] ❌ 更新失败:', error);
+      console.error('[useHeartTreeName] 更新失败:', error);
       return false;
     } finally {
       setIsSaving(false);
@@ -128,7 +129,7 @@ export function useHeartTreeName() {
   const syncToDatabase = useCallback(async () => {
     if (!session?.user?.id) return false;
 
-    const localName = getUserStorage(STORAGE_KEY);
+    const localName = localStorage.getItem(STORAGE_KEY);
     if (!localName || localName === '心树') {
       // 没有本地数据或使用默认名字，不需要同步
       return true;
@@ -142,14 +143,14 @@ export function useHeartTreeName() {
       });
 
       if (response.ok) {
-        console.log('[useHeartTreeName] ✅ 同步到数据库成功');
-        setUserStorage(SYNC_KEY, 'true');
+        console.log('[useHeartTreeName] 同步到数据库成功');
+        localStorage.setItem(SYNC_KEY, 'true');
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error('[useHeartTreeName] ❌ 同步失败:', error);
+      console.error('[useHeartTreeName] 同步失败:', error);
       return false;
     }
   }, [session?.user?.id]);

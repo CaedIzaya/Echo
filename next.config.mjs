@@ -9,11 +9,19 @@ const nextConfig = {
   // React严格模式，帮助发现潜在问题
   reactStrictMode: true,
   
+  // Fast Refresh 配置
+  onDemandEntries: {
+    // 页面在内存中保留的最长时间（毫秒）
+    maxInactiveAge: 25 * 1000,
+    // 同时保留的页面数
+    pagesBufferLength: 2,
+  },
+  
   // 服务器外部包配置
   serverExternalPackages: ["@prisma/client"],
   
   // Webpack 配置
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       '~': path.resolve(__dirname, './src'),
@@ -23,6 +31,55 @@ const nextConfig = {
     config.resolve.fallback = {
       ...config.resolve.fallback,
     };
+    
+    // 配置文件监听选项，忽略 Windows 系统文件和不必要的目录
+    if (!isServer) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: [
+          // Node modules and git
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.next/**',
+          '**/out/**',
+          '**/build/**',
+          '**/dist/**',
+          
+          // Prisma database files
+          '**/prisma/dev.db',
+          '**/prisma/**/*.db',
+          '**/prisma/**/*.db-journal',
+          
+          // Public folder nested projects (防止扫描嵌套项目)
+          '**/public/**/node_modules/**',
+          '**/public/**/.next/**',
+          '**/public/**/package.json',
+          
+          // Windows 系统文件 (绝对路径)
+          'C:/DumpStack.log.tmp',
+          'C:/hiberfil.sys',
+          'C:/pagefile.sys',
+          'C:/swapfile.sys',
+          
+          // Windows 系统文件 (通配符模式)
+          '**/C:/DumpStack.log.tmp',
+          '**/C:/hiberfil.sys',
+          '**/C:/pagefile.sys',
+          '**/C:/swapfile.sys',
+          
+          // 临时文件
+          '**/*.tmp',
+          '**/*.temp',
+          '**/.cache/**',
+        ],
+        // 使用轮询可以避免某些文件系统事件问题，但会消耗更多资源
+        // 在 Windows 上，如果遇到问题可以设置为 true
+        poll: false,
+        // 减少轮询间隔（如果启用轮询）
+        aggregateTimeout: 300,
+      };
+    }
+    
     return config;
   },
   

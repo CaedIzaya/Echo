@@ -1,0 +1,11 @@
+{
+  "ignore_dirs": [
+    "node_modules",
+    ".git",
+    ".next",
+    "out",
+    "build",
+    "dist"
+  ]
+}
+

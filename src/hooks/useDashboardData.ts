@@ -2,12 +2,11 @@
  * Dashboard 数据加载 Hook
  * 
  * 目的：确保关键数据从数据库加载，localStorage 仅作为缓存
- * 优先级：数据库 > localStorage（用户隔离）
+ * 优先级：数据库 > localStorage
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { getUserStorage, setUserStorage, userStorageJSON } from '~/lib/userStorage';
 
 export interface DashboardData {
   // 今日统计
@@ -34,16 +33,28 @@ const SYNC_KEY = 'dashboardDataSynced';
 export function useDashboardData() {
   const { data: session, status } = useSession();
   const [data, setData] = useState<DashboardData>(() => {
-    // 🔥 新策略：初始化时使用默认值，等待数据库加载
-    // 不再从localStorage读取，避免读到其他用户的数据
+    // 初始化时先从缓存读取
+    if (typeof window === 'undefined') {
+      return getDefaultData();
+    }
+    
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+        return getDefaultData();
+      }
+    }
+    
     return getDefaultData();
   });
 
-  // 从数据库加载数据（数据库优先）
+  // 从数据库加载数据
   const loadFromDatabase = useCallback(async () => {
     if (!session?.user?.id) return;
 
-    console.log('[useDashboardData] 🔄 从数据库加载数据（用户隔离）...');
+    console.log('[useDashboardData] 🔄 开始从数据库加载关键数据...');
     
     setData(prev => ({ ...prev, isLoading: true }));
 
@@ -73,15 +84,15 @@ export function useDashboardData() {
       // 更新状态
       setData(newData);
 
-      // 🔥 写入用户隔离的缓存
-      userStorageJSON.set(CACHE_KEY, newData);
-      setUserStorage(SYNC_KEY, 'true');
-      setUserStorage('dashboardDataSyncedAt', new Date().toISOString());
+      // 写入缓存
+      localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
+      localStorage.setItem(SYNC_KEY, 'true');
+      localStorage.setItem('dashboardDataSyncedAt', new Date().toISOString());
 
-      // 🔥 同步到旧的 localStorage 结构（兼容性）- 使用用户隔离
-      syncToUserStorage(newData);
+      // 🔥 同步到旧的 localStorage 结构（兼容性）
+      syncToLegacyStorage(newData);
 
-      console.log('[useDashboardData] 💾 数据已缓存（用户:', session.user.id, '）');
+      console.log('[useDashboardData] 💾 数据已缓存到 localStorage');
 
     } catch (error: any) {
       console.error('[useDashboardData] ❌ 加载失败', error);
@@ -89,40 +100,41 @@ export function useDashboardData() {
     }
   }, [session?.user?.id]);
 
-  // 自动加载：登录时强制从数据库同步
+  // 自动加载：登录时检查并同步
   useEffect(() => {
     if (status === 'loading') return;
 
-    if (status === 'authenticated' && session?.user?.id) {
-      // 🔥 新策略：每次登录都从数据库加载，确保数据正确
-      // 用户隔离的缓存仅作为备用
-      const synced = getUserStorage(SYNC_KEY);
-      const lastSyncAt = getUserStorage('dashboardDataSyncedAt');
+    if (status === 'authenticated') {
+      const synced = localStorage.getItem(SYNC_KEY);
+      const lastSyncAt = localStorage.getItem('dashboardDataSyncedAt');
       
+      // 🌟 优化：检查是否需要同步（更严格的条件）
       const needSync = !synced || !lastSyncAt || isDataStale(lastSyncAt);
       
       if (needSync) {
-        console.log('[useDashboardData] 📊 从数据库加载数据（首次或过期）');
+        console.log('[useDashboardData] 📊 需要同步数据（首次加载或数据过期）');
         loadFromDatabase();
       } else {
-        // 先使用缓存，然后后台刷新
-        const cachedData = userStorageJSON.get<DashboardData>(CACHE_KEY);
-        if (cachedData) {
-          setData({ ...cachedData, isLoading: false });
-          console.log('[useDashboardData] ⚡ 使用用户缓存，后台刷新');
-        }
+        console.log('[useDashboardData] ⚡ 使用缓存数据（性能优化）');
+        setData(prev => ({ ...prev, isLoading: false }));
         
-        // 后台刷新（5秒后）
-        setTimeout(() => {
-          loadFromDatabase();
-        }, 5000);
+        // 🌟 优化：仅在数据接近过期时后台同步（45分钟后）
+        const lastSync = new Date(lastSyncAt);
+        const now = new Date();
+        const minutesSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
+        
+        if (minutesSinceSync > 45) {
+          console.log('[useDashboardData] 🔄 后台静默同步（数据接近过期）');
+          setTimeout(() => {
+            loadFromDatabase();
+          }, 3000); // 延迟3秒，避免阻塞初始渲染
+        }
       }
     } else {
-      // 未登录，清空数据
-      setData(getDefaultData());
+      // 未登录，使用缓存数据
       setData(prev => ({ ...prev, isLoading: false }));
     }
-  }, [status, session?.user?.id, loadFromDatabase]);
+  }, [status, loadFromDatabase]);
 
   // 手动刷新
   const refresh = useCallback(() => {
@@ -176,8 +188,8 @@ function isDataStale(lastSyncAt: string): boolean {
   }
 }
 
-// 同步到旧的 localStorage 结构（向后兼容，使用用户隔离）
-function syncToUserStorage(data: DashboardData) {
+// 同步到旧的 localStorage 结构（向后兼容）
+function syncToLegacyStorage(data: DashboardData) {
   try {
     // todayStats
     const todayStats = {
@@ -186,17 +198,17 @@ function syncToUserStorage(data: DashboardData) {
         date: data.todayDate,
       },
     };
-    userStorageJSON.set('todayStats', todayStats);
+    localStorage.setItem('todayStats', JSON.stringify(todayStats));
 
     // weeklyStats
     const weeklyStats = {
       totalMinutes: data.weeklyMinutes,
       weekStart: data.weekStart,
     };
-    userStorageJSON.set('weeklyStats', weeklyStats);
+    localStorage.setItem('weeklyStats', JSON.stringify(weeklyStats));
 
     // totalFocusMinutes
-    setUserStorage('totalFocusMinutes', data.totalMinutes.toString());
+    localStorage.setItem('totalFocusMinutes', data.totalMinutes.toString());
 
     // dashboardStats
     const dashboardStats = {
@@ -204,11 +216,11 @@ function syncToUserStorage(data: DashboardData) {
       streakDays: data.streakDays,
       completedGoals: 0, // 需要从数据库计算
     };
-    userStorageJSON.set('dashboardStats', dashboardStats);
+    localStorage.setItem('dashboardStats', JSON.stringify(dashboardStats));
 
-    console.log('[syncToUserStorage] ✅ 已同步到用户隔离存储');
+    console.log('[syncToLegacyStorage] ✅ 已同步到旧存储结构');
   } catch (error) {
-    console.error('[syncToUserStorage] 同步失败', error);
+    console.error('[syncToLegacyStorage] 同步失败', error);
   }
 }
 

@@ -67,3 +67,9 @@ desktop.ini
 *.tmp
 *.temp
 .cache
+
+# Prevent nested projects in public folder
+/public/Echo-main/
+/public/**/node_modules/
+/public/**/.next/
+/public/**/package.json

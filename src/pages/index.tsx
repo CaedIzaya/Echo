@@ -3,49 +3,14 @@ import { useRouter } from 'next/router';
 import ProgressRing from './dashboard/ProgressRing';
 import EchoSpirit from './dashboard/EchoSpirit';
 import { setCurrentUserId, migrateToUserStorage } from '~/lib/userStorage';
-
-const FOCUS_QUOTES = [
-  { text: 'Attention is the rarest and purest form of generosity.', author: 'Simone Weil' },
-  { text: 'Silence is not the absence of something but the presence of everything.', author: 'Gordon Hempton' },
-  { text: 'The art of being wise is the art of knowing what to overlook.', author: 'William James' },
-  { text: 'You become what you give your attention to.', author: 'Epictetus' },
-  { text: 'Distraction is the destroyer of depth.', author: 'Digital Minimalism' },
-];
-
-const LOADING_STEPS = [
-  { id: 1, message: 'Disconnecting from the noise...', duration: 1600 },
-  { id: 2, message: 'Filtering stray algorithms...', duration: 1200 },
-  { id: 3, message: 'Syncing with your intention...', duration: 1500 },
-  { id: 4, message: 'Reclaiming your focus...', duration: 1000 },
-  { id: 5, message: 'Echo is almost ready.', duration: 800 },
-];
-
-const LANDING_FEATURES = [
-  {
-    title: '轻量规划',
-    description: '热爱无需多虑，随时随地设置完成小目标',
-    icon: '🎯',
-    accent: 'from-emerald-50 via-white to-teal-50/60 border-emerald-100/70',
-  },
-  {
-    title: '专注计时',
-    description: '我们欢迎你划水，但是专注的时候，全力以赴',
-    icon: '⏱️',
-    accent: 'from-cyan-50 via-white to-sky-50/60 border-cyan-100/70',
-  },
-  {
-    title: '陪伴守护',
-    description: '与光精灵和心树一起，见证每一刻成长的确幸',
-    icon: '😃',
-    accent: 'from-teal-50 via-white to-emerald-50/60 border-teal-100/70',
-  },
-] as const;
-
-const HERO_PLAN_TASKS = [
-  { title: '晨间写作', detail: '完成 500 字手稿', done: true },
-  { title: '章节复盘', detail: '记录 3 条灵感', done: false },
-  { title: '夜读沉浸', detail: '专注 25 分钟', done: false },
-];
+import {
+  FOCUS_QUOTES,
+  LOADING_STEPS,
+  LANDING_FEATURES,
+  HERO_PLAN_TASKS,
+  ECHO_PRINCIPLES,
+  RANDOM_SPIRIT_MESSAGES,
+} from '~/constants/landing';
 
 const EchoLoader = () => {
   const rings = [0, 1, 2, 3];
@@ -440,27 +405,6 @@ const FeatureGrid = () => (
   </section>
 );
 
-const EchoPrinciples = [
-  {
-    emoji: '1️⃣',
-    title: '排名与比较',
-    description: '只关注自己的成长，为自己而专注。',
-    accent: 'from-emerald-50 via-white to-teal-50/60 border-emerald-100/70',
-  },
-  {
-    emoji: '2️⃣',
-    title: '惩罚与情绪绑架',
-    description: '心树不会枯萎，Lumi 不会失望，连胜不会中断。',
-    accent: 'from-cyan-50 via-white to-sky-50/60 border-cyan-100/70',
-  },
-  {
-    emoji: '3️⃣',
-    title: '替你定义何为"正确"',
-    description: '没有"应该坚持多久"，只有你自己的步伐。',
-    accent: 'from-teal-50 via-white to-emerald-50/60 border-teal-100/70',
-  },
-] as const;
-
 const MotivationSection = () => (
   <section className="pb-20 bg-white">
     <div className="max-w-6xl mx-auto px-6">
@@ -479,7 +423,7 @@ const MotivationSection = () => (
 
       {/* 三大绝不卡片 */}
       <div className="grid md:grid-cols-3 gap-6">
-        {EchoPrinciples.map((principle, index) => (
+        {ECHO_PRINCIPLES.map((principle, index) => (
           <div
             key={index}
             className={`rounded-[28px] border-2 bg-gradient-to-br ${principle.accent} p-8 shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden`}
@@ -663,12 +607,6 @@ export default function Home() {
   const hasShownWelcome = useRef(false);
   const spiritMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // 随机消息
-  const randomMessages = [
-    "……你真喜欢点我。",
-    "再点我我就假装死机了。",
-    "？？？ 你是来玩 Echo 的，还是来玩我的？"
-  ];
 
   const shouldForceOnboarding = () => {
     if (typeof window === 'undefined') {
@@ -735,13 +673,13 @@ export default function Home() {
     };
   }, [isTransitioning]);
 
-  // 自动显示开场白（用统一的 showMessage，避免出现“一闪而过”）
+  // 自动显示开场白（优化：缩短延迟）
   useEffect(() => {
     if (!isTransitioning && !hasShownWelcome.current) {
       hasShownWelcome.current = true;
       setTimeout(() => {
         showMessage("嘿，你来了。\n\n从这里开始，你的时间会慢慢有重量。", 5000);
-      }, 500); // 延迟500ms显示，确保页面已加载
+      }, 100); // 优化：缩短到 100ms
     }
   }, [isTransitioning]);
 
@@ -772,8 +710,8 @@ export default function Home() {
         // 如果 session 仍然存在（可能是缓存），等待一下再检查
         if (session?.user) {
           console.log("首页：退出登录后仍检测到 session，等待清除...");
-          // 等待服务器清除 session
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // 优化：缩短等待时间
+          await new Promise(resolve => setTimeout(resolve, 200));
           
           // 再次检查 session
           const retryResponse = await fetch('/api/auth/session', {
@@ -850,7 +788,7 @@ export default function Home() {
       console.log('✅ 已设置用户ID:', session.user.id);
     }
     
-    // 短暂延迟让用户看到状态
+    // 优化：立即处理，无需延迟
     setTimeout(() => {
       const forceOnboarding = shouldForceOnboarding();
       console.log('首页：是否需要强制引导流程:', forceOnboarding);
@@ -878,14 +816,14 @@ export default function Home() {
           window.localStorage.setItem(firstWelcomeKey, 'true');
         }
 
-        // 欢迎语播完后再决定去 onboarding / dashboard
+        // 优化：缩短欢迎语后的等待时间
         setTimeout(() => {
           if (session.user.hasCompletedOnboarding) {
             router.push('/dashboard');
           } else {
             router.push('/onboarding');
           }
-        }, 8200);
+        }, 3000); // 优化：从 8200ms 缩短到 3000ms
         return;
       }
 
@@ -897,7 +835,7 @@ export default function Home() {
 
       // 如果没有完成onboarding，跳转到onboarding页面
       router.push('/onboarding');
-    }, 1000);
+    }, 300); // 优化：从 1000ms 缩短到 300ms
   };
 
   const loadingMessage =
@@ -918,7 +856,7 @@ export default function Home() {
       showMessage("好了，欢迎环节就到这。\n\n剩下的时间，我们拿去专注。", 5000);
     } else {
       // 随机显示消息
-      const randomMessage = randomMessages[Math.floor(Math.random() * randomMessages.length)];
+      const randomMessage = RANDOM_SPIRIT_MESSAGES[Math.floor(Math.random() * RANDOM_SPIRIT_MESSAGES.length)];
       showMessage(randomMessage, 4000);
     }
   };

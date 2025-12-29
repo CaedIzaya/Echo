@@ -1,0 +1,39 @@
+# Cursor ignore file - prevents indexing these directories
+node_modules/
+.next/
+out/
+build/
+dist/
+.git/
+
+# Database files
+*.db
+*.db-journal
+prisma/dev.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Build artifacts
+*.tsbuildinfo
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Prevent nested projects
+public/**/node_modules/
+public/**/.next/
+public/**/package.json
+
