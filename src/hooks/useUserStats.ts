@@ -40,8 +40,9 @@ export function useUserStats() {
         const dbTotalMinutes = data.stats.totalFocusMinutes || 0;
 
         // 对比 localStorage 和数据库的值
-        const localStreakDays = parseInt(localStorage.getItem(STORAGE_KEY_STREAK) || '0');
-        const localTotalMinutes = parseInt(localStorage.getItem(STORAGE_KEY_TOTAL) || '0');
+        // ✅ 使用用户隔离的 localStorage
+        const localStreakDays = parseInt(getUserStorage(STORAGE_KEY_STREAK) || '0');
+        const localTotalMinutes = parseInt(getUserStorage(STORAGE_KEY_TOTAL) || '0');
 
         // 🔥 使用较大值（数据库或localStorage）
         const finalStreakDays = Math.max(dbStreakDays, localStreakDays);
@@ -66,9 +67,10 @@ export function useUserStats() {
         setTotalFocusMinutes(finalTotalMinutes);
 
         // 更新 localStorage
-        localStorage.setItem(STORAGE_KEY_STREAK, finalStreakDays.toString());
-        localStorage.setItem(STORAGE_KEY_TOTAL, finalTotalMinutes.toString());
-        localStorage.setItem(SYNC_KEY, 'true');
+        // ✅ 使用用户隔离的 localStorage
+        setUserStorage(STORAGE_KEY_STREAK, finalStreakDays.toString());
+        setUserStorage(STORAGE_KEY_TOTAL, finalTotalMinutes.toString());
+        setUserStorage(SYNC_KEY, 'true');
 
         console.log('[useUserStats] 数据加载完成:', {
           streakDays: finalStreakDays,
@@ -77,9 +79,9 @@ export function useUserStats() {
       }
     } catch (error) {
       console.error('[useUserStats] 加载失败:', error);
-      // 失败时使用 localStorage 的值
-      const localStreakDays = parseInt(localStorage.getItem(STORAGE_KEY_STREAK) || '0');
-      const localTotalMinutes = parseInt(localStorage.getItem(STORAGE_KEY_TOTAL) || '0');
+      // 失败时使用 localStorage 的值（用户隔离）
+      const localStreakDays = parseInt(getUserStorage(STORAGE_KEY_STREAK) || '0');
+      const localTotalMinutes = parseInt(getUserStorage(STORAGE_KEY_TOTAL) || '0');
       if (localStreakDays > 0) setStreakDays(localStreakDays);
       if (localTotalMinutes > 0) setTotalFocusMinutes(localTotalMinutes);
     } finally {
@@ -102,7 +104,7 @@ export function useUserStats() {
       console.warn('[useUserStats] 未登录，只更新 localStorage');
       setStreakDays(newStreakDays);
       setLastStreakDate(date);
-      localStorage.setItem(STORAGE_KEY_STREAK, newStreakDays.toString());
+      setUserStorage(STORAGE_KEY_STREAK, newStreakDays.toString());
       return;
     }
 
@@ -110,7 +112,7 @@ export function useUserStats() {
       // 更新状态和 localStorage
       setStreakDays(newStreakDays);
       setLastStreakDate(date);
-      localStorage.setItem(STORAGE_KEY_STREAK, newStreakDays.toString());
+      setUserStorage(STORAGE_KEY_STREAK, newStreakDays.toString());
 
       // 同步到数据库
       const response = await fetch('/api/user/stats/update', {
@@ -138,7 +140,7 @@ export function useUserStats() {
       console.warn('[useUserStats] 未登录，只更新 localStorage');
       const newTotal = totalFocusMinutes + minutes;
       setTotalFocusMinutes(newTotal);
-      localStorage.setItem(STORAGE_KEY_TOTAL, newTotal.toString());
+      setUserStorage(STORAGE_KEY_TOTAL, newTotal.toString());
       return;
     }
 
@@ -147,7 +149,7 @@ export function useUserStats() {
       
       // 更新状态和 localStorage
       setTotalFocusMinutes(newTotal);
-      localStorage.setItem(STORAGE_KEY_TOTAL, newTotal.toString());
+      setUserStorage(STORAGE_KEY_TOTAL, newTotal.toString());
 
       // 同步到数据库
       const response = await fetch('/api/user/stats/update', {
