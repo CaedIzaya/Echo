@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 export interface DashboardData {
   // 今日统计
@@ -38,7 +39,8 @@ export function useDashboardData() {
       return getDefaultData();
     }
     
-    const cached = localStorage.getItem(CACHE_KEY);
+    // ✅ 使用用户隔离的 localStorage
+    const cached = getUserStorage(CACHE_KEY);
     if (cached) {
       try {
         return JSON.parse(cached);
@@ -85,9 +87,10 @@ export function useDashboardData() {
       setData(newData);
 
       // 写入缓存
-      localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
-      localStorage.setItem(SYNC_KEY, 'true');
-      localStorage.setItem('dashboardDataSyncedAt', new Date().toISOString());
+      // ✅ 使用用户隔离的 localStorage
+      setUserStorage(CACHE_KEY, JSON.stringify(newData));
+      setUserStorage(SYNC_KEY, 'true');
+      setUserStorage('dashboardDataSyncedAt', new Date().toISOString());
 
       // 🔥 同步到旧的 localStorage 结构（兼容性）
       syncToLegacyStorage(newData);
@@ -105,8 +108,9 @@ export function useDashboardData() {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      const synced = localStorage.getItem(SYNC_KEY);
-      const lastSyncAt = localStorage.getItem('dashboardDataSyncedAt');
+      // ✅ 使用用户隔离的 localStorage
+      const synced = getUserStorage(SYNC_KEY);
+      const lastSyncAt = getUserStorage('dashboardDataSyncedAt');
       
       // 🌟 优化：检查是否需要同步（更严格的条件）
       const needSync = !synced || !lastSyncAt || isDataStale(lastSyncAt);
@@ -188,7 +192,7 @@ function isDataStale(lastSyncAt: string): boolean {
   }
 }
 
-// 同步到旧的 localStorage 结构（向后兼容）
+// 同步到旧的 localStorage 结构（向后兼容 - 使用用户隔离）
 function syncToLegacyStorage(data: DashboardData) {
   try {
     // todayStats
@@ -198,17 +202,17 @@ function syncToLegacyStorage(data: DashboardData) {
         date: data.todayDate,
       },
     };
-    localStorage.setItem('todayStats', JSON.stringify(todayStats));
+    setUserStorage('todayStats', JSON.stringify(todayStats));
 
     // weeklyStats
     const weeklyStats = {
       totalMinutes: data.weeklyMinutes,
       weekStart: data.weekStart,
     };
-    localStorage.setItem('weeklyStats', JSON.stringify(weeklyStats));
+    setUserStorage('weeklyStats', JSON.stringify(weeklyStats));
 
     // totalFocusMinutes
-    localStorage.setItem('totalFocusMinutes', data.totalMinutes.toString());
+    setUserStorage('totalFocusMinutes', data.totalMinutes.toString());
 
     // dashboardStats
     const dashboardStats = {
@@ -216,9 +220,9 @@ function syncToLegacyStorage(data: DashboardData) {
       streakDays: data.streakDays,
       completedGoals: 0, // 需要从数据库计算
     };
-    localStorage.setItem('dashboardStats', JSON.stringify(dashboardStats));
+    setUserStorage('dashboardStats', JSON.stringify(dashboardStats));
 
-    console.log('[syncToLegacyStorage] ✅ 已同步到旧存储结构');
+    console.log('[syncToLegacyStorage] ✅ 已同步到旧存储结构（用户隔离）');
   } catch (error) {
     console.error('[syncToLegacyStorage] 同步失败', error);
   }

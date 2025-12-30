@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 export interface Milestone {
   id: string;
@@ -51,7 +52,8 @@ export function useProjects() {
     if (typeof window === 'undefined') return [];
     
     try {
-      const cached = localStorage.getItem(STORAGE_KEY);
+      // ✅ 使用用户隔离的 localStorage
+    const cached = getUserStorage(STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
         return Array.isArray(parsed) ? parsed : [];
@@ -85,9 +87,10 @@ export function useProjects() {
         setProjects(dbProjects);
         
         // 🌟 优化：写入缓存并记录时间戳
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProjects));
-        localStorage.setItem(SYNC_KEY, 'true');
-        localStorage.setItem('projectsSyncedAt', new Date().toISOString());
+        // ✅ 使用用户隔离的 localStorage
+        setUserStorage(STORAGE_KEY, JSON.stringify(dbProjects));
+        setUserStorage(SYNC_KEY, 'true');
+        setUserStorage('projectsSyncedAt', new Date().toISOString());
         
         console.log('[useProjects] 💾 计划数据已缓存（1小时有效期）');
         
@@ -121,8 +124,9 @@ export function useProjects() {
       }
       
       // 🌟 优化：检查同步时间戳，避免频繁查询
-      const synced = localStorage.getItem(SYNC_KEY);
-      const lastSyncAt = localStorage.getItem('projectsSyncedAt');
+      // ✅ 使用用户隔离的 localStorage
+      const synced = getUserStorage(SYNC_KEY);
+      const lastSyncAt = getUserStorage('projectsSyncedAt');
       
       // 计划数据缓存1小时（极低频数据）
       const needSync = !synced || !lastSyncAt || isProjectDataStale(lastSyncAt);
@@ -174,7 +178,8 @@ export function useProjects() {
       
       // 更新缓存
       const allProjects = [...projects, newProject];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allProjects));
+      // ✅ 使用用户隔离的 localStorage
+      setUserStorage(STORAGE_KEY, JSON.stringify(allProjects));
       
       return newProject;
       
@@ -222,8 +227,9 @@ export function useProjects() {
       const allProjects = projects.map(p => 
         p.id === projectId ? updatedProject : p
       );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allProjects));
-      localStorage.setItem('projectsSyncedAt', new Date().toISOString());
+      // ✅ 使用用户隔离的 localStorage
+      setUserStorage(STORAGE_KEY, JSON.stringify(allProjects));
+      setUserStorage('projectsSyncedAt', new Date().toISOString());
       
       return true;
       
@@ -262,7 +268,8 @@ export function useProjects() {
       
       // 更新缓存
       const allProjects = projects.filter(p => p.id !== projectId);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allProjects));
+      // ✅ 使用用户隔离的 localStorage
+      setUserStorage(STORAGE_KEY, JSON.stringify(allProjects));
       
       return true;
       
@@ -311,7 +318,8 @@ export function useProjects() {
       const allProjects = projects.map(p => 
         p.id === projectId ? { ...p, milestones: updatedMilestones } : p
       );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allProjects));
+      // ✅ 使用用户隔离的 localStorage
+      setUserStorage(STORAGE_KEY, JSON.stringify(allProjects));
       
       return true;
       
@@ -358,7 +366,7 @@ export function useProjects() {
       await Promise.all(promises);
       
       console.log('[useProjects] ✅ 同步完成');
-      localStorage.setItem(SYNC_KEY, 'true');
+      setUserStorage(SYNC_KEY, 'true');
       
       // 重新加载确保数据一致
       await loadFromDatabase();

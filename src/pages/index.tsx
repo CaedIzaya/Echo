@@ -758,9 +758,8 @@ export default function Home() {
         if (session.user.id) {
           setCurrentUserId(session.user.id);
           
-          // 迁移旧数据到用户隔离存储（首次登录）
-          const migrationKeys = ['userPlans', 'todayStats', 'weeklyStats', 'focusSession'];
-          migrateToUserStorage(migrationKeys);
+          // ❌ 移除自动迁移：防止把其他用户的数据误迁移
+          // 新系统直接从数据库读取，不需要迁移旧数据
         }
         
         handleAuthenticatedUser(session);

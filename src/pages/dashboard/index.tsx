@@ -26,7 +26,7 @@ import { useDataSync } from '~/hooks/useDataSync';
 import { useDashboardData } from '~/hooks/useDashboardData';
 import { useProjects } from '~/hooks/useProjects';
 import { syncToDatabase } from '~/lib/realtimeSync';
-import { userStorageJSON, getUserStorage, setUserStorage } from '~/lib/userStorage';
+import { userStorageJSON, getUserStorage, setUserStorage, setCurrentUserId } from '~/lib/userStorage';
 import { 
   pickHomeSentence, 
   pickSentenceFromPool,
@@ -304,6 +304,27 @@ function calculateWeeklyComparison(currentWeek: number, lastWeek: number) {
 export default function Dashboard() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
+  
+  // 🔥 关键修复：在使用任何 Hook 之前，先设置用户ID
+  useEffect(() => {
+    if (session?.user?.id) {
+      setCurrentUserId(session.user.id);
+      console.log('✅ Dashboard 已设置用户ID:', session.user.id);
+      
+      // 🧹 清理全局 localStorage key（防止数据污染）
+      if (typeof window !== 'undefined') {
+        const globalKeys = [
+          'userExp', 'heartTreeExpState', 'achievedAchievements', 'userPlans',
+          'todayStats', 'weeklyStats', 'totalFocusMinutes', 'focusSession'
+        ];
+        globalKeys.forEach(key => {
+          if (localStorage.getItem(key)) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+    }
+  }, [session?.user?.id]);
   
   // ========== 持久化 Hooks（数据库同步）==========
   const { userExp, userLevel: hookUserLevel, addUserExp, updateUserExp } = useUserExp();
@@ -1018,7 +1039,7 @@ export default function Dashboard() {
     // 处理新的一天：归档昨日数据并重置今日数据
     if (isNewDay) {
       // 🔒 保护性检查：记录经验值状态，确保不被意外修改
-      const beforeUserExp = localStorage.getItem('userExp');
+      const beforeUserExp = getUserStorage('userExp');
       console.log('📅 新的一天开始 - 数据保护检查', {
         日期: today,
         昨日日期: lastFocusDate,
@@ -1096,7 +1117,7 @@ export default function Dashboard() {
       setTodayStats({ minutes: 0, date: today });
       
       // 🔒 保护性验证：确认经验值没有被意外修改
-      const afterUserExp = localStorage.getItem('userExp');
+      const afterUserExp = getUserStorage('userExp');
       if (beforeUserExp !== afterUserExp) {
         console.error('❌❌❌ 严重警告：经验值在日期切换时被意外修改！', {
           切换前: beforeUserExp,
@@ -1106,7 +1127,7 @@ export default function Dashboard() {
         console.error('❌ 正在尝试恢复经验值...');
         // 尝试恢复
         if (beforeUserExp && parseFloat(beforeUserExp) > parseFloat(afterUserExp || '0')) {
-          localStorage.setItem('userExp', beforeUserExp);
+          setUserStorage('userExp', beforeUserExp);
           console.log('✅ 经验值已恢复');
         }
       } else {

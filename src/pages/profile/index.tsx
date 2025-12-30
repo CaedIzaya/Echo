@@ -5,6 +5,7 @@ import Head from 'next/head';
 import BottomNavigation from '../dashboard/BottomNavigation';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 import localforage from 'localforage';
+import { getUserStorage } from '~/lib/userStorage';
 
 // Types
 interface UserProfile {
@@ -65,7 +66,8 @@ export default function Profile() {
 
   const loadUserLevel = () => {
     if (typeof window === 'undefined') return;
-    const userExp = parseFloat(localStorage.getItem('userExp') || '0');
+    // ✅ 使用用户隔离的 localStorage
+    const userExp = parseFloat(getUserStorage('userExp') || '0');
     const levelInfo = LevelManager.calculateLevel(userExp);
     setUserLevel(levelInfo);
   };

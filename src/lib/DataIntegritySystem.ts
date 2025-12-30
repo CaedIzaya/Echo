@@ -164,9 +164,10 @@ function loadUserDataFromLocal(): UserDataSnapshot {
     };
   }
   
-  const userExp = parseFloat(localStorage.getItem('userExp') || '0');
-  const totalFocusMinutes = parseFloat(localStorage.getItem('totalFocusMinutes') || '0');
-  const achievedAchievements = localStorage.getItem('achievedAchievements');
+  // ✅ 使用用户隔离的 localStorage
+  const userExp = parseFloat(getUserStorage('userExp') || '0');
+  const totalFocusMinutes = parseFloat(getUserStorage('totalFocusMinutes') || '0');
+  const achievedAchievements = getUserStorage('achievedAchievements');
   const hasAnyAchievements = achievedAchievements ? JSON.parse(achievedAchievements).length > 0 : false;
   
   return {
@@ -203,20 +204,20 @@ export async function recoverDataFromDatabase(): Promise<boolean> {
     
     // 2. 恢复用户经验
     if (userData.userExp > 0) {
-      localStorage.setItem('userExp', userData.userExp.toString());
-      localStorage.setItem('userExpSynced', 'true');
+      setUserStorage('userExp', userData.userExp.toString());
+      setUserStorage('userExpSynced', 'true');
       console.log('[DataIntegrity] 已恢复用户经验:', userData.userExp);
     }
     
     // 3. 恢复成就数据
     if (Array.isArray(achievementsData) && achievementsData.length > 0) {
       const achievementIds = achievementsData.map((a: any) => a.achievementId);
-      localStorage.setItem('achievedAchievements', JSON.stringify(achievementIds));
+      setUserStorage('achievedAchievements', JSON.stringify(achievementIds));
       console.log('[DataIntegrity] 已恢复成就数据:', achievementIds.length, '个成就');
     }
     
     // 4. 设置恢复标记
-    localStorage.setItem('dataRecoveredAt', new Date().toISOString());
+    setUserStorage('dataRecoveredAt', new Date().toISOString());
     localStorage.setItem('dataRecovered', 'true');
     
     console.log('[DataIntegrity] ✅ 数据恢复完成');

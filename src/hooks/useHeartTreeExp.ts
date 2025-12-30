@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import type { HeartTreeExpState } from '~/lib/HeartTreeExpSystem';
 import { loadHeartTreeExpState, saveHeartTreeExpState, normalizeHeartTreeState } from '~/lib/HeartTreeExpSystem';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 const STORAGE_KEY = 'heartTreeExpState';
 const SYNC_KEY = 'heartTreeExpSynced';
@@ -38,7 +39,8 @@ export function useHeartTreeExp() {
         const normalized = normalizeHeartTreeState(state);
         setExpState(normalized);
         saveHeartTreeExpState(normalized);
-        localStorage.setItem(SYNC_KEY, 'true');
+        // ✅ 使用用户隔离的 localStorage
+        setUserStorage(SYNC_KEY, 'true');
         
         console.log('[useHeartTreeExp] 从数据库加载经验:', normalized);
       }
@@ -57,7 +59,8 @@ export function useHeartTreeExp() {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      const synced = localStorage.getItem(SYNC_KEY);
+      // ✅ 使用用户隔离的 localStorage
+      const synced = getUserStorage(SYNC_KEY);
       
       if (!synced) {
         loadFromDatabase();
@@ -105,7 +108,8 @@ export function useHeartTreeExp() {
           console.error('[useHeartTreeExp] 保存到数据库失败:', error);
         } else {
           console.log('[useHeartTreeExp] 保存到数据库成功');
-          localStorage.setItem(SYNC_KEY, 'true');
+          // ✅ 使用用户隔离的 localStorage
+        setUserStorage(SYNC_KEY, 'true');
         }
       }
 
@@ -142,7 +146,8 @@ export function useHeartTreeExp() {
 
       if (response.ok) {
         console.log('[useHeartTreeExp] 同步到数据库成功');
-        localStorage.setItem(SYNC_KEY, 'true');
+        // ✅ 使用用户隔离的 localStorage
+        setUserStorage(SYNC_KEY, 'true');
         return true;
       }
 

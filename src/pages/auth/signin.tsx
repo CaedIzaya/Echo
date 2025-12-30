@@ -116,9 +116,32 @@ export default function SignIn() {
         setCurrentUserId(session.user.id);
         console.log('✅ 登录成功，已设置用户ID:', session.user.id);
         
-        // 迁移旧数据到用户隔离存储（首次登录）
-        const migrationKeys = ['userPlans', 'todayStats', 'weeklyStats', 'focusSession', 'achievedAchievements'];
-        migrateToUserStorage(migrationKeys);
+        // 🧹 自动清理全局 localStorage key（防止数据污染）
+        if (typeof window !== 'undefined') {
+          const globalKeysToClean = [
+            'userExp', 'userExpSynced', 'userExpSyncedAt',
+            'heartTreeExpState', 'heartTreeExpSynced',
+            'heartTreeNameV1', 'heartTreeNameSynced',
+            'achievedAchievements', 'achievementsSynced', 'achievementsSyncedAt',
+            'userPlans', 'userPlansSynced', 'projectsSyncedAt',
+            'todayStats', 'weeklyStats', 'dashboardStats',
+            'totalFocusMinutes', 'focusSession', 'flowMetrics',
+            'dashboardDataCache', 'dashboardDataSynced', 'dashboardDataSyncedAt',
+            'dataRecovered', 'dataSyncedAt', 'dataRecoveredAt'
+          ];
+          
+          let cleaned = 0;
+          globalKeysToClean.forEach(key => {
+            if (localStorage.getItem(key)) {
+              localStorage.removeItem(key);
+              cleaned++;
+            }
+          });
+          
+          if (cleaned > 0) {
+            console.log(`🧹 清理了 ${cleaned} 个全局 localStorage key`);
+          }
+        }
       }
       
       if (session?.user?.hasCompletedOnboarding) {

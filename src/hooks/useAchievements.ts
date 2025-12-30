@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 const STORAGE_KEY = 'achievedAchievements';
 const SYNC_KEY = 'achievementsSynced';
@@ -28,15 +29,17 @@ export function useAchievements() {
         
         // 更新状态和 localStorage
         setAchievedIds(ids);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(ids)));
-        localStorage.setItem(SYNC_KEY, 'true');
+        // ✅ 使用用户隔离的 localStorage
+        setUserStorage(STORAGE_KEY, JSON.stringify(Array.from(ids)));
+        setUserStorage(SYNC_KEY, 'true');
         
         console.log('[useAchievements] 从数据库加载成就:', ids.size, '个');
       }
     } catch (error) {
       console.error('[useAchievements] 加载失败:', error);
       // 失败时使用 localStorage 的值
-      const stored = localStorage.getItem(STORAGE_KEY);
+      // ✅ 使用用户隔离的 localStorage
+      const stored = getUserStorage(STORAGE_KEY);
       if (stored) {
         try {
           const idsArray = JSON.parse(stored) as string[];
@@ -57,7 +60,8 @@ export function useAchievements() {
 
     if (status === 'authenticated') {
       // 🌟 优化：立即显示 localStorage 数据
-      const stored = localStorage.getItem(STORAGE_KEY);
+      // ✅ 使用用户隔离的 localStorage
+      const stored = getUserStorage(STORAGE_KEY);
       if (stored) {
         try {
           const idsArray = JSON.parse(stored) as string[];
@@ -70,8 +74,9 @@ export function useAchievements() {
       setIsLoading(false);
       
       // 🌟 优化：仅在未同步或超过24小时时才查询数据库（极低频数据）
-      const synced = localStorage.getItem(SYNC_KEY);
-      const lastSyncAt = localStorage.getItem('achievementsSyncedAt');
+      // ✅ 使用用户隔离的 localStorage
+      const synced = getUserStorage(SYNC_KEY);
+      const lastSyncAt = getUserStorage('achievementsSyncedAt');
       
       const needSync = !synced || !lastSyncAt || isAchievementDataStale(lastSyncAt);
       
@@ -82,7 +87,8 @@ export function useAchievements() {
         console.log('[useAchievements] ⚡ 跳过数据库查询（缓存有效，极低频数据）');
       }
     } else {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      // ✅ 使用用户隔离的 localStorage
+      const stored = getUserStorage(STORAGE_KEY);
       if (stored) {
         try {
           const idsArray = JSON.parse(stored) as string[];
@@ -110,11 +116,12 @@ export function useAchievements() {
       const newIds = new Set(achievedIds);
       newIds.add(achievementId);
       setAchievedIds(newIds);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(newIds)));
+      // ✅ 使用用户隔离的 localStorage
+      setUserStorage(STORAGE_KEY, JSON.stringify(Array.from(newIds)));
 
       // 🌟 优化：延迟同步到数据库（成就是极低频数据，不阻塞UI）
       if (session?.user?.id) {
-        localStorage.setItem(SYNC_KEY, 'false');
+        setUserStorage(SYNC_KEY, 'false');
         
         setTimeout(async () => {
           try {
@@ -129,8 +136,8 @@ export function useAchievements() {
               console.error('[useAchievements] 保存到数据库失败:', error);
             } else {
               console.log('[useAchievements] ✅ 成就已同步到数据库:', achievementId);
-              localStorage.setItem(SYNC_KEY, 'true');
-              localStorage.setItem('achievementsSyncedAt', new Date().toISOString());
+              setUserStorage(SYNC_KEY, 'true');
+              setUserStorage('achievementsSyncedAt', new Date().toISOString());
             }
           } catch (error) {
             console.error('[useAchievements] 同步异常:', error);
@@ -195,7 +202,7 @@ export function useAchievements() {
       }
 
       console.log(`[useAchievements] 同步成功 ${successCount}/${ids.length} 个成就`);
-      localStorage.setItem(SYNC_KEY, 'true');
+      setUserStorage(SYNC_KEY, 'true');
       return true;
     } catch (error) {
       console.error('[useAchievements] 同步失败:', error);

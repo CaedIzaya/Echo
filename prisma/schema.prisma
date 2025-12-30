@@ -3,6 +3,7 @@ generator client {
 }
 
 datasource db {
+  // 支持 PostgreSQL 和 SQLite，根据 DATABASE_URL 自动切换
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }

@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 interface SyncStatus {
   isSyncing: boolean;
@@ -45,36 +46,37 @@ export function useDataSync() {
       
       // 更新所有 localStorage 缓存
       if (typeof window !== 'undefined') {
+        // ✅ 所有数据使用用户隔离的 localStorage
         // 1. 用户经验和等级
-        localStorage.setItem('userExp', data.userExp.toString());
-        localStorage.setItem('userExpSynced', 'true');
+        setUserStorage('userExp', data.userExp.toString());
+        setUserStorage('userExpSynced', 'true');
         
         // 2. 成就数据
-        localStorage.setItem('achievedAchievements', JSON.stringify(data.achievements));
+        setUserStorage('achievedAchievements', JSON.stringify(data.achievements));
         
         // 3. 心树数据
         if (data.heartTreeName) {
-          localStorage.setItem('heartTreeNameV1', data.heartTreeName);
+          setUserStorage('heartTreeNameV1', data.heartTreeName);
         }
         
         // 4. 统计数据
-        localStorage.setItem('todayStats', JSON.stringify({
+        setUserStorage('todayStats', JSON.stringify({
           [data.todayStats.date]: {
             minutes: data.todayStats.minutes,
             date: data.todayStats.date,
           }
         }));
         
-        localStorage.setItem('weeklyStats', JSON.stringify({
+        setUserStorage('weeklyStats', JSON.stringify({
           totalMinutes: data.weeklyStats.totalMinutes,
           weekStart: data.weeklyStats.weekStart,
         }));
         
-        localStorage.setItem('totalFocusMinutes', data.totalStats.totalMinutes.toString());
+        setUserStorage('totalFocusMinutes', data.totalStats.totalMinutes.toString());
         
         // 5. 同步元数据
-        localStorage.setItem('dataSyncedAt', data.syncedAt);
-        localStorage.setItem('dataRecovered', 'true');
+        setUserStorage('dataSyncedAt', data.syncedAt);
+        setUserStorage('dataRecovered', 'true');
         
         console.log('[useDataSync] ✅ 数据同步完成', {
           userExp: data.userExp,
@@ -113,7 +115,7 @@ export function useDataSync() {
   const shouldSync = useCallback((): boolean => {
     if (typeof window === 'undefined') return false;
     
-    const lastSyncAt = localStorage.getItem('dataSyncedAt');
+    const lastSyncAt = getUserStorage('dataSyncedAt');
     if (!lastSyncAt) {
       console.log('[useDataSync] 从未同步过，需要同步');
       return true;
@@ -128,8 +130,8 @@ export function useDataSync() {
     }
     
     // 检查关键数据是否存在
-    const userExp = localStorage.getItem('userExp');
-    const achievements = localStorage.getItem('achievedAchievements');
+    const userExp = getUserStorage('userExp');
+    const achievements = getUserStorage('achievedAchievements');
     
     if (!userExp || !achievements) {
       console.log('[useDataSync] 关键数据缺失，需要同步');

@@ -15,6 +15,7 @@
  */
 
 import { useCallback } from 'react';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 // 数据分类标识
 export type DataPriority = 'high' | 'medium' | 'low' | 'veryLow';
@@ -87,7 +88,8 @@ export function useSmartDataSync() {
     const config = DATA_CONFIGS[dataKey];
     if (!config) return false;
     
-    const lastSyncAt = localStorage.getItem(`${config.syncKey}_at`);
+    // ✅ 使用用户隔离的 localStorage
+    const lastSyncAt = getUserStorage(`${config.syncKey}_at`);
     if (!lastSyncAt) return false;
     
     try {
@@ -108,8 +110,9 @@ export function useSmartDataSync() {
     const config = DATA_CONFIGS[dataKey];
     if (!config) return;
     
-    localStorage.setItem(config.syncKey, 'true');
-    localStorage.setItem(`${config.syncKey}_at`, new Date().toISOString());
+    // ✅ 使用用户隔离的 localStorage
+    setUserStorage(config.syncKey, 'true');
+    setUserStorage(`${config.syncKey}_at`, new Date().toISOString());
   }, []);
 
   // 标记数据需要同步
@@ -119,7 +122,8 @@ export function useSmartDataSync() {
     const config = DATA_CONFIGS[dataKey];
     if (!config) return;
     
-    localStorage.setItem(config.syncKey, 'false');
+    // ✅ 使用用户隔离的 localStorage
+    setUserStorage(config.syncKey, 'false');
   }, []);
 
   // 检查是否需要同步
@@ -129,7 +133,8 @@ export function useSmartDataSync() {
     const config = DATA_CONFIGS[dataKey];
     if (!config) return true;
     
-    const synced = localStorage.getItem(config.syncKey);
+    // ✅ 使用用户隔离的 localStorage
+    const synced = getUserStorage(config.syncKey);
     if (synced !== 'true') return true;
     
     return !isCacheValid(dataKey);
@@ -149,35 +154,39 @@ export function useSmartDataSync() {
     // 1. 立即更新 localStorage（用户体验优先）
     if (updates.todayMinutes !== undefined) {
       const today = new Date().toISOString().split('T')[0];
-      const todayStats = JSON.parse(localStorage.getItem('todayStats') || '{}');
+      // ✅ 使用用户隔离的 localStorage
+      const todayStats = JSON.parse(getUserStorage('todayStats') || '{}');
       todayStats[today] = { minutes: updates.todayMinutes, date: today };
-      localStorage.setItem('todayStats', JSON.stringify(todayStats));
+      setUserStorage('todayStats', JSON.stringify(todayStats));
     }
     
     if (updates.weeklyMinutes !== undefined) {
-      const weeklyStats = JSON.parse(localStorage.getItem('weeklyStats') || '{}');
+      // ✅ 使用用户隔离的 localStorage
+      const weeklyStats = JSON.parse(getUserStorage('weeklyStats') || '{}');
       weeklyStats.totalMinutes = updates.weeklyMinutes;
-      localStorage.setItem('weeklyStats', JSON.stringify(weeklyStats));
+      setUserStorage('weeklyStats', JSON.stringify(weeklyStats));
     }
     
     if (updates.totalMinutes !== undefined) {
-      localStorage.setItem('totalFocusMinutes', updates.totalMinutes.toString());
+      setUserStorage('totalFocusMinutes', updates.totalMinutes.toString());
     }
     
     if (updates.streakDays !== undefined) {
-      const dashboardStats = JSON.parse(localStorage.getItem('dashboardStats') || '{}');
+      // ✅ 使用用户隔离的 localStorage
+      const dashboardStats = JSON.parse(getUserStorage('dashboardStats') || '{}');
       dashboardStats.streakDays = updates.streakDays;
-      localStorage.setItem('dashboardStats', JSON.stringify(dashboardStats));
+      setUserStorage('dashboardStats', JSON.stringify(dashboardStats));
     }
     
     if (updates.userExp !== undefined) {
-      localStorage.setItem('userExp', updates.userExp.toString());
+      setUserStorage('userExp', updates.userExp.toString());
     }
     
     if (updates.heartTreeExp !== undefined) {
-      const heartTreeState = JSON.parse(localStorage.getItem('heartTreeExpState') || '{}');
+      // ✅ 使用用户隔离的 localStorage
+      const heartTreeState = JSON.parse(getUserStorage('heartTreeExpState') || '{}');
       heartTreeState.totalExp = updates.heartTreeExp;
-      localStorage.setItem('heartTreeExpState', JSON.stringify(heartTreeState));
+      setUserStorage('heartTreeExpState', JSON.stringify(heartTreeState));
     }
     
     // 2. 延迟同步到数据库（避免阻塞UI）

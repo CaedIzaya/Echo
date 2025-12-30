@@ -87,7 +87,7 @@ export const authOptions: NextAuthOptions = {
     }
   },
   session: {
-    strategy: "jwt",
+    strategy: "jwt",  // CredentialsProvider 必须使用 JWT
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   // Cookie 配置：NextAuth 在生产环境会自动添加 __Secure- 前缀

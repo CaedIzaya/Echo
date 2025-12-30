@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
 
 const STORAGE_KEY = 'heartTreeNameV1';
 const SYNC_KEY = 'heartTreeNameSynced';
@@ -28,15 +29,17 @@ export function useHeartTreeName() {
         
         // 更新状态和 localStorage
         setTreeName(name);
-        localStorage.setItem(STORAGE_KEY, name);
-        localStorage.setItem(SYNC_KEY, 'true');
+        // ✅ 使用用户隔离的 localStorage
+        setUserStorage(STORAGE_KEY, name);
+        setUserStorage(SYNC_KEY, 'true');
         
         console.log('[useHeartTreeName] 从数据库加载心树名字:', name);
       }
     } catch (error) {
       console.error('[useHeartTreeName] 加载失败:', error);
       // 失败时使用 localStorage 的值
-      const localName = localStorage.getItem(STORAGE_KEY);
+      // ✅ 使用用户隔离的 localStorage
+      const localName = getUserStorage(STORAGE_KEY);
       if (localName) {
         setTreeName(localName);
       }
@@ -51,14 +54,16 @@ export function useHeartTreeName() {
 
     if (status === 'authenticated') {
       // 检查是否已同步
-      const synced = localStorage.getItem(SYNC_KEY);
+      // ✅ 使用用户隔离的 localStorage
+      const synced = getUserStorage(SYNC_KEY);
       
       if (!synced) {
         // 未同步：从数据库加载
         loadFromDatabase();
       } else {
         // 已同步：先用 localStorage 显示，然后后台同步
-        const localName = localStorage.getItem(STORAGE_KEY);
+        // ✅ 使用用户隔离的 localStorage
+      const localName = getUserStorage(STORAGE_KEY);
         if (localName) {
           setTreeName(localName);
         }
@@ -69,7 +74,8 @@ export function useHeartTreeName() {
       }
     } else {
       // 未登录：只使用 localStorage
-      const localName = localStorage.getItem(STORAGE_KEY);
+      // ✅ 使用用户隔离的 localStorage
+      const localName = getUserStorage(STORAGE_KEY);
       if (localName) {
         setTreeName(localName);
       }
@@ -94,7 +100,8 @@ export function useHeartTreeName() {
     try {
       // 立即更新 localStorage（用户体验优先）
       const trimmedName = newName.trim();
-      localStorage.setItem(STORAGE_KEY, trimmedName);
+      // ✅ 使用用户隔离的 localStorage
+      setUserStorage(STORAGE_KEY, trimmedName);
       setTreeName(trimmedName);
 
       // 如果已登录，同步到数据库
@@ -112,7 +119,7 @@ export function useHeartTreeName() {
           // 下次登录时会从 localStorage 同步到数据库
         } else {
           console.log('[useHeartTreeName] 保存到数据库成功');
-          localStorage.setItem(SYNC_KEY, 'true');
+          setUserStorage(SYNC_KEY, 'true');
         }
       }
 

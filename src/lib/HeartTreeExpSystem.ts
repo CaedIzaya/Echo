@@ -5,6 +5,8 @@
 // - 让用户"常常升级"，但不会升级到麻木
 // - 成长完全围绕「专注行为 + 反思行为」，心树是这些行为的年轮可视化
 
+import { getUserStorage, setUserStorage } from './userStorage';
+
 export interface HeartTreeExpState {
   /** 当前等级（1~MAX_LEVEL） */
   level: number;
@@ -80,7 +82,8 @@ export function loadHeartTreeExpState(): HeartTreeExpState {
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    // ✅ 使用用户隔离的 localStorage
+    const raw = getUserStorage(STORAGE_KEY);
     if (!raw) {
       return {
         level: 1,
@@ -129,7 +132,8 @@ export function loadHeartTreeExpState(): HeartTreeExpState {
 export function saveHeartTreeExpState(state: HeartTreeExpState): void {
   if (typeof window === 'undefined') return;
   const normalized = normalizeHeartTreeState(state);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  // ✅ 使用用户隔离的 localStorage
+  setUserStorage(STORAGE_KEY, JSON.stringify(normalized));
 }
 
 // ------- 核心算法 -------
