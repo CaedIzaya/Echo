@@ -55,7 +55,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'game_fps',
         key: 'fps',
-        label: '第一人称射击（FPS）',
+        label: 'FPS',
         order: 1,
         items: [
           {
@@ -113,7 +113,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'game_moba',
         key: 'moba',
-        label: '多人竞技场（MOBA）',
+        label: 'MOBA',
         order: 2,
         items: [
           {
@@ -171,7 +171,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'game_rpg_arpg',
         key: 'rpg_arpg',
-        label: '角色扮演 / 动作角色扮演（RPG / ARPG）',
+        label: 'RPG',
         order: 3,
         items: [
           {
@@ -229,7 +229,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'game_act',
         key: 'act',
-        label: '动作 / 动作冒险（ACT）',
+        label: '动作',
         order: 4,
         items: [
           {
@@ -979,7 +979,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'drawing_manga',
         key: 'manga',
-        label: '漫画（Manga / Comic）',
+        label: '漫画',
         order: 2,
         items: [
           {
@@ -1015,7 +1015,7 @@ export const interestConfig: InterestConfig = [
           {
             id: 'drawing_manga_webtoon',
             key: 'webtoon',
-            name: '纵向长条漫画（Webtoon）',
+            name: '纵向长条漫画',
             milestone: {
               id: 'drawing_manga_webtoon_ms',
               description: '完成一段纵向长条漫画草稿（含至少 3 个场景切换）',
@@ -1035,35 +1035,187 @@ export const interestConfig: InterestConfig = [
         ],
       },
 
-      // TODO: 其余 Category 示例（可按相同结构继续扩展）
-      // {
-      //   id: 'drawing_characters',
-      //   key: 'characters',
-      //   label: '人物与人体',
-      //   order: 3,
-      //   items: [ ... ]
-      // },
-      // {
-      //   id: 'drawing_backgrounds',
-      //   key: 'backgrounds',
-      //   label: '场景与构图',
-      //   order: 4,
-      //   items: [ ... ]
-      // },
-      // {
-      //   id: 'drawing_concept',
-      //   key: 'concept',
-      //   label: '原创与概念设计',
-      //   order: 5,
-      //   items: [ ... ]
-      // },
+      {
+        id: 'drawing_characters',
+        key: 'characters',
+        label: '人物与人体',
+        order: 3,
+        items: [
+          {
+            id: 'drawing_characters_anatomy_basics',
+            key: 'anatomy_basics',
+            name: '人体基本结构',
+            milestone: {
+              id: 'drawing_characters_anatomy_basics_ms',
+              description: '绘制 3 个不同姿势的人体结构（骨架/火柴人均可）',
+            },
+            tags: ['人体', '基础', '结构'],
+          },
+          {
+            id: 'drawing_characters_facial_features',
+            key: 'facial_features',
+            name: '五官练习',
+            milestone: {
+              id: 'drawing_characters_facial_features_ms',
+              description: '练习 3 个角度不同的眼睛/鼻子/嘴巴',
+            },
+            tags: ['五官', '面部', '练习'],
+          },
+          {
+            id: 'drawing_characters_portrait_sketch',
+            key: 'portrait_sketch',
+            name: '人像临摹',
+            milestone: {
+              id: 'drawing_characters_portrait_sketch_ms',
+              description: '完成一张 ≥ 20 分钟的人像临摹并标注光源',
+            },
+            tags: ['人像', '临摹', '光影'],
+          },
+          {
+            id: 'drawing_characters_gesture_drawing',
+            key: 'gesture_drawing',
+            name: '动态速写',
+            milestone: {
+              id: 'drawing_characters_gesture_drawing_ms',
+              description: '完成 10 张 30 秒姿势速写',
+            },
+            tags: ['速写', '动态', '练习'],
+          },
+          {
+            id: 'drawing_characters_clothing_fabric',
+            key: 'clothing_fabric',
+            name: '服饰与褶皱',
+            milestone: {
+              id: 'drawing_characters_clothing_fabric_ms',
+              description: '绘制至少 1 张带褶皱的服饰练习（裙摆/袖子等）',
+            },
+            tags: ['服饰', '褶皱', '细节'],
+          },
+        ],
+      },
+      {
+        id: 'drawing_backgrounds',
+        key: 'backgrounds',
+        label: '场景与构图',
+        order: 4,
+        items: [
+          {
+            id: 'drawing_backgrounds_urban_sketch',
+            key: 'urban_sketch',
+            name: '城市速写',
+            milestone: {
+              id: 'drawing_backgrounds_urban_sketch_ms',
+              description: '完成一次 10–20 分钟的城市/街景速写',
+            },
+            tags: ['城市', '速写', '街景'],
+          },
+          {
+            id: 'drawing_backgrounds_landscape',
+            key: 'landscape',
+            name: '自然风景',
+            milestone: {
+              id: 'drawing_backgrounds_landscape_ms',
+              description: '绘制 1 张自然风景草稿（树/山/天空）',
+            },
+            tags: ['风景', '自然', '环境'],
+          },
+          {
+            id: 'drawing_backgrounds_architecture_perspective',
+            key: 'architecture_perspective',
+            name: '建筑透视',
+            milestone: {
+              id: 'drawing_backgrounds_architecture_perspective_ms',
+              description: '完成 1 张两点透视的建筑草图（室外或室内）',
+            },
+            tags: ['建筑', '透视', '结构'],
+          },
+          {
+            id: 'drawing_backgrounds_composition',
+            key: 'composition',
+            name: '构图练习',
+            milestone: {
+              id: 'drawing_backgrounds_composition_ms',
+              description: '使用三分法/S 曲线完成 1 张构图练习稿',
+            },
+            tags: ['构图', '布局', '技巧'],
+          },
+          {
+            id: 'drawing_backgrounds_atmosphere_art',
+            key: 'atmosphere_art',
+            name: '氛围画',
+            milestone: {
+              id: 'drawing_backgrounds_atmosphere_art_ms',
+              description: '完成一张主色调明确的氛围画（可用数字草稿）',
+            },
+            tags: ['氛围', '色调', '情绪'],
+          },
+        ],
+      },
+      {
+        id: 'drawing_concept',
+        key: 'concept',
+        label: '原创与概念设计',
+        order: 5,
+        items: [
+          {
+            id: 'drawing_concept_original_character',
+            key: 'original_character',
+            name: '原创角色',
+            milestone: {
+              id: 'drawing_concept_original_character_ms',
+              description: '绘制一名原创角色（含至少 2 个特色元素）',
+            },
+            tags: ['原创', '角色', '设计'],
+          },
+          {
+            id: 'drawing_concept_illustration',
+            key: 'illustration',
+            name: '插画创作',
+            milestone: {
+              id: 'drawing_concept_illustration_ms',
+              description: '完成一张 ≥ 60 分钟的小插画（线稿或半成稿均可）',
+            },
+            tags: ['插画', '创作', '完整作品'],
+          },
+          {
+            id: 'drawing_concept_concept_art',
+            key: 'concept_art',
+            name: '概念设计',
+            milestone: {
+              id: 'drawing_concept_concept_art_ms',
+              description: '为同一主题绘制 3 个不同迭代版本（如武器/场景/生物）',
+            },
+            tags: ['概念', '迭代', '设计'],
+          },
+          {
+            id: 'drawing_concept_style_exploration',
+            key: 'style_exploration',
+            name: '风格模仿',
+            milestone: {
+              id: 'drawing_concept_style_exploration_ms',
+              description: '临摹 1 位喜爱的画师风格并记录心得',
+            },
+            tags: ['风格', '学习', '临摹'],
+          },
+          {
+            id: 'drawing_concept_themed_art',
+            key: 'themed_art',
+            name: '主题创作',
+            milestone: {
+              id: 'drawing_concept_themed_art_ms',
+              description: '以"风/光/孤独/城市/治愈"任一主题完成一次创作',
+            },
+            tags: ['主题', '创作', '表达'],
+          },
+        ],
+      },
     ],
   },
   {
     id: 'domain_coding',
     key: 'coding',
     label: '编程 / 代码',
-    order: 5,
+    order: 5,//
     categories: [
       {
         id: 'coding_basic_lang',
@@ -1126,7 +1278,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'coding_web_frontend',
         key: 'web_frontend',
-        label: 'Web 前端（HTML / CSS / JS / 框架）',
+        label: 'Web 前端',
         order: 2,
         items: [
           {
@@ -1210,7 +1362,7 @@ export const interestConfig: InterestConfig = [
           {
             id: 'coding_backend_database_intro',
             key: 'database_intro',
-            name: '数据库入门（MySQL / Postgres）',
+            name: '数据库入门',
             milestone: {
               id: 'coding_backend_database_intro_ms',
               description: '完成一次建表、插入数据与查询数据的完整流程',
@@ -1248,7 +1400,7 @@ export const interestConfig: InterestConfig = [
           {
             id: 'coding_data_ai_analysis_script',
             key: 'analysis_script',
-            name: '数据分析脚本（Python）',
+            name: '数据分析脚本',
             milestone: {
               id: 'coding_data_ai_analysis_script_ms',
               description: '使用 Python 读取一次 CSV/JSON 数据并完成一次简单统计（如平均值）',
@@ -1278,7 +1430,7 @@ export const interestConfig: InterestConfig = [
           {
             id: 'coding_data_ai_automation',
             key: 'automation',
-            name: '自动化脚本（本地工具）',
+            name: '自动化脚本',
             milestone: {
               id: 'coding_data_ai_automation_ms',
               description: '编写一个脚本自动完成一件小事，例如批量重命名文件或整理目录',
@@ -1366,7 +1518,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'language_english_practical',
         key: 'english_practical',
-        label: '实战英语（IELTS / Duolingo / 实用英语）',
+        label: '实战英语',
         order: 1,
         items: [
           {
@@ -1912,7 +2064,7 @@ export const interestConfig: InterestConfig = [
           {
             id: 'sports_special_training_agility',
             key: 'agility_coordination',
-            name: '身体素质（灵敏与协调）',
+            name: '身体素质',
             milestone: {
               id: 'sports_special_training_agility_ms',
               description: '完成一次灵敏度梯或左右移动练习，不少于 10 分钟',
@@ -2260,7 +2412,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'career_job_search',
         key: 'job_search',
-        label: '求职核心（简历 / 面试 / 投递）',
+        label: '求职核心',
         order: 1,
         items: [
           {
@@ -2318,7 +2470,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'career_professional_communication',
         key: 'professional_communication',
-        label: '专业沟通（写作 / 逻辑 / 输出力）',
+        label: '专业沟通',
         order: 2,
         items: [
           {
@@ -2376,7 +2528,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'career_core_skills',
         key: 'core_skills',
-        label: '核心技能（产品 / 数据 / 技术 / AI）',
+        label: '核心技能',
         order: 3,
         items: [
           {
@@ -2434,7 +2586,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'career_workplace',
         key: 'workplace',
-        label: '职场能力（协作 / 领导 / 情绪能量）',
+        label: '职场能力',
         order: 4,
         items: [
           {
@@ -2492,7 +2644,7 @@ export const interestConfig: InterestConfig = [
       {
         id: 'career_long_term',
         key: 'long_term',
-        label: '长期战略（职业规划 / 愿景 / 财务能力）',
+        label: '长期战略',
         order: 5,
         items: [
           {
@@ -2796,7 +2948,7 @@ export const interestConfig: InterestConfig = [
           {
             id: 'academic_major_direction_math',
             key: 'math',
-            name: '数学（高数 / 线性代数）',
+            name: '数学',
             milestone: {
               id: 'academic_major_direction_math_ms',
               description: '独立推导一次课堂上的公式，可以借助 AI 验证过程',
