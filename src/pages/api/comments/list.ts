@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { db } from '~/server/db';
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,19 +10,18 @@ export default async function handler(
   }
 
   try {
-    // Connect to the Neon database
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL 环境变量未设置');
-    }
-    
-    const sql = neon(process.env.DATABASE_URL);
-    
-    // Fetch all comments ordered by creation time (newest first)
-    const comments = await sql`
-      SELECT id, comment, "createdAt", "updatedAt"
-      FROM comments
-      ORDER BY "createdAt" DESC
-    `;
+    // 使用 Prisma 获取所有评论，按创建时间倒序排列
+    const comments = await db.comment.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        comment: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
     
     return res.status(200).json({ success: true, comments });
   } catch (error) {

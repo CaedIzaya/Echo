@@ -42,6 +42,23 @@ export default async function handler(
 
     console.log(`[heart-tree-exp] 更新心树经验: userId=${session.user.id}, level=${level}, totalExp=${totalExp}`);
 
+    // 获取当前等级，检查是否升级
+    const currentUser = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { heartTreeLevel: true, fruits: true },
+    });
+
+    const oldLevel = currentUser?.heartTreeLevel || 1;
+    const isLevelUp = level > oldLevel;
+    
+    // 计算应该获得的果实数量（每5级获得1个果实）
+    let fruitsToAdd = 0;
+    if (isLevelUp) {
+      const oldFruitMilestones = Math.floor(oldLevel / 5);
+      const newFruitMilestones = Math.floor(level / 5);
+      fruitsToAdd = newFruitMilestones - oldFruitMilestones;
+    }
+
     // 更新数据库
     const updatedUser = await db.user.update({
       where: { id: session.user.id },
@@ -54,21 +71,28 @@ export default async function handler(
           ? new Date(fertilizerBuff.expiresAt)
           : null,
         fertilizerMultiplier: fertilizerBuff?.multiplier || null,
+        ...(fruitsToAdd > 0 && { fruits: { increment: fruitsToAdd } }),
       },
       select: {
         heartTreeLevel: true,
         heartTreeCurrentExp: true,
         heartTreeTotalExp: true,
+        fruits: true,
       },
     });
 
-    console.log(`[heart-tree-exp] 心树经验更新成功: level=${updatedUser.heartTreeLevel}`);
+    console.log(`[heart-tree-exp] 心树经验更新成功: level=${updatedUser.heartTreeLevel}, fruits=${updatedUser.fruits}`);
+    if (fruitsToAdd > 0) {
+      console.log(`[heart-tree-exp] 🍎 获得 ${fruitsToAdd} 个果实！`);
+    }
 
     return res.status(200).json({
       success: true,
       level: updatedUser.heartTreeLevel,
       currentExp: updatedUser.heartTreeCurrentExp,
       totalExp: updatedUser.heartTreeTotalExp,
+      fruits: updatedUser.fruits,
+      fruitsEarned: fruitsToAdd,
     });
   } catch (error: any) {
     console.error("[heart-tree-exp] 更新心树经验失败:", {

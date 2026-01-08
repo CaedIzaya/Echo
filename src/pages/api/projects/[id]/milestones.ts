@@ -58,6 +58,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(201).json({ milestone });
     }
 
+    // PUT: 批量更新里程碑
+    if (req.method === 'PUT') {
+      const { milestones } = req.body;
+
+      if (!Array.isArray(milestones)) {
+        return res.status(400).json({ error: '无效的里程碑数据' });
+      }
+
+      console.log('[milestones] 批量更新里程碑:', { projectId, count: milestones.length });
+
+      // 删除旧的里程碑
+      await db.milestone.deleteMany({
+        where: { projectId }
+      });
+
+      // 创建新的里程碑列表
+      const created = await Promise.all(
+        milestones.map((m: any) => 
+          db.milestone.create({
+            data: {
+              id: m.id || undefined,
+              title: m.title,
+              isCompleted: m.isCompleted || false,
+              order: m.order || 0,
+              projectId,
+            }
+          })
+        )
+      );
+
+      console.log('[milestones] 批量更新成功:', created.length);
+
+      return res.status(200).json({ milestones: created });
+    }
+
     return res.status(405).json({ error: '方法不允许' });
 
   } catch (error: any) {

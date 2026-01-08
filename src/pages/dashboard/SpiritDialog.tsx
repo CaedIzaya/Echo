@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useCallback, CSSProperties } from 'react';
-import { pickUniversalSentence } from '~/lib/echoSpiritDialogueV2';
+import { pickUniversalSentence, pickLevelUpSentence } from '~/lib/echoSpiritDialogueV2';
 import { globalTimerManager } from '~/lib/performanceOptimizer';
 
 // 🔥 文案优先级定义
@@ -19,6 +19,8 @@ interface DialogueQueueItem {
   priority: DialoguePriority;
   duration: number; // 毫秒
   timestamp: number; // 入队时间戳
+  minPlayTime?: number; // 最小播放时间（毫秒），未设置则使用duration
+  canBeInterrupted?: boolean; // 是否可被打断，默认true
 }
 
 // 文案数据（欢迎 / 完成 / 定时陪伴仍沿用原有池；
@@ -203,11 +205,12 @@ interface SpiritDialogProps {
 }
 
 export interface SpiritDialogRef {
-  showMessage: () => void;
+  showMessage: (heartTreeLevel?: number, flowIndex?: number) => void;
   showWelcomeMessage: () => void; // 显示欢迎文案
   showCompletionMessage: () => void; // 显示专注完成祝贺文案
   showTypedMessage: (text: string, tone?: 'cute' | 'chuunibyou' | 'philosophical' | 'awareness') => void; // 显示指定文案（用于首页语境/事件层）
   showAwarenessMessage?: (text: string, durationMs?: number) => void; // 觉察机制文案，默认10秒
+  showLevelUpMessage?: () => void; // 显示等级提升文案
 }
 
 // 随机选择一条文案（移到组件外部，避免依赖问题）
@@ -222,6 +225,11 @@ const getRandomMessage = (type?: 'cute' | 'chuunibyou' | 'philosophical') => {
   };
 };
 
+// 🔥 队列配置常量
+const MAX_QUEUE_SIZE = 5; // 最大队列长度
+const MAX_SAME_PRIORITY = 2; // 同优先级最多数量
+const DIALOGUE_MAX_AGE = 30000; // 文案过期时间（30秒）
+
 const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   ({ spiritState, onStateChange, mobileContainerClassName, mobileContainerStyle }, ref) => {
   const [currentMessage, setCurrentMessage] = useState<string>('');
@@ -231,12 +239,15 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
   const messageStartTimeRef = useRef<number>(0); // 记录文案开始显示的时间
   const periodicTimerRef = useRef<NodeJS.Timeout | null>(null); // 定时触发文案的定时器
   const lastPeriodicTimeRef = useRef<number>(0); // 记录上次定时触发的时间
+  const [isShaking, setIsShaking] = useState(false); // 小精灵抖动状态
   
   // 🔥 文案队列管理
   const [dialogueQueue, setDialogueQueue] = useState<DialogueQueueItem[]>([]);
   const [isPlaying, setIsPlaying] = useState(false); // 是否正在播放文案
   const currentPriorityRef = useRef<DialoguePriority | null>(null); // 当前播放文案的优先级
+  const currentItemRef = useRef<DialogueQueueItem | null>(null); // 当前播放的文案项
   const queueIdCounterRef = useRef<number>(0); // 队列ID计数器
+  const shouldPlayNextRef = useRef<boolean>(false); // 标记是否应该播放下一个
 
   // 🔥 核心队列管理方法
   
@@ -246,6 +257,8 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     tone: 'cute' | 'chuunibyou' | 'philosophical' | 'awareness',
     priority: DialoguePriority,
     duration: number = 8000,
+    minPlayTime?: number,
+    canBeInterrupted: boolean = true,
   ) => {
     const newItem: DialogueQueueItem = {
       id: `dialogue_${++queueIdCounterRef.current}`,
@@ -254,6 +267,8 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       priority,
       duration,
       timestamp: Date.now(),
+      minPlayTime: minPlayTime || duration,
+      canBeInterrupted,
     };
 
     // 如果当前没有播放文案，直接播放
@@ -264,13 +279,20 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
 
     // 如果有文案正在播放，检查优先级
     const currentPriority = currentPriorityRef.current;
-    if (currentPriority === null) {
+    const currentItem = currentItemRef.current;
+    
+    if (currentPriority === null || !currentItem) {
       playDialogue(newItem);
       return;
     }
 
-    // 如果新文案优先级更高，立即播放（当前文案自动丢弃）
-    if (priority > currentPriority) {
+    // 🔥 检查当前文案是否可以被打断
+    const playedTime = Date.now() - messageStartTimeRef.current;
+    const canInterruptCurrent = currentItem.canBeInterrupted !== false && 
+      playedTime >= (currentItem.minPlayTime || currentItem.duration);
+
+    // 如果新文案优先级更高，且当前文案可以被打断，则立即播放
+    if (priority > currentPriority && canInterruptCurrent) {
       console.log(`[SpiritDialog] 高优先级文案插队: ${priority} > ${currentPriority}`);
       if (timerRef.current) {
         globalTimerManager.clearTimeout(timerRef.current);
@@ -280,9 +302,25 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       return;
     }
 
-    // 优先级相同或更低，加入队列
-    console.log(`[SpiritDialog] 文案加入队列: priority=${priority}, text="${text.substring(0, 20)}..."`);
+    // 如果当前文案不可被打断，或优先级相同/更低，加入队列
+    console.log(`[SpiritDialog] 文案加入队列: priority=${priority}, queueSize=${dialogueQueue.length}`);
+    
     setDialogueQueue(prev => {
+      // 🔥 优化1：检查队列长度限制
+      if (prev.length >= MAX_QUEUE_SIZE) {
+        console.warn(`[SpiritDialog] 队列已满 (${MAX_QUEUE_SIZE})，移除优先级最低的文案`);
+        const sorted = [...prev].sort((a, b) => a.priority - b.priority);
+        const toRemove = sorted[0];
+        prev = prev.filter(item => item.id !== toRemove.id);
+      }
+      
+      // 🔥 优化2：检查同优先级数量
+      const samePriorityCount = prev.filter(item => item.priority === priority).length;
+      if (samePriorityCount >= MAX_SAME_PRIORITY) {
+        console.warn(`[SpiritDialog] 同优先级文案过多 (${priority})，跳过入队`);
+        return prev;
+      }
+      
       const newQueue = [...prev, newItem];
       // 按优先级和时间戳排序
       newQueue.sort((a, b) => {
@@ -293,17 +331,23 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
       });
       return newQueue;
     });
-  }, [isPlaying]);
+  }, [isPlaying, dialogueQueue]);
 
   // 播放文案
   const playDialogue = useCallback((item: DialogueQueueItem) => {
-    console.log(`[SpiritDialog] 开始播放文案: priority=${item.priority}, text="${item.text.substring(0, 30)}..."`);
+    console.log(`[SpiritDialog] 开始播放文案: priority=${item.priority}, duration=${item.duration}ms, text="${item.text.substring(0, 30)}..."`);
     
+    // 使用批量更新
     setCurrentMessage(item.text);
     setMessageType(item.tone);
     setIsVisible(true);
     setIsPlaying(true);
+    
+    // 立即输出状态
+    console.log('[SpiritDialog] 已设置状态 - isVisible=true, message=', item.text.substring(0, 20));
+    
     currentPriorityRef.current = item.priority;
+    currentItemRef.current = item;
     messageStartTimeRef.current = Date.now();
 
     if (onStateChange) {
@@ -316,28 +360,54 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     }
 
     timerRef.current = globalTimerManager.setTimeout(() => {
-      console.log(`[SpiritDialog] 文案播放完成`);
+      console.log(`[SpiritDialog] 文案播放完成，准备播放下一个`);
       setIsVisible(false);
       setCurrentMessage('');
       setIsPlaying(false);
       currentPriorityRef.current = null;
+      currentItemRef.current = null;
       timerRef.current = null;
 
-      // 播放队列中的下一个
-      playNextFromQueue();
+      // 标记应该播放下一个
+      shouldPlayNextRef.current = true;
     }, item.duration);
   }, [onStateChange, spiritState]);
 
   // 播放队列中的下一个文案
   const playNextFromQueue = useCallback(() => {
+    console.log('[SpiritDialog] playNextFromQueue 被调用');
+    
     setDialogueQueue(prev => {
+      console.log('[SpiritDialog] 当前队列长度:', prev.length);
+      
       if (prev.length === 0) {
+        console.log('[SpiritDialog] 队列为空，无需播放');
         return prev;
       }
 
-      const [nextItem, ...rest] = prev;
+      const now = Date.now();
+      
+      // 🔥 优化3：过滤掉过期的文案
+      const validQueue = prev.filter(item => {
+        const age = now - item.timestamp;
+        if (age > DIALOGUE_MAX_AGE) {
+          console.log(`[SpiritDialog] 文案已过期 (${Math.round(age/1000)}秒): "${item.text.substring(0, 20)}..."`);
+          return false;
+        }
+        return true;
+      });
+
+      if (validQueue.length === 0) {
+        console.log('[SpiritDialog] 队列为空或全部过期');
+        return [];
+      }
+
+      const [nextItem, ...rest] = validQueue;
+      console.log('[SpiritDialog] 准备播放下一个文案:', nextItem.text.substring(0, 30));
+      
       // 使用setTimeout确保状态更新完成后再播放
       setTimeout(() => {
+        console.log('[SpiritDialog] setTimeout 触发，开始播放');
         playDialogue(nextItem);
       }, 100);
 
@@ -347,16 +417,15 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
 
   // 显示文案的函数（用户交互触发，5秒后自动隐藏）
   // 注意：这是用户点击小精灵后触发的对话框，保持5秒持续时间
-  const showMessage = useCallback(() => {
-    // 🔥 如果有文案正在播放，忽略点击
-    if (isPlaying) {
-      console.log('[SpiritDialog] 文案播放中，忽略用户点击');
-      return;
-    }
-    // 每次点击都从通用人格池（universal_pool）抽一句
-    const { text } = pickUniversalSentence();
+  const showMessage = useCallback((heartTreeLevel: number = 0, flowIndex: number = 0) => {
+    console.log('[SpiritDialog] showMessage 被调用, isPlaying:', isPlaying);
+    
+    // 每次点击都从动态通用人格池抽一句（融合了等级和心流状态）
+    const { text } = pickUniversalSentence({ heartTreeLevel, flowIndex });
+    console.log('[SpiritDialog] 选中文案:', text);
     
     // 使用队列系统，用户点击优先级为 LOW
+    // 无论是否正在播放，都加入队列，按顺序播放
     enqueueDialogue(text, 'cute', DialoguePriority.LOW, 5000);
   }, [isPlaying, enqueueDialogue]);
 
@@ -397,8 +466,8 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     (text: string, durationMs: number = 10000) => {
       if (!text) return;
 
-      // 觉察机制文案使用 HIGH 优先级
-      enqueueDialogue(text, 'awareness', DialoguePriority.HIGH, durationMs);
+      // 🔥 觉察机制文案：HIGH 优先级，至少播放 5 秒，不可被同级打断
+      enqueueDialogue(text, 'awareness', DialoguePriority.HIGH, durationMs, 5000, false);
     },
     [enqueueDialogue],
   );
@@ -408,8 +477,16 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     // 随机选择一条祝贺文案
     const completionMessage = completionMessages[Math.floor(Math.random() * completionMessages.length)];
     
-    // 完成祝贺文案使用 CRITICAL 优先级（最高）
-    enqueueDialogue(completionMessage, 'philosophical', DialoguePriority.CRITICAL, 8000);
+    // 🔥 完成祝贺文案：CRITICAL 优先级，必须完整播放，不可被打断
+    enqueueDialogue(completionMessage, 'philosophical', DialoguePriority.CRITICAL, 8000, 8000, false);
+  }, [enqueueDialogue]);
+
+  // 显示等级提升文案的函数（事件触发，8秒后自动隐藏）
+  const showLevelUpMessage = useCallback(() => {
+    const { text } = pickLevelUpSentence();
+    
+    // 等级提升文案使用 MEDIUM 优先级
+    enqueueDialogue(text, 'cute', DialoguePriority.MEDIUM, 8000);
   }, [enqueueDialogue]);
 
   // 显示定时触发的陪伴文案（非交互触发，8秒后自动隐藏）
@@ -424,6 +501,15 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     enqueueDialogue(periodicMessage, 'philosophical', DialoguePriority.AUTO, 8000);
   }, [enqueueDialogue]);
 
+  // 监听shouldPlayNextRef，触发播放下一个
+  useEffect(() => {
+    if (shouldPlayNextRef.current) {
+      shouldPlayNextRef.current = false;
+      console.log('[SpiritDialog] 检测到shouldPlayNext标记，开始播放下一个');
+      playNextFromQueue();
+    }
+  }, [isPlaying, playNextFromQueue]);
+
   // 通过ref暴露方法
   useImperativeHandle(ref, () => ({
     showMessage,
@@ -431,7 +517,8 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     showCompletionMessage,
     showTypedMessage,
     showAwarenessMessage,
-  }), [showMessage, showWelcomeMessage, showCompletionMessage, showTypedMessage, showAwarenessMessage]);
+    showLevelUpMessage,
+  }), [showMessage, showWelcomeMessage, showCompletionMessage, showTypedMessage, showAwarenessMessage, showLevelUpMessage]);
 
   // 定时触发文案（每20分钟）
   useEffect(() => {
@@ -486,9 +573,7 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
         globalTimerManager.clearInterval(periodicTimerRef.current);
         periodicTimerRef.current = null;
       }
-      // 组件卸载时也清空消息和隐藏状态
-      setIsVisible(false);
-      setCurrentMessage('');
+      // 不清空消息状态，避免热更新时文案消失
     };
   }, []);
 
@@ -528,7 +613,9 @@ const SpiritDialog = forwardRef<SpiritDialogRef, SpiritDialogProps>(
     }
   };
 
-  if (!isVisible || !currentMessage) return null;
+  if (!isVisible || !currentMessage) {
+    return null;
+  }
 
   const dialogStyle = getDialogStyle();
 

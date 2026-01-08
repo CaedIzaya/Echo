@@ -6,12 +6,24 @@ interface AchievementPanelProps {
 }
 
 export default function AchievementPanel({ onClose }: AchievementPanelProps) {
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'flow' | 'time' | 'daily' | 'milestone' | 'first'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'flow' | 'time' | 'daily' | 'milestone' | 'first' | 'badge'>('all');
   const [stats, setStats] = useState({ total: 0, achieved: 0, progress: 0 });
+  const [badges, setBadges] = useState<string[]>([]);
 
   useEffect(() => {
     const manager = getAchievementManager();
     setStats(manager.getAchievementStats());
+    
+    // 加载已购买的勋章
+    fetch('/api/shop/items')
+      .then(res => res.json())
+      .then(data => {
+        const purchasedBadges = data
+          .filter((item: any) => item.type === 'badge' && item.purchased)
+          .map((item: any) => item.id);
+        setBadges(purchasedBadges);
+      })
+      .catch(err => console.error('加载勋章失败:', err));
   }, []);
 
   const manager = getAchievementManager();
@@ -42,11 +54,19 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
 
   const categories = [
     { key: 'all', label: '全部', icon: '🏆' },
+    { key: 'badge', label: '勋章', icon: '🎖️' },
     { key: 'first', label: '初体验', icon: '🌱' },
     { key: 'flow', label: '心流', icon: '✨' },
     { key: 'time', label: '时长', icon: '⏰' },
     { key: 'daily', label: '每日', icon: '📅' },
     { key: 'milestone', label: '小目标', icon: '🎯' },
+  ];
+  
+  // 勋章数据
+  const badgeData = [
+    { id: 'badge_bronze', name: '青铜勋章', icon: '🥉', description: '彰显你的努力与坚持' },
+    { id: 'badge_silver', name: '白银勋章', icon: '🥈', description: '展现你的专注与毅力' },
+    { id: 'badge_gold', name: '黄金勋章', icon: '🥇', description: '证明你的卓越与非凡' },
   ];
 
   return (
@@ -95,6 +115,50 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
 
         {/* 成就列表 */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* 勋章展示区（仅在全部或勋章分类时显示） */}
+          {(selectedCategory === 'all' || selectedCategory === 'badge') && badges.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <span>🎖️</span>
+                我的勋章
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {badgeData.map(badge => {
+                  const owned = badges.includes(badge.id);
+                  if (!owned && selectedCategory === 'badge') return null;
+                  
+                  return (
+                    <div
+                      key={badge.id}
+                      className={`rounded-2xl p-6 border-2 transition-all ${
+                        owned
+                          ? 'bg-gradient-to-br from-amber-400 to-orange-500 border-transparent shadow-lg text-white'
+                          : 'bg-gray-50 border-gray-200 text-gray-400'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-6xl mb-3">{badge.icon}</div>
+                        <h4 className={`font-bold text-lg mb-2 ${owned ? 'text-white' : 'text-gray-500'}`}>
+                          {badge.name}
+                        </h4>
+                        <p className={`text-sm ${owned ? 'text-white/90' : 'text-gray-400'}`}>
+                          {badge.description}
+                        </p>
+                        {owned && (
+                          <div className="mt-3 text-xs text-white/80 bg-white/20 rounded-full px-3 py-1 inline-block">
+                            ✓ 已拥有
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 成就列表（勋章分类时不显示） */}
+          {selectedCategory !== 'badge' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredAchievements.map((achievement) => {
               const isUnlocked = manager.isAchievementUnlocked(achievement.id);
@@ -142,6 +206,7 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
               );
             })}
           </div>
+          )}
         </div>
 
         {/* 进度条 */}

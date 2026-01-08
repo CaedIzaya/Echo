@@ -14,6 +14,8 @@ import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import StartupMotivation from './StartupMotivation';
+import ShopModal from '~/components/shop/ShopModal';
+import { getCurrentTheme, getThemeConfig } from '~/lib/themeSystem';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import type { Achievement } from '~/lib/AchievementSystem';
 import { useMailSystem, MailSystem } from '~/lib/MailSystem';
@@ -322,6 +324,10 @@ export default function Dashboard() {
             localStorage.removeItem(key);
           }
         });
+        
+        // 🔥 每次进入Dashboard都清除计划缓存时间戳，强制重新加载
+        localStorage.removeItem('projectsSyncedAt');
+        console.log('🔄 已清除计划缓存时间戳，将从数据库重新加载');
       }
     }
   }, [session?.user?.id]);
@@ -331,6 +337,19 @@ export default function Dashboard() {
   const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
   const { unlockAchievement: unlockAchievementToDB } = useAchievements();
   const { syncStatus, syncAllData } = useDataSync(); // 🆕 数据同步 Hook
+  
+  // 监听用户等级变化，触发等级提升文案
+  const prevUserLevelRef = useRef<number>(hookUserLevel);
+  useEffect(() => {
+    if (hookUserLevel > prevUserLevelRef.current && prevUserLevelRef.current > 0) {
+      console.log(`[Dashboard] 🎉 用户等级提升: ${prevUserLevelRef.current} → ${hookUserLevel}`);
+      // 触发等级提升文案
+      if (spiritDialogRef.current?.showLevelUpMessage) {
+        spiritDialogRef.current.showLevelUpMessage();
+      }
+    }
+    prevUserLevelRef.current = hookUserLevel;
+  }, [hookUserLevel]);
   
   // 🔥 统计数据从数据库加载
   const { 
@@ -346,6 +365,7 @@ export default function Dashboard() {
     isLoading: projectsLoading,
     updateMilestones: updateMilestonesToDB,
     createProject: createProjectToDB,
+    reload: refreshProjects,
   } = useProjects();
   
   // 使用 useMemo 缓存 userId，避免因 session 对象引用变化而触发重新渲染
@@ -505,19 +525,8 @@ export default function Dashboard() {
   const [lumiClickEvents, setLumiClickEvents] = useState<number[]>([]);
 
   // 主要计划状态 - 🔥 优先从数据库加载
-  const [primaryPlan, setPrimaryPlan] = useState<Project | null>(() => {
-    // 如果有数据库数据，使用数据库的主计划
-    if (!projectsLoading && dbPrimaryProject) {
-      return dbPrimaryProject;
-    }
-    
-    // 否则使用缓存
-    if (typeof window !== 'undefined') {
-      const plans = userStorageJSON.get<any[]>('userPlans', []) || [];
-      return plans.find((p: Project) => p.isPrimary) || null;
-    }
-    return null;
-  });
+  // 直接使用数据库的主计划，不维护额外state
+  const primaryPlan = dbPrimaryProject;
 
   // 成就系统相关 - 必须在所有条件返回之前声明
   const [achievementManager, setAchievementManager] = useState<AchievementManager | null>(null);
@@ -596,14 +605,15 @@ export default function Dashboard() {
 
   // 小精灵点击统一处理：经验值 + 觉察检查 + 文案展示
   const handleSpiritClick = async () => {
+    console.log('[Dashboard] 小精灵被点击');
+    
     const today = getTodayDate();
     if (typeof window !== 'undefined') {
       const lastSpiritInteractionDate = localStorage.getItem('lastSpiritInteractionDate');
       if (lastSpiritInteractionDate !== today) {
         const spiritExp = LevelManager.calculateSpiritInteractionExp();
-        await addUserExp(spiritExp); // 使用 Hook 自动保存到数据库
+        await addUserExp(spiritExp);
         localStorage.setItem('lastSpiritInteractionDate', today);
-        // userLevel 会自动同步，无需手动 setUserLevel
       }
     }
 
@@ -617,9 +627,17 @@ export default function Dashboard() {
       return updated;
     });
 
-    // 若未触发觉察，回退到普通气泡
+    console.log('[Dashboard] 觉察处理结果:', handledAwareness);
+
+    // 若未触发觉察，显示普通对话
     if (!handledAwareness && spiritDialogRef.current) {
-      spiritDialogRef.current.showMessage();
+      const heartTreeLevel = heartTreeExpState.level || 0;
+      const flowIndexScore = flowIndex.score || 0;
+      
+      console.log('[Dashboard] 调用 showMessage, 心树等级:', heartTreeLevel, '心流指数:', flowIndexScore);
+      spiritDialogRef.current.showMessage(heartTreeLevel, flowIndexScore);
+    } else {
+      console.log('[Dashboard] 觉察已处理或ref不存在');
     }
   };
   const [newAchievements, setNewAchievements] = useState<any[]>([]);
@@ -640,6 +658,16 @@ export default function Dashboard() {
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
   const [showStreakInfo, setShowStreakInfo] = useState(false);
   const [showFlowInfo, setShowFlowInfo] = useState(false);
+  const [showShopModal, setShowShopModal] = useState(false);
+  const [fruits, setFruits] = useState(0);
+  const [theme, setThemeState] = useState<'default' | 'echo' | 'salt_blue' | 'fresh_green'>('default');
+  
+  // 客户端加载主题（必须在useEffect中，避免SSR问题）
+  useEffect(() => {
+    const savedTheme = getCurrentTheme();
+    console.log('[Dashboard] 客户端加载主题:', savedTheme);
+    setThemeState(savedTheme);
+  }, []);
   
   // 启动激励相关状态
   const [showStartupMotivation, setShowStartupMotivation] = useState(false);
@@ -711,39 +739,20 @@ export default function Dashboard() {
 
     console.log('📝 添加小目标到计划:', { planId: primaryPlan.id, title });
 
-    // 更新本地状态
-    setPrimaryPlan(prev => {
-      if (!prev) return prev;
+    // 保存到数据库
+    if (primaryPlan && session?.user?.id) {
+      const updatedMilestones = [...(primaryPlan.milestones || []), newMilestone];
       
-      const updatedMilestones = [...(prev.milestones || []), newMilestone];
-      const updatedPlan = {
-        ...prev,
-        milestones: updatedMilestones
-      };
-
-      // 🔥 保存到数据库
-      if (session?.user?.id && prev.id) {
-        updateMilestonesToDB(prev.id, updatedMilestones).then(success => {
-          if (success) {
-            console.log('✅ 小目标已同步到数据库');
-          } else {
-            console.error('❌ 同步小目标失败');
-          }
-        });
-      }
-
-      // 同步到 localStorage
-      if (typeof window !== 'undefined') {
-        const savedPlans = localStorage.getItem('userPlans');
-        const plans = savedPlans ? JSON.parse(savedPlans) : [];
-        const updatedPlans = plans.map((p: Project) => 
-          p.id === updatedPlan.id ? updatedPlan : p
-        );
-        userStorageJSON.set('userPlans', updatedPlans);
-      }
-
-      return updatedPlan;
-    });
+      updateMilestonesToDB(primaryPlan.id, updatedMilestones).then(success => {
+        if (success) {
+          console.log('✅ 小目标已同步到数据库');
+          // 刷新计划数据
+          refreshProjects();
+        } else {
+          console.error('❌ 同步小目标失败');
+        }
+      });
+    }
   };
 
   // 播放完成音效 - 叮咚音效
@@ -827,47 +836,27 @@ export default function Dashboard() {
     
     // 延迟执行完成逻辑，让动画先播放
     setTimeout(async () => {
-      setPrimaryPlan(prev => {
-        if (!prev) return prev;
-        
-        const updatedMilestones = prev.milestones.map(m =>
+      if (primaryPlan && session?.user?.id) {
+        const updatedMilestones = primaryPlan.milestones.map(m =>
           milestoneIds.includes(m.id) ? { ...m, isCompleted: true } : m
         );
 
-        const updatedPlan = {
-          ...prev,
-          milestones: updatedMilestones
-        };
-
-        // 🔥 保存到数据库（使用 Hook 方法）
-        if (session?.user?.id && prev.id) {
-          console.log('💾 批量更新小目标到数据库', {
-            projectId: prev.id,
-            milestoneIds,
-            count: milestoneIds.length,
-          });
-          
-          updateMilestonesToDB(prev.id, updatedMilestones).then(success => {
-            if (success) {
-              console.log('✅ 小目标已同步到数据库');
-            } else {
-              console.error('❌ 同步小目标失败');
-            }
-          });
-        }
-
-        // 同步到localStorage（缓存）
-        if (typeof window !== 'undefined') {
-          const savedPlans = localStorage.getItem('userPlans');
-          const plans = savedPlans ? JSON.parse(savedPlans) : [];
-          const updatedPlans = plans.map((p: Project) => 
-            p.id === updatedPlan.id ? updatedPlan : p
-          );
-          userStorageJSON.set('userPlans', updatedPlans);
-        }
-
-        return updatedPlan;
-      });
+        console.log('💾 批量更新小目标到数据库', {
+          projectId: primaryPlan.id,
+          milestoneIds,
+          count: milestoneIds.length,
+        });
+        
+        updateMilestonesToDB(primaryPlan.id, updatedMilestones).then(success => {
+          if (success) {
+            console.log('✅ 小目标已同步到数据库');
+            // 刷新计划数据
+            refreshProjects();
+          } else {
+            console.error('❌ 同步小目标失败');
+          }
+        });
+      }
 
       // 批量完成小目标获得经验值（移到 setPrimaryPlan 之外）
       if (typeof window !== 'undefined') {
@@ -1559,12 +1548,12 @@ export default function Dashboard() {
   }, [dashboardDataLoading, dashboardData]);
   
   // 🔥 监听计划数据变化，同步更新主计划
+  // 🔥 监听数据库计划数据，同步缓存
   useEffect(() => {
     if (projectsLoading) return;
     
     if (dbPrimaryProject) {
-      console.log('[Dashboard] 🔄 更新主计划', dbPrimaryProject.name);
-      setPrimaryPlan(dbPrimaryProject);
+      console.log('[Dashboard] 🔄 主计划数据:', dbPrimaryProject.name);
       
       // 同步到 localStorage 缓存
       if (typeof window !== 'undefined') {
@@ -2174,6 +2163,12 @@ export default function Dashboard() {
     router.push('/focus');
   };
 
+  // 调试：输出主题信息
+  useEffect(() => {
+    console.log('[Dashboard] 主题状态更新:', theme);
+    console.log('[Dashboard] themeConfig:', getThemeConfig(theme));
+  }, [theme]);
+
   // 加载状态
   if (sessionStatus === 'loading' || isLoading) {
     return (
@@ -2315,42 +2310,51 @@ export default function Dashboard() {
     );
   };
 
-  const FlowCard = () => (
-    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs uppercase tracking-[0.4em] text-white/80">心流指数</p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowFlowInfo(!showFlowInfo);
-            }}
-            data-tooltip-trigger
-            className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <span className="text-xs font-bold text-white">!</span>
-          </button>
-          <span className="text-2xl">🌀</span>
+  // 商城卡片组件
+  const ShopCard = () => {
+    // 获取果实数据
+    useEffect(() => {
+      if (session?.user?.id) {
+        fetch('/api/user/fruits')
+          .then(res => res.json())
+          .then(data => {
+            if (data.fruits !== undefined) {
+              setFruits(data.fruits);
+            }
+          })
+          .catch(err => console.error('获取果实数据失败:', err));
+      }
+    }, [session?.user?.id]);
+
+    return (
+      <div 
+        onClick={() => setShowShopModal(true)}
+        className="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-500 rounded-3xl p-6 shadow-lg shadow-orange-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden group"
+      >
+        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+          <span className="text-6xl">🏪</span>
         </div>
-      </div>
-      {showFlowInfo && (
-        <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-          <p className="text-xs text-zinc-600 leading-relaxed">
-            心流指数会记得你的长期努力，也会珍惜你此刻的投入。
+        
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium">心树商城</p>
+          <span className="text-2xl">🛍️</span>
+        </div>
+        
+        <div className="space-y-3 relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-3xl">🍎</span>
+            <div>
+              <p className="text-sm text-white/80">我的果实</p>
+              <p className="text-3xl font-bold">{fruits}</p>
+            </div>
+          </div>
+          <p className="text-sm text-white/90">
+            点击进入商城，兑换精美道具
           </p>
-          <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
         </div>
-      )}
-      <div className="space-y-3">
-        <div className="flex items-baseline gap-2">
-          <p className="text-4xl font-bold">{flowIndex.score}</p>
-          <p className="text-sm text-white/80">/ 100</p>
-        </div>
-        <p className="text-sm font-medium text-white/90">{flowIndex.level}</p>
-        {/* 质量、时长、一致性数据已隐藏 */}
       </div>
-    </div>
-  );
+    );
+  };
 
   // 里程碑卡片组件
   const MilestoneCard = () => {
@@ -2572,8 +2576,16 @@ export default function Dashboard() {
     return null; // 或者显示一个极简的loading，但通常会很快通过
   }
 
+  const themeConfig = getThemeConfig(theme);
+  
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 relative pb-24">
+    <div 
+      className={`min-h-screen text-zinc-900 relative pb-24 transition-all duration-500 ${theme !== 'default' ? 'animate-breathing-bg' : ''}`}
+      style={{
+        backgroundColor: themeConfig.bgColor,
+        ...(themeConfig.bgStyle || {}),
+      }}
+    >
       {/* 成就通知 */}
       <AchievementNotification />
       
@@ -2886,7 +2898,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            <FlowCard />
+            <ShopCard />
             <AchievementsSection />
           </div>
         </div>
@@ -2946,7 +2958,7 @@ export default function Dashboard() {
               </div>
             </div>
             <MilestoneCard />
-            <FlowCard />
+            <ShopCard />
           </div>
 
           {/* PC - 右侧内容区 */}
@@ -3116,6 +3128,16 @@ export default function Dashboard() {
           onAddMilestone={handleAddMilestoneFromMotivation}
         />
       )}
+
+      {/* 商城弹窗 */}
+      <ShopModal 
+        isOpen={showShopModal} 
+        onClose={() => {
+          setShowShopModal(false);
+          // 关闭商城时重新加载主题状态
+          setThemeState(getCurrentTheme());
+        }}
+      />
       
       {/* 动画样式 */}
       <style jsx>{`
@@ -3145,6 +3167,14 @@ export default function Dashboard() {
             transform: scale(1.02);
           }
         }
+        @keyframes breathing-bg {
+          0%, 100% {
+            opacity: 0.85;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
         :global(.animate-breathing) {
           animation: breathing 2s ease-in-out infinite;
         }
@@ -3153,6 +3183,9 @@ export default function Dashboard() {
         }
         :global(.animate-pulse-gentle) {
           animation: pulse-gentle 2s ease-in-out infinite;
+        }
+        :global(.animate-breathing-bg) {
+          animation: breathing-bg 4s ease-in-out infinite;
         }
       `}</style>
     </div>

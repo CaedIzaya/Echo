@@ -12,6 +12,7 @@ import SecurityGuideCard from './SecurityGuideCard';
 import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
+import ShopModal from '~/components/shop/ShopModal';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 import { useUserExp } from '~/hooks/useUserExp';
@@ -430,6 +431,8 @@ export default function Dashboard() {
   const [showWeeklyInfo, setShowWeeklyInfo] = useState(false);
   const [showStreakInfo, setShowStreakInfo] = useState(false);
   const [showFlowInfo, setShowFlowInfo] = useState(false);
+  const [showShopModal, setShowShopModal] = useState(false);
+  const [fruits, setFruits] = useState(0);
 
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
@@ -1645,42 +1648,51 @@ export default function Dashboard() {
     );
   };
 
-  const FlowCard = () => (
-    <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 rounded-3xl p-6 shadow-lg shadow-cyan-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs uppercase tracking-[0.4em] text-white/80">心流指数</p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowFlowInfo(!showFlowInfo);
-            }}
-            data-tooltip-trigger
-            className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <span className="text-xs font-bold text-white">!</span>
-          </button>
-          <span className="text-2xl">🌀</span>
+  // 商城卡片组件
+  const ShopCard = () => {
+    // 获取果实数据
+    useEffect(() => {
+      if (session?.user?.id) {
+        fetch('/api/user/fruits')
+          .then(res => res.json())
+          .then(data => {
+            if (data.fruits !== undefined) {
+              setFruits(data.fruits);
+            }
+          })
+          .catch(err => console.error('获取果实数据失败:', err));
+      }
+    }, [session?.user?.id]);
+
+    return (
+      <div 
+        onClick={() => setShowShopModal(true)}
+        className="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-500 rounded-3xl p-6 shadow-lg shadow-orange-500/30 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden group"
+      >
+        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+          <span className="text-6xl">🏪</span>
         </div>
-      </div>
-      {showFlowInfo && (
-        <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-          <p className="text-xs text-zinc-600 leading-relaxed">
-            心流指数会记得你的长期努力，也会珍惜你此刻的投入。
+        
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium">心树商城</p>
+          <span className="text-2xl">🛍️</span>
+        </div>
+        
+        <div className="space-y-3 relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-3xl">🍎</span>
+            <div>
+              <p className="text-sm text-white/80">我的果实</p>
+              <p className="text-3xl font-bold">{fruits}</p>
+            </div>
+          </div>
+          <p className="text-sm text-white/90">
+            点击进入商城，兑换精美道具
           </p>
-          <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
         </div>
-      )}
-      <div className="space-y-3">
-        <div className="flex items-baseline gap-2">
-          <p className="text-4xl font-bold">{flowIndex.score}</p>
-          <p className="text-sm text-white/80">/ 100</p>
-        </div>
-        <p className="text-sm font-medium text-white/90">{flowIndex.level}</p>
-        {/* 质量、时长、一致性数据已隐藏 */}
       </div>
-    </div>
-  );
+    );
+  };
 
   // 里程碑卡片组件
   const MilestoneCard = () => {
@@ -2080,7 +2092,7 @@ export default function Dashboard() {
             </div>
 
             <div className="hidden xl:block space-y-6">
-              <FlowCard />
+              <ShopCard />
               <MilestoneCard />
             </div>
           </div>
@@ -2189,7 +2201,7 @@ export default function Dashboard() {
             </div>
 
             <div className="xl:hidden order-3">
-              <FlowCard />
+              <ShopCard />
             </div>
 
             <div className="order-4 xl:order-3">
@@ -2247,6 +2259,12 @@ export default function Dashboard() {
           }} 
         />
       )}
+
+      {/* 商城弹窗 */}
+      <ShopModal 
+        isOpen={showShopModal} 
+        onClose={() => setShowShopModal(false)} 
+      />
       
       {/* 快速查找指南 */}
       {showQuickSearchGuide && (

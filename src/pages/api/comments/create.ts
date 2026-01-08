@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { db } from '~/server/db';
 
 export default async function handler(
   req: NextApiRequest,
@@ -16,25 +16,14 @@ export default async function handler(
       return res.status(400).json({ error: '评论不能为空' });
     }
 
-    // Connect to the Neon database
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL 环境变量未设置');
-    }
+    // 使用 Prisma 创建评论
+    const newComment = await db.comment.create({
+      data: {
+        comment: comment.trim(),
+      },
+    });
     
-    const sql = neon(process.env.DATABASE_URL);
-    
-    // Generate a simple ID compatible with Prisma cuid format
-    const id = `c${Date.now().toString(36)}${Math.random().toString(36).substring(2)}`;
-    const now = new Date();
-    
-    // Insert the comment from the form into the Postgres database
-    // Using template literal syntax for Neon serverless
-    await sql`
-      INSERT INTO comments (id, comment, "createdAt", "updatedAt") 
-      VALUES (${id}, ${comment}, ${now}, ${now})
-    `;
-    
-    return res.status(200).json({ success: true, id });
+    return res.status(200).json({ success: true, id: newComment.id });
   } catch (error) {
     console.error('创建评论失败:', error);
     const errorMessage = error instanceof Error ? error.message : '未知错误';

@@ -124,11 +124,27 @@ export default function PlansPage() {
     
     // 调用 API 更新数据库
     await updateProject(selectedPlanId, { isPrimary: true }, async () => {
-      await fetch(`/api/projects/${selectedPlanId}`, {
+      const response = await fetch(`/api/projects/${selectedPlanId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isPrimary: true }),
       });
+      
+      if (response.ok) {
+        // 清除缓存，强制Dashboard重新加载
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('userPlansSynced');
+          localStorage.removeItem('projectsSyncedAt');
+          localStorage.setItem('primaryPlanChanged', Date.now().toString());
+          // 强制触发storage事件（同一标签页也能监听到）
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'primaryPlanChanged',
+            newValue: Date.now().toString(),
+          }));
+        }
+        return true;
+      }
+      return false;
     });
     
     setPageState('browsing');
@@ -141,6 +157,15 @@ export default function PlansPage() {
     
     if (confirm(`确定要删除计划"${selectedPlan?.name}"吗？此操作不可恢复。`)) {
       await deleteCachedProject(selectedPlanId);
+      
+      // 清除缓存，强制Dashboard重新加载
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('userPlans');
+        localStorage.removeItem('userPlansSynced');
+        localStorage.removeItem('projectsSyncedAt');
+        localStorage.setItem('primaryPlanChanged', Date.now().toString());
+      }
+      
       setSelectedPlanId(null);
       setPageState('browsing');
     }

@@ -28,6 +28,12 @@ export interface Project {
   isPrimary?: boolean;
   isCompleted?: boolean;
   milestones: Milestone[];
+  finalGoal?: {
+    content: string;
+    createdAt: string;
+    isCompleted: boolean;
+    completedAt?: string;
+  };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -110,41 +116,18 @@ export function useProjects() {
     }
   }, [session?.user?.id, loadFromCache]);
 
-  // 初始化加载
+  // 初始化加载 - 完全依赖数据库
   useEffect(() => {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      // 🌟 优化：立即显示缓存数据
-      const cached = loadFromCache();
-      if (cached.length > 0) {
-        setProjects(cached);
-        setIsLoading(false);
-        console.log('[useProjects] ⚡ 使用缓存计划数据（性能优化）');
-      }
-      
-      // 🌟 优化：检查同步时间戳，避免频繁查询
-      // ✅ 使用用户隔离的 localStorage
-      const synced = getUserStorage(SYNC_KEY);
-      const lastSyncAt = getUserStorage('projectsSyncedAt');
-      
-      // 计划数据缓存1小时（极低频数据）
-      const needSync = !synced || !lastSyncAt || isProjectDataStale(lastSyncAt);
-      
-      if (needSync) {
-        console.log('[useProjects] 📊 计划数据需要同步（首次或超过1小时）');
-        loadFromDatabase();
-      } else {
-        console.log('[useProjects] ⚡ 跳过数据库查询（缓存有效）');
-        // 不进行后台同步，除非用户主动刷新
-      }
+      console.log('[useProjects] 🔥 开始从数据库加载计划（不使用缓存）');
+      loadFromDatabase();
     } else {
-      // 未登录：只使用缓存
-      const cached = loadFromCache();
-      setProjects(cached);
+      setProjects([]);
       setIsLoading(false);
     }
-  }, [status, loadFromCache, loadFromDatabase]);
+  }, [status, loadFromDatabase]);
 
   // 创建计划
   const createProject = useCallback(async (projectData: Partial<Project>) => {
@@ -394,15 +377,15 @@ export function useProjects() {
   };
 }
 
-// 检查计划数据是否过期（1小时）
+// 检查计划数据是否过期（5分钟）
 function isProjectDataStale(lastSyncAt: string): boolean {
   try {
     const lastSync = new Date(lastSyncAt);
     const now = new Date();
-    const hoursSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60);
+    const minutesSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
     
-    // 计划数据超过1小时视为过期（极低频数据）
-    return hoursSinceSync > 1;
+    // 🔥 计划数据超过5分钟视为过期（提高实时性）
+    return minutesSinceSync > 5;
   } catch {
     return true;
   }

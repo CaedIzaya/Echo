@@ -8,6 +8,8 @@
  * 3. 防护标记：记录关键里程碑，防止误判新用户
  */
 
+import { getUserStorage, setUserStorage } from './userStorage';
+
 export interface UserDataSnapshot {
   userExp: number;
   userLevel: number;

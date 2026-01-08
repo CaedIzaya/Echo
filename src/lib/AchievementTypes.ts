@@ -22,6 +22,9 @@ export enum AchievementType {
   HIGH_QUALITY = 'high_quality',        // 高评分
   SPECIAL_TIME = 'special_time',       // 特殊时段
   INTENSITY = 'intensity',             // 专注强度
+  HEART_TREE_WATER = 'heart_tree_water', // 心树浇水
+  HEART_TREE_FERTILIZER = 'heart_tree_fertilizer', // 心树施肥
+  HEART_TREE_LEVEL = 'heart_tree_level', // 心树等级
 }
 
 // 成就等级枚举
@@ -117,6 +120,27 @@ export const DAILY_MILESTONES_ACHIEVEMENTS: Achievement[] = [
   { id: 'daily_m_10', name: '极限挑战', description: '单日完成10个小目标', icon: '🦸', rarity: 'LEGENDARY', type: AchievementType.DAILY_MILESTONES, target: 10, achieved: false, currentProgress: 0, repeatable: true },
 ];
 
+// 心树浇水成就
+export const HEART_TREE_WATER_ACHIEVEMENTS: Achievement[] = [
+  { id: 'water_10', name: '灌溉新手', description: '心树浇水满10次', icon: '💧', rarity: 'COMMON', type: AchievementType.HEART_TREE_WATER, target: 10, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'water_50', name: '勤勉园丁', description: '心树浇水满50次', icon: '🌊', rarity: 'UNCOMMON', type: AchievementType.HEART_TREE_WATER, target: 50, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'water_100', name: '水润之源', description: '心树浇水满100次', icon: '💦', rarity: 'RARE', type: AchievementType.HEART_TREE_WATER, target: 100, achieved: false, currentProgress: 0, repeatable: false },
+];
+
+// 心树施肥成就
+export const HEART_TREE_FERTILIZER_ACHIEVEMENTS: Achievement[] = [
+  { id: 'fertilizer_5', name: '营养师', description: '心树施肥满5次', icon: '🌱', rarity: 'COMMON', type: AchievementType.HEART_TREE_FERTILIZER, target: 5, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'fertilizer_20', name: '成长专家', description: '心树施肥满20次', icon: '🌿', rarity: 'UNCOMMON', type: AchievementType.HEART_TREE_FERTILIZER, target: 20, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'fertilizer_50', name: '培育大师', description: '心树施肥满50次', icon: '🍀', rarity: 'RARE', type: AchievementType.HEART_TREE_FERTILIZER, target: 50, achieved: false, currentProgress: 0, repeatable: false },
+];
+
+// 心树等级成就
+export const HEART_TREE_LEVEL_ACHIEVEMENTS: Achievement[] = [
+  { id: 'tree_level_10', name: '茁壮成长', description: '心树等级达到10级', icon: '🌳', rarity: 'COMMON', type: AchievementType.HEART_TREE_LEVEL, target: 10, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'tree_level_20', name: '参天之木', description: '心树等级达到20级', icon: '🌲', rarity: 'UNCOMMON', type: AchievementType.HEART_TREE_LEVEL, target: 20, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'tree_level_30', name: '生命古树', description: '心树等级达到30级', icon: '🎄', rarity: 'RARE', type: AchievementType.HEART_TREE_LEVEL, target: 30, achieved: false, currentProgress: 0, repeatable: false },
+];
+
 // 所有成就
 export const ALL_ACHIEVEMENTS: Achievement[] = [
   ...FLOW_INDEX_ACHIEVEMENTS,
@@ -127,6 +151,9 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
   ...FOCUS_STREAK_ACHIEVEMENTS,
   ...MILESTONE_COUNT_ACHIEVEMENTS,
   ...DAILY_MILESTONES_ACHIEVEMENTS,
+  ...HEART_TREE_WATER_ACHIEVEMENTS,
+  ...HEART_TREE_FERTILIZER_ACHIEVEMENTS,
+  ...HEART_TREE_LEVEL_ACHIEVEMENTS,
 ];
 
 // 按类型获取成就

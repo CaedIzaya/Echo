@@ -169,6 +169,63 @@ export class AchievementManager {
     return newAchievements;
   }
 
+  checkHeartTreeWaterAchievements(count: number): Achievement[] {
+    const newAchievements: Achievement[] = [];
+    
+    const milestones = [
+      { count: 10, id: 'water_10' },
+      { count: 50, id: 'water_50' },
+      { count: 100, id: 'water_100' },
+    ];
+
+    for (const milestone of milestones) {
+      if (count >= milestone.count && !this.achievedAchievements.has(milestone.id)) {
+        const achievement = this.unlockAchievement(milestone.id);
+        if (achievement) newAchievements.push(achievement);
+      }
+    }
+
+    return newAchievements;
+  }
+
+  checkHeartTreeFertilizerAchievements(count: number): Achievement[] {
+    const newAchievements: Achievement[] = [];
+    
+    const milestones = [
+      { count: 5, id: 'fertilizer_5' },
+      { count: 20, id: 'fertilizer_20' },
+      { count: 50, id: 'fertilizer_50' },
+    ];
+
+    for (const milestone of milestones) {
+      if (count >= milestone.count && !this.achievedAchievements.has(milestone.id)) {
+        const achievement = this.unlockAchievement(milestone.id);
+        if (achievement) newAchievements.push(achievement);
+      }
+    }
+
+    return newAchievements;
+  }
+
+  checkHeartTreeLevelAchievements(level: number): Achievement[] {
+    const newAchievements: Achievement[] = [];
+    
+    const milestones = [
+      { level: 10, id: 'tree_level_10' },
+      { level: 20, id: 'tree_level_20' },
+      { level: 30, id: 'tree_level_30' },
+    ];
+
+    for (const milestone of milestones) {
+      if (level >= milestone.level && !this.achievedAchievements.has(milestone.id)) {
+        const achievement = this.unlockAchievement(milestone.id);
+        if (achievement) newAchievements.push(achievement);
+      }
+    }
+
+    return newAchievements;
+  }
+
   /**
    * 检查"首次"成就
    * 
@@ -252,6 +309,17 @@ export class AchievementManager {
       { id: 'first_milestone_created', name: '小试牛刀', description: '第一次创建小目标', icon: '✨', category: 'first', requirement: 1 },
       { id: 'first_plan_created', name: '规划先行', description: '第一次创建新计划', icon: '📋', category: 'first', requirement: 1 },
       { id: 'first_plan_completed', name: '首战告捷', description: '第一次完成计划', icon: '🎉', category: 'first', requirement: 1 },
+      
+      // Heart Tree achievements
+      { id: 'water_10', name: '灌溉新手', description: '心树浇水满10次', icon: '💧', category: 'first', requirement: 10 },
+      { id: 'water_50', name: '勤勉园丁', description: '心树浇水满50次', icon: '🌊', category: 'first', requirement: 50 },
+      { id: 'water_100', name: '水润之源', description: '心树浇水满100次', icon: '💦', category: 'first', requirement: 100 },
+      { id: 'fertilizer_5', name: '营养师', description: '心树施肥满5次', icon: '🌱', category: 'first', requirement: 5 },
+      { id: 'fertilizer_20', name: '成长专家', description: '心树施肥满20次', icon: '🌿', category: 'first', requirement: 20 },
+      { id: 'fertilizer_50', name: '培育大师', description: '心树施肥满50次', icon: '🍀', category: 'first', requirement: 50 },
+      { id: 'tree_level_10', name: '茁壮成长', description: '心树等级达到10级', icon: '🌳', category: 'first', requirement: 10 },
+      { id: 'tree_level_20', name: '参天之木', description: '心树等级达到20级', icon: '🌲', category: 'first', requirement: 20 },
+      { id: 'tree_level_30', name: '生命古树', description: '心树等级达到30级', icon: '🎄', category: 'first', requirement: 30 },
     ];
   }
 
