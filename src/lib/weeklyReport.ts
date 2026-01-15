@@ -4,6 +4,7 @@ import { LevelManager } from "~/lib/LevelSystem";
 import { expToNextLevel } from "~/lib/HeartTreeExpSystem";
 
 const WEEKLY_REPORT_TTL_DAYS = 84; // 12 周（保留更长时间确保对比数据不丢失）
+const ANCHORED_REPORT_DAYS = 7;
 
 export type DailyPoint = {
   date: string; // YYYY-MM-DD
@@ -51,8 +52,21 @@ export type WeeklyReportPayload = {
 
 type Options = {
   referenceDate?: Date;
+  periodStart?: Date;
   persist?: boolean;
 };
+
+function startOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
 
 export function getWeekRange(referenceDate = new Date()) {
   // 🔥 使用用户本地时区计算周期（周一00:00 - 周日23:59）
@@ -82,12 +96,30 @@ export function getWeekRange(referenceDate = new Date()) {
   return { start, end };
 }
 
+export function getAnchoredWeekRange(periodStart: Date) {
+  // 🔥 基于锚点日期的周期（7天），用于“注册日-注册日”周报
+  const start = startOfDay(periodStart);
+  const end = addDays(start, ANCHORED_REPORT_DAYS - 1);
+  end.setHours(23, 59, 59, 999);
+
+  console.log(`[getAnchoredWeekRange] 📅 周期计算:`, {
+    锚点日期: formatDateKey(start),
+    周期开始: formatDateKey(start),
+    周期结束: formatDateKey(end),
+    标签: formatLabel(start, end),
+  });
+
+  return { start, end };
+}
+
 export async function computeWeeklyReport(
   userId: string,
   options?: Options,
 ): Promise<WeeklyReportPayload> {
   const referenceDate = options?.referenceDate ?? new Date();
-  const { start: weekStart, end: weekEnd } = getWeekRange(referenceDate);
+  const { start: weekStart, end: weekEnd } = options?.periodStart
+    ? getAnchoredWeekRange(options.periodStart)
+    : getWeekRange(referenceDate);
 
   const prevStart = new Date(weekStart);
   prevStart.setDate(prevStart.getDate() - 7);

@@ -165,6 +165,24 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
 
   // State 2: 今天有专注，但还没有小结
   if (hasFocus && !hasSummary) {
+    // 🔥 新增：自动触发一次"目标设定弹出"的回调
+    useEffect(() => {
+      const today = new Date().toLocaleDateString('en-CA');
+      const alreadyShownToday = sessionStorage.getItem(`goalSetPromptShown_${today}`) === 'true';
+      
+      // 每天仅触发一次
+      if (!alreadyShownToday) {
+        // 延迟1秒展示，避免页面加载时的闪烁
+        const timer = setTimeout(() => {
+          // 触发一个自定义事件，通知 Dashboard 弹出目标设定
+          window.dispatchEvent(new CustomEvent('showGoalSetPrompt'));
+          sessionStorage.setItem(`goalSetPromptShown_${today}`, 'true');
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }
+    }, []);
+    
     return (
       <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-3xl p-6 shadow-lg text-white h-full flex flex-col justify-between relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl transform translate-x-10 -translate-y-10 group-hover:bg-white/20 transition-all"></div>

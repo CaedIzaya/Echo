@@ -211,13 +211,13 @@ const LandingHero = ({
           在这里,
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400">
-            重遇自我
+            重拾注意力
             </span>
           </h1>
 
           <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
-            <p>你不是不努力，只是需要一个安静的地方。</p>
-            <p>Echo 是一个陪你轻轻开始的专注空间。</p>
+            <p>安静不下来，不是你的问题。</p>
+            <p>你只是需要一个陪你安静开始的空间。</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -347,7 +347,9 @@ const LandingHero = ({
           <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
             <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <p className="text-base font-light leading-relaxed text-slate-700">
-              意识到自己的注意力经常涣散？
+            明明很想做点什么
+            <br />
+            却总是迟迟开始不了？
             </p>
           </div>
 
@@ -355,7 +357,9 @@ const LandingHero = ({
           <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
             <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-teal-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <p className="text-base font-light leading-relaxed text-slate-700">
-              总觉得难以开始，没有动力？
+            注意力被不停打断
+            <br />
+            一天下来却没留下些什么？
             </p>
           </div>
 
@@ -363,7 +367,9 @@ const LandingHero = ({
           <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
             <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <p className="text-base font-light leading-relaxed text-slate-700">
-              想要生活更充实有意义感？
+            不缺目标
+            <br />
+            只是缺一个安静的空间？
             </p>
           </div>
         </div>

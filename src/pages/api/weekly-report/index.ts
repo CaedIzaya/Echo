@@ -24,7 +24,7 @@ export default async function handler(
     console.log(`[weekly-report] 开始生成周报: userId=${session.user.id}, weekStart=${weekStartParam ?? "本周"}, preview=${preview}`);
     
     const report = await computeWeeklyReport(session.user.id, {
-      referenceDate: weekStartParam ? new Date(weekStartParam) : undefined,
+      periodStart: weekStartParam ? new Date(weekStartParam) : undefined,
       persist: !preview,
     });
     

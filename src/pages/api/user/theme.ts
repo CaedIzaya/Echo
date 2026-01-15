@@ -10,41 +10,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'GET') {
-    // 获取用户主题设置
-    try {
-      const user = await db.user.findUnique({
-        where: { id: session.user.id },
-        select: { selectedTheme: true },
-      });
-
-      return res.status(200).json({ 
-        theme: user?.selectedTheme || 'default',
-      });
-    } catch (error) {
-      console.error('获取主题设置失败:', error);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
+    // 主题设置存储在 localStorage，服务端返回默认值
+    return res.status(200).json({ 
+      theme: 'default',
+    });
   }
 
   if (req.method === 'POST') {
-    // 更新用户主题设置
-    try {
-      const { theme } = req.body;
+    // 主题设置存储在 localStorage，服务端不持久化
+    const { theme } = req.body;
 
-      if (!theme || !['default', 'echo', 'salt_blue', 'fresh_green'].includes(theme)) {
-        return res.status(400).json({ error: 'Invalid theme' });
-      }
-
-      await db.user.update({
-        where: { id: session.user.id },
-        data: { selectedTheme: theme },
-      });
-
-      return res.status(200).json({ success: true, theme });
-    } catch (error) {
-      console.error('更新主题设置失败:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+    if (!theme || !['default', 'echo', 'salt_blue', 'fresh_green'].includes(theme)) {
+      return res.status(400).json({ error: 'Invalid theme' });
     }
+
+    return res.status(200).json({ success: true, theme });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

@@ -157,7 +157,7 @@ export default function GoalSetting() {
         setIsEditMode(true);
         setEditPlanId(router.query.editPlanId as string);
         try {
-          const existingPlans = userStorageJSON.get<any[]>('userPlans', []) || [];
+          const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
           const planToEdit = existingPlans.find((p: any) => p.id === router.query.editPlanId);
           if (planToEdit) {
             setFormData((prev) => ({

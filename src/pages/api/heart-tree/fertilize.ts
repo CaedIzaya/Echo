@@ -14,20 +14,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // 增加施肥计数
-    const user = await db.user.update({
-      where: { id: session.user.id },
-      data: { 
-        fertilizerCount: { increment: 1 },
-      },
-      select: { 
-        fertilizerCount: true,
-      },
-    });
-
+    // 施肥逻辑已集成到 exp/update.ts 的 fertilizerBuff 中
+    // 这里只返回成功响应，不单独记录 fertilizerCount
+    
     return res.status(200).json({ 
       success: true,
-      fertilizerCount: user.fertilizerCount,
+      message: '施肥成功',
     });
   } catch (error) {
     console.error('施肥失败:', error);

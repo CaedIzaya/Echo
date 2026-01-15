@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
-import { computeWeeklyReport, getWeekRange, formatDateKey } from "~/lib/weeklyReport";
+import { computeWeeklyReport, getAnchoredWeekRange, formatDateKey } from "~/lib/weeklyReport";
+import { db } from "~/server/db";
 
 /**
  * 生成周报邮件 API
@@ -30,22 +31,22 @@ export default async function handler(
     // 获取周开始日期（从请求体或自动计算上周一）
     const requestedWeekStart = req.body?.weekStart as string | undefined;
     
-    let referenceDate: Date;
-    
+    let periodStart: Date;
+
     if (requestedWeekStart) {
-      // 使用指定的周开始日期
-      referenceDate = new Date(requestedWeekStart);
-      console.log('[generate-weekly-mail] 使用指定日期:', requestedWeekStart);
+      // 使用指定周期开始日期（支持注册日锚点）
+      periodStart = new Date(requestedWeekStart);
+      console.log('[generate-weekly-mail] 使用指定周期开始日期:', requestedWeekStart);
     } else {
-      // 默认：上周一（本周一往前推7天）
+      // 默认：以上周同一天为周期起点（用于兼容旧行为）
       const today = new Date();
-      const lastMonday = new Date(today);
-      lastMonday.setDate(today.getDate() - 7);
-      referenceDate = lastMonday;
-      console.log('[generate-weekly-mail] 使用默认日期（上周一）:', formatDateKey(lastMonday));
+      const lastWeekSameDay = new Date(today);
+      lastWeekSameDay.setDate(today.getDate() - 7);
+      periodStart = lastWeekSameDay;
+      console.log('[generate-weekly-mail] 使用默认周期开始日期（上周同日）:', formatDateKey(lastWeekSameDay));
     }
-    
-    const { start: weekStart, end: weekEnd } = getWeekRange(referenceDate);
+
+    const { start: weekStart, end: weekEnd } = getAnchoredWeekRange(periodStart);
     const weekStartStr = formatDateKey(weekStart);
     const weekEndStr = formatDateKey(weekEnd);
 
@@ -53,8 +54,38 @@ export default async function handler(
 
     // 生成周报数据（会自动保存到数据库）
     const report = await computeWeeklyReport(session.user.id, {
-      referenceDate,
+      periodStart,
       persist: true,
+    });
+
+    // 写入数据库邮件（避免跨设备丢失）
+    const mailId = `weekly_report_${weekStartStr}`;
+    const mailRecord = await db.mail.upsert({
+      where: { id: mailId },
+      update: {
+        title: `本周专注周报 · ${report.period.label}`,
+        content: `您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。`,
+        date: formatDateKey(new Date()),
+        isRead: false,
+        type: 'report',
+        sender: 'Echo 周报',
+        actionUrl: `/reports/weekly?weekStart=${weekStartStr}`,
+        actionLabel: '查看周报',
+        expiresAt: new Date(Date.now() + 84 * 24 * 60 * 60 * 1000),
+      },
+      create: {
+        id: mailId,
+        userId: session.user.id,
+        title: `本周专注周报 · ${report.period.label}`,
+        content: `您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。`,
+        date: formatDateKey(new Date()),
+        isRead: false,
+        type: 'report',
+        sender: 'Echo 周报',
+        actionUrl: `/reports/weekly?weekStart=${weekStartStr}`,
+        actionLabel: '查看周报',
+        expiresAt: new Date(Date.now() + 84 * 24 * 60 * 60 * 1000),
+      },
     });
 
     // 返回邮件信息（格式符合 MailSystem.Mail 接口）

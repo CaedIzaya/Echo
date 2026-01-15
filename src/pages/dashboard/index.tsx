@@ -1144,11 +1144,6 @@ export default function Dashboard() {
         newWeekStart: currentWeekStart
       });
       
-      // 🆕 生成上周的周报邮件（发送到信箱系统）
-      generateWeeklyReportMail(currentWeekStartDate).catch(err => {
-        console.error('❌ 生成周报邮件失败:', err);
-      });
-      
       currentWeeklyTotal = 0;
       currentWeekStartDate = currentWeekStart;
     }
@@ -1356,48 +1351,6 @@ export default function Dashboard() {
       streakDays: stats.streakDays,
       streakBonus: `${((LevelManager.getStreakBonusMultiplier(stats.streakDays) - 1) * 100).toFixed(0)}%`
     });
-  };
-
-  // 🆕 生成周报邮件并添加到信箱系统
-  const generateWeeklyReportMail = async (lastWeekStart: string) => {
-    if (!userId) return;
-    
-    try {
-      console.log('📧 开始生成上周周报邮件:', lastWeekStart);
-      
-      // 调用 API 生成周报邮件
-      const response = await fetch('/api/generate-weekly-mail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ weekStart: lastWeekStart }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (data.success && data.mail) {
-          // 添加到信箱系统
-          const mailSystem = MailSystem.getInstance();
-          mailSystem.addMail(data.mail);
-          
-          console.log('✅ 周报邮件已添加到信箱', {
-            mailId: data.mail.id,
-            title: data.mail.title,
-            reportSummary: data.reportSummary
-          });
-        }
-      } else {
-        const error = await response.json();
-        // 如果是"注册时间不足7天"的错误，静默处理（不是错误）
-        if (error.code !== 'INSUFFICIENT_REGISTRATION_TIME') {
-          console.error('❌ 生成周报邮件失败:', error);
-        } else {
-          console.log('ℹ️ 注册时间不足7天，暂不生成周报');
-        }
-      }
-    } catch (error) {
-      console.error('❌ 生成周报邮件异常:', error);
-    }
   };
 
   // 暴露给 focus 页使用的函数
@@ -1680,71 +1633,59 @@ export default function Dashboard() {
           // userLevel 会自动同步
         }
         
-        // 🆕 检查是否需要生成周报邮件（基于用户注册周区间，每周一自动生成）
+        // 🆕 周报自动生成（基于注册日锚点，每7天一次）
         const checkAndGenerateWeeklyReport = async () => {
           try {
-            // 获取用户注册日期
-            const userResponse = await fetch('/api/user/profile');
-            if (!userResponse.ok) {
-              console.warn('无法获取用户信息，跳过周报检查');
+            const response = await fetch('/api/weekly-report/auto', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            
+            if (!response.ok) {
+              console.warn('周报自动检查失败:', response.status);
               return;
             }
-            const userData = await userResponse.json();
-            if (!userData.user?.createdAt) {
-              console.warn('用户注册日期不存在，跳过周报检查');
-              return;
-            }
             
-            const userCreatedAt = new Date(userData.user.createdAt);
-            // 计算用户注册日期所在的周区间（周一-周日）
-            const { getWeekRange, formatDateKey } = await import('~/lib/weeklyReport');
-            const { start: registrationWeekStart } = getWeekRange(userCreatedAt);
-            const registrationWeekStartStr = formatDateKey(registrationWeekStart);
+            const data = await response.json();
             
-            // 获取当前周的开始日期
-            const currentWeekStart = getCurrentWeekStart();
-            const currentWeekStartDate = new Date(currentWeekStart + 'T00:00:00');
-            
-            // 计算应该发送周报的日期：注册周的下一个周一
-            const nextMondayAfterRegistration = new Date(registrationWeekStart);
-            nextMondayAfterRegistration.setDate(registrationWeekStart.getDate() + 7); // 注册周的下一个周一
-            
-            // 检查：如果当前周的开始日期 >= 注册周的下一个周一，且还未发送过该周报
-            const lastWeeklyMailCheck = localStorage.getItem('lastWeeklyMailCheck');
-            const shouldSendReport = 
-              currentWeekStartDate.getTime() >= nextMondayAfterRegistration.getTime() &&
-              lastWeeklyMailCheck !== currentWeekStart;
-            
-            if (shouldSendReport) {
-              console.log('📧 检测到需要生成周报邮件', {
-                注册日期: userCreatedAt.toISOString(),
-                注册周区间开始: registrationWeekStartStr,
-                应发送日期: formatDateKey(nextMondayAfterRegistration),
-                当前周开始: currentWeekStart
-              });
-              
-              // 生成注册周区间的周报邮件（使用注册周的开始日期）
-              await generateWeeklyReportMail(registrationWeekStartStr);
-              
-              // 标记已检查（避免重复生成）
-              localStorage.setItem('lastWeeklyMailCheck', currentWeekStart);
-              console.log('✅ 周报邮件检查标记已更新:', currentWeekStart);
+            if (data.shouldSend && data.mail) {
+              const mailSystem = MailSystem.getInstance();
+              await mailSystem.refresh();
+              console.log('✅ 周报邮件已添加到信箱', data.period);
             } else {
               console.log('ℹ️ 暂不需要生成周报', {
-                注册日期: userCreatedAt.toISOString(),
-                注册周区间开始: registrationWeekStartStr,
-                应发送日期: formatDateKey(nextMondayAfterRegistration),
-                当前周开始: currentWeekStart,
-                已检查: lastWeeklyMailCheck
+                nextSendAt: data.nextSendAt,
+                anchorStart: data.anchorStart,
               });
             }
           } catch (error) {
-            console.error('❌ 检查周报邮件失败:', error);
+            console.error('❌ 周报自动生成失败:', error);
           }
         };
         
         // 执行周报检查（异步，不阻塞页面）
         checkAndGenerateWeeklyReport();
+
+        // 🔄 邮件补发（非周报）
+        const backfillMails = async () => {
+          try {
+            const response = await fetch('/api/mails/backfill', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            if (response.ok) {
+              const mailSystem = MailSystem.getInstance();
+              await mailSystem.refresh();
+              console.log('✅ 邮件补发完成');
+            } else {
+              console.warn('邮件补发失败:', response.status);
+            }
+          } catch (error) {
+            console.error('❌ 邮件补发异常:', error);
+          }
+        };
+
+        backfillMails();
         
         const lastWelcomeDate = localStorage.getItem('lastWelcomeDate');
 

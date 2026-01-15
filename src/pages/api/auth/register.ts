@@ -46,6 +46,48 @@ export default async function handler(
       },
     });
 
+    // 创建新手欢迎邮件（永久保存）
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+
+    await db.mail.create({
+      data: {
+        id: `welcome_${user.id}`,
+        userId: user.id,
+        title: "欢迎来到 Echo Focus",
+        content: `亲爱的旅人：
+
+很高兴能在 Echo Focus 遇见你。
+
+这是一个为你打造的专注空间，在这里，你可以：
+1. 设定专注目标，进入心流状态
+2. 种植你的心树，见证自我成长
+3. 完成里程碑，记录每一个进步的瞬间
+
+重要提醒（建议尽快完成）：
+请前往「个人中心 → 账号安全 → 设置密保问题」完成密保设置。
+这会帮助你在忘记密码时，随时回到 Echo。
+
+如果暂时还不确定怎么用 Echo，可以在仪表盘点击右上角的 🔍，打开「使用指南」查看详细说明。
+
+愿你在这里找回内心的平静与力量。
+
+Echo 团队
+敬上`,
+        date: dateStr,
+        sender: "Echo 团队",
+        type: "system",
+        isRead: false,
+        isPermanent: true,
+        actionUrl: "/profile/security-questions",
+        actionLabel: "去设置密保",
+        expiresAt: null,
+      },
+    });
+
     res.status(201).json({ 
       user: {
         id: user.id,

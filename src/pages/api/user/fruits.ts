@@ -19,8 +19,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       select: { 
         fruits: true,
         heartTreeLevel: true,
-        wateringCount: true,
-        fertilizerCount: true,
       },
     });
 

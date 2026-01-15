@@ -14,20 +14,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // 增加浇水计数
-    const user = await db.user.update({
-      where: { id: session.user.id },
-      data: { 
-        wateringCount: { increment: 1 },
-      },
-      select: { 
-        wateringCount: true,
-      },
-    });
-
+    // 浇水逻辑已集成到 exp/update.ts 的 lastWateredDate 中
+    // 这里只返回成功响应，不单独记录 wateringCount
+    
     return res.status(200).json({ 
       success: true,
-      wateringCount: user.wateringCount,
+      message: '浇水成功',
     });
   } catch (error) {
     console.error('浇水失败:', error);

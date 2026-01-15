@@ -63,6 +63,8 @@ model User {
   heartTreeLevel         Int            @default(1)
   heartTreeCurrentExp    Float          @default(0)
   heartTreeTotalExp      Float          @default(0)
+  fruits                 Int            @default(0)     // 🍎 当前果实
+  totalFruitsEarned      Int            @default(0)     // 🍎 累计获得果实
   lastWateredDate        String?
   fertilizerExpiresAt    DateTime?
   fertilizerMultiplier   Float?
@@ -80,9 +82,33 @@ model User {
   recoveryQuestions      RecoveryQuestion[]
   passwordResetTokens    PasswordResetToken[]
   achievements           Achievement[]
+  mails                  Mail[]
 
   @@index([createdAt])
   @@index([email])
+}
+
+model Mail {
+  id          String   @id
+  userId      String
+  title       String
+  content     String
+  date        String   // YYYY-MM-DD
+  sender      String   @default("Echo 系统")
+  type        String   @default("system")
+  isRead      Boolean  @default(false)
+  isPermanent Boolean  @default(false)
+  actionUrl   String?
+  actionLabel String?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([userId, isRead])
+  @@index([expiresAt])
+  @@map("mails")
 }
 
 model Project {
@@ -247,4 +273,17 @@ model Achievement {
   @@index([userId])
   @@index([achievementId])
   @@map("achievements_unlocked")
+}
+
+model ShopPurchase {
+  id        String   @id @default(cuid())
+  userId    String
+  itemId    String
+  itemType  String
+  price     Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, itemId])
+  @@index([userId])
+  @@map("shop_purchases")
 }

@@ -5,7 +5,8 @@ import type { GetServerSideProps } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]";
 import type { WeeklyReportPayload } from "~/lib/weeklyReport";
-import { computeWeeklyReport, getWeekRange, formatDateKey } from "~/lib/weeklyReport";
+import { computeWeeklyReport, formatDateKey } from "~/lib/weeklyReport";
+import { db } from "~/server/db";
 import { useEffect, useMemo, useState } from "react";
 import localforage from "localforage";
 
@@ -636,6 +637,41 @@ function formatDateLabel(date: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${days[d.getDay()]}`;
 }
 
+const REPORT_HOUR_LOCAL = 8;
+const REPORT_DAYS = 7;
+
+function startOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function getSendAt(periodStart: Date) {
+  const sendAt = addDays(startOfDay(periodStart), REPORT_DAYS);
+  sendAt.setHours(REPORT_HOUR_LOCAL, 0, 0, 0);
+  return sendAt;
+}
+
+function getLastDueStart(anchorStart: Date, now: Date) {
+  let candidateStart = anchorStart;
+  let lastDue: Date | null = null;
+  let nextSendAt = getSendAt(candidateStart);
+
+  while (now.getTime() >= nextSendAt.getTime()) {
+    lastDue = candidateStart;
+    candidateStart = addDays(candidateStart, REPORT_DAYS);
+    nextSendAt = getSendAt(candidateStart);
+  }
+
+  return lastDue;
+}
+
 export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
   try {
     const session = await getServerSession(ctx.req, ctx.res, authOptions);
@@ -654,9 +690,43 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
     const weekStartParam =
       typeof weekStartParamRaw === "string" ? weekStartParamRaw : null;
 
-    // 🔥 计算本周的周一
-    const { start: currentWeekStart } = getWeekRange(new Date());
-    const currentWeekStartStr = formatDateKey(currentWeekStart);
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { createdAt: true },
+    });
+
+    if (!user?.createdAt) {
+      return {
+        props: {
+          report: null,
+          expired: false,
+          requestedWeekStart: null,
+          error: "用户注册时间缺失",
+          isCurrentWeek: false,
+          navigation: {
+            hasPrev: false,
+            hasNext: false,
+            prevWeekStart: null,
+            nextWeekStart: null,
+          },
+        },
+      };
+    }
+
+    const anchorStart = startOfDay(user.createdAt);
+    const latestReport = await db.weeklyReport.findFirst({
+      where: { userId: session.user.id },
+      orderBy: { weekStart: "desc" },
+      select: { weekStart: true },
+    });
+
+    const now = new Date();
+    const lastDueStart = latestReport?.weekStart
+      ? startOfDay(new Date(latestReport.weekStart))
+      : getLastDueStart(anchorStart, now);
+
+    const currentPeriodStart = lastDueStart ?? anchorStart;
+    const currentPeriodStartStr = formatDateKey(currentPeriodStart);
 
     if (weekStartParam) {
       const requested = new Date(weekStartParam);
@@ -681,17 +751,19 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
       }
     }
 
-    const referenceDate = weekStartParam ? new Date(weekStartParam) : undefined;
+    const periodStart = weekStartParam
+      ? new Date(weekStartParam)
+      : currentPeriodStart;
     const report = sanitizeForJson(
       await computeWeeklyReport(session.user.id, {
-        referenceDate,
+        periodStart,
         persist: false,
       }),
     );
 
     // 🔥 计算导航信息
     const reportWeekStart = report.period.start.split('T')[0];
-    const isCurrentWeek = reportWeekStart === currentWeekStartStr;
+    const isCurrentWeek = reportWeekStart === currentPeriodStartStr;
 
     // 计算上一周和下一周的周一日期
     const reportWeekDate = new Date(reportWeekStart);
@@ -707,12 +779,12 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
     const nextWeekStart = formatDateKey(nextWeekDate);
 
     // 检查是否有上一周（不超过4周历史）
-    const oldestAllowedDate = new Date(currentWeekStart);
-    oldestAllowedDate.setDate(currentWeekStart.getDate() - (MAX_HISTORY_WEEKS * 7));
+    const oldestAllowedDate = new Date(currentPeriodStart);
+    oldestAllowedDate.setDate(currentPeriodStart.getDate() - (MAX_HISTORY_WEEKS * 7));
     const hasPrev = prevWeekDate.getTime() >= oldestAllowedDate.getTime();
 
     // 检查是否有下一周（不能超过本周）
-    const hasNext = nextWeekDate.getTime() <= currentWeekStart.getTime();
+    const hasNext = nextWeekDate.getTime() <= currentPeriodStart.getTime();
 
     const navigation = {
       hasPrev,
@@ -722,7 +794,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
     };
 
     console.log('[weekly-report] 导航信息:', {
-      当前周: currentWeekStartStr,
+      当前周: currentPeriodStartStr,
       显示周: reportWeekStart,
       是否本周: isCurrentWeek,
       导航: navigation,
