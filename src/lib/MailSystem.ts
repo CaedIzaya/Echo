@@ -76,7 +76,7 @@ export class MailSystem {
       }));
 
       this.mails = mapped.filter((mail) => !isExpired(mail));
-      this.mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // 邮件已经在 API 层按 createdAt desc 排序，无需再次排序
     } catch (error) {
       console.error('[MailSystem] 加载邮件异常:', error);
       this.mails = [];

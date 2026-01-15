@@ -613,6 +613,10 @@ export default function Home() {
   const hasShownWelcome = useRef(false);
   const spiritMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
   
+  // 🔥 防止重复检查标记
+  const hasCheckedAuth = useRef(false);
+  const isSignedOutSession = useRef(false);
+  
 
   const shouldForceOnboarding = () => {
     if (typeof window === 'undefined') {
@@ -649,7 +653,11 @@ export default function Home() {
   };
 
   useEffect(() => {
-    checkAuthAndRedirect();
+    // 🔥 防止重复检查：只在首次加载或 signedOut 参数改变时执行
+    if (!hasCheckedAuth.current || router.query.signedOut === 'true') {
+      hasCheckedAuth.current = true;
+      checkAuthAndRedirect();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.signedOut]);
 
@@ -695,52 +703,27 @@ export default function Home() {
       const isSignedOut = router.query.signedOut === 'true';
       
       if (isSignedOut) {
-        // 清除 URL 参数，避免刷新后再次触发（使用 replace 不会触发页面重新加载）
+        // 🔥 标记为退出登录状态，防止后续 session 检查重新跳转
+        isSignedOutSession.current = true;
+        
+        // 清除 URL 参数，避免刷新后再次触发
         if (typeof window !== 'undefined') {
           window.history.replaceState({}, '', '/');
         }
         
-        // 强制清除可能的缓存，重新获取 session
-        const response = await fetch('/api/auth/session', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          },
-        });
-        const session = await response.json();
-        
-        console.log("首页：退出登录后检查 session:", session);
-        
-        // 如果 session 仍然存在（可能是缓存），等待一下再检查
-        if (session?.user) {
-          console.log("首页：退出登录后仍检测到 session，等待清除...");
-          // 优化：缩短等待时间
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
-          // 再次检查 session
-          const retryResponse = await fetch('/api/auth/session', {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0',
-            },
-          });
-          const retrySession = await retryResponse.json();
-          
-          if (retrySession?.user) {
-            console.log("首页：重试后仍有 session，可能是真的登录了");
-            setAuthStatus(`已登录: ${retrySession.user.email}`);
-            handleAuthenticatedUser(retrySession);
-            return;
-          }
-        }
-        
-        // 确认用户已退出登录，显示欢迎页面
+        // 🔥 强制显示登录页，不再检查 session
+        // 原因：退出登录后的 session 检查可能因为浏览器缓存而不准确
+        // 用户主动退出就应该看到登录页，即使 session 还存在（浏览器缓存）
+        console.log("首页：用户已退出登录，强制显示欢迎界面");
         setAuthStatus('未登录');
-        console.log("首页：确认用户已退出登录，显示欢迎界面");
+        setLoading(false);
+        return;
+      }
+      
+      // 🔥 如果已经标记为退出登录，不再检查 session
+      if (isSignedOutSession.current) {
+        console.log("首页：已标记为退出登录，跳过 session 检查");
+        setAuthStatus('未登录');
         setLoading(false);
         return;
       }

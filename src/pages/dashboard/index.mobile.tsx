@@ -1208,9 +1208,10 @@ export default function Dashboard() {
               headers: { 'Content-Type': 'application/json' },
             });
             if (response.ok) {
+              // 刷新邮件系统，更新未读计数
               const mailSystem = MailSystem.getInstance();
               await mailSystem.refresh();
-              console.log('✅ 邮件补发完成');
+              console.log('✅ 邮件补发完成，未读计数已更新');
             } else {
               console.warn('邮件补发失败:', response.status);
             }

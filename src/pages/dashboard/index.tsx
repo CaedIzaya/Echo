@@ -532,7 +532,7 @@ export default function Dashboard() {
   const [achievementManager, setAchievementManager] = useState<AchievementManager | null>(null);
   const [showAchievementPanel, setShowAchievementPanel] = useState(false);
   const [showMailPanel, setShowMailPanel] = useState(false);
-  const { unreadCount } = useMailSystem();
+  const { unreadCount, refresh: refreshMails } = useMailSystem();
 
   // 构建小精灵点击的觉察上下文（仅用于规则6）
   const buildLumiClickAwarenessContext = (clicks: number[]): AwarenessContext => {
@@ -1674,9 +1674,9 @@ export default function Dashboard() {
               headers: { 'Content-Type': 'application/json' },
             });
             if (response.ok) {
-              const mailSystem = MailSystem.getInstance();
-              await mailSystem.refresh();
-              console.log('✅ 邮件补发完成');
+              // 刷新邮件系统，更新未读计数
+              await refreshMails();
+              console.log('✅ 邮件补发完成，未读计数已更新');
             } else {
               console.warn('邮件补发失败:', response.status);
             }

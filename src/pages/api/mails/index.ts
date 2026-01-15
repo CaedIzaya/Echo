@@ -14,7 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const mails = await db.mail.findMany({
         where: { userId: session.user.id },
-        orderBy: { date: 'desc' },
+        orderBy: [
+          { createdAt: 'desc' }, // 最新创建的在上面
+          { date: 'desc' },      // 相同创建时间按日期排序
+        ],
       });
 
       const today = new Date();
