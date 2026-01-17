@@ -4,7 +4,8 @@ generator client {
 
 datasource db {
   // 支持 PostgreSQL 和 SQLite，根据 DATABASE_URL 自动切换
-  provider = "postgresql"
+  // 本地开发推荐使用 SQLite
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -69,9 +70,11 @@ model User {
   fertilizerExpiresAt    DateTime?
   fertilizerMultiplier   Float?
   flowMetrics            Json?          // 心流指标数据（impression, tempFlow等）
-  streakDays             Int            @default(0)     // 🔥 连续专注天数
+  streakDays             Int            @default(0)     // 🔥 连续专注天数（全局，所有计划累计）
   lastStreakDate         String?                        // 🔥 最后一次更新连续天数的日期 (YYYY-MM-DD)
-  totalFocusMinutes      Int            @default(0)     // 🔥 总专注时长（分钟）
+  totalFocusMinutes      Int            @default(0)     // 🔥 总专注时长（分钟，全局）
+  totalCompletedMilestones Int          @default(0)     // 📊 总完成小目标数（全局统计）
+  totalCompletedProjects Int            @default(0)     // 📊 总完成计划数（全局统计）
   accounts               Account[]
   sessions               Session[]
   projects               Project[]

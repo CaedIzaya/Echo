@@ -275,7 +275,12 @@ export default function Dashboard() {
   // ========== 持久化 Hooks（数据库同步）==========
   const { userExp, userLevel: hookUserLevel, addUserExp, updateUserExp: saveUserExpToDB } = useUserExp();
   const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
-  const { unlockAchievement: unlockAchievementToDB } = useAchievements();
+  const { 
+    achievedIds,
+    unlockAchievement: unlockAchievementToDB, 
+    isAchievementUnlocked,
+    isLoading: isAchievementsLoading 
+  } = useAchievements();
   
   // 使用 useMemo 缓存 userId，避免因 session 对象引用变化而触发重新渲染
   const userId = useMemo(() => session?.user?.id, [session?.user?.id]);
@@ -1283,8 +1288,26 @@ export default function Dashboard() {
     return computeFlowIndex(metrics, weeklyBehavior);
   }, [stats.streakDays, todayStats.minutes, weeklyStats.totalMinutes, totalFocusMinutes]);
 
+  // 🔥 修复：将 Hook 的成就数据同步到 AchievementManager
+  useEffect(() => {
+    if (isAchievementsLoading) return;
+    
+    const manager = getAchievementManager();
+    // 强制使用 Hook 的数据覆盖 manager 的 localStorage 数据
+    manager['achievedAchievements'] = new Set(achievedIds);
+    console.log('[Dashboard Mobile] 🔄 同步成就数据到 Manager:', achievedIds.size, '个');
+  }, [isAchievementsLoading, achievedIds]);
+
   // 初始化成就管理器
   useEffect(() => {
+    // 🔥 修复：等待成就数据加载完成后再进行成就检测，避免刷新页面时重复触发
+    if (isAchievementsLoading) {
+      console.log('[Dashboard Mobile] ⏳ 等待成就数据加载...');
+      return;
+    }
+    
+    console.log('[Dashboard Mobile] ✅ 成就数据已加载，开始检测成就...', { achievedCount: achievedIds.size });
+    
     const manager = getAchievementManager();
     setAchievementManager(manager);
     
@@ -1397,7 +1420,7 @@ export default function Dashboard() {
       // 3秒后自动清空，以便再次触发
       setTimeout(() => setNewAchievements([]), 3000);
     }
-  }, [flowIndex.score, totalFocusMinutes, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
+  }, [isAchievementsLoading, flowIndex.score, totalFocusMinutes, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
   
   // 从localStorage恢复未查看成就
   useEffect(() => {

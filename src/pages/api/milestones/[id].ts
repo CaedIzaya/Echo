@@ -41,6 +41,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log('[milestone] 更新里程碑:', id);
 
+      // 如果小目标从未完成变为已完成，更新统计数据
+      if (isCompleted === true && !milestone.isCompleted) {
+        // 更新用户全局统计
+        await db.user.update({
+          where: { id: session.user.id },
+          data: {
+            totalCompletedMilestones: {
+              increment: 1
+            }
+          }
+        });
+        console.log('[milestone] 用户总完成小目标数+1');
+        
+        // 更新项目统计
+        await db.project.update({
+          where: { id: milestone.projectId },
+          data: {
+            completedMilestones: {
+              increment: 1
+            }
+          }
+        });
+        console.log('[milestone] 项目完成小目标数+1');
+        
+        // 检查是否解锁首次完成小目标成就
+        const userStats = await db.user.findUnique({
+          where: { id: session.user.id },
+          select: { totalCompletedMilestones: true }
+        });
+        
+        if (userStats && userStats.totalCompletedMilestones === 0) {
+          await db.achievement.upsert({
+            where: {
+              userId_achievementId: {
+                userId: session.user.id,
+                achievementId: 'first_milestone_completed'
+              }
+            },
+            create: {
+              userId: session.user.id,
+              achievementId: 'first_milestone_completed',
+              category: 'milestone'
+            },
+            update: {}
+          });
+          console.log('[milestone] 解锁首次完成小目标成就');
+        }
+      }
+
       const updatedMilestone = await db.milestone.update({
         where: { id },
         data: {

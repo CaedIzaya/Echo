@@ -92,6 +92,17 @@ export default function ShopModal({ isOpen, onClose }: ShopModalProps) {
         if (item.type === 'theme') {
           setCurrentTheme(getCurrentTheme());
         }
+        
+        // 🔄 如果购买的是勋章，刷新邮件系统（勋章购买会触发特殊邮件）
+        if (item.type === 'badge') {
+          console.log('[ShopModal] 📧 检测到购买勋章，刷新邮件系统');
+          try {
+            const { MailSystem } = await import('~/lib/MailSystem');
+            await MailSystem.getInstance().refresh();
+          } catch (error) {
+            console.error('[ShopModal] 邮件刷新失败:', error);
+          }
+        }
       } else {
         const error = await res.json();
         alert(error.error || '购买失败');

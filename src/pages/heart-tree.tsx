@@ -206,7 +206,11 @@ export default function HeartTreePage() {
         )}
 
         {/* 移动端底部导航：当前页面为心树（无论是否命名都显示） */}
-        <BottomNavigation active="heart-tree" />
+        <BottomNavigation 
+          active="heart-tree" 
+          hasFocusedToday={hasCompletedFocusToday}
+          todaySessions={hasCompletedFocusToday ? 1 : 0}
+        />
       </>
     );
   }

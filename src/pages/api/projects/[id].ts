@@ -74,6 +74,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
+      // 如果计划从未完成变为已完成，更新用户的全局统计
+      if (isCompleted === true && !existingProject.isCompleted) {
+        await db.user.update({
+          where: { id: session.user.id },
+          data: {
+            totalCompletedProjects: {
+              increment: 1
+            }
+          }
+        });
+        console.log('[projects] 用户总完成计划数+1');
+        
+        // 检查是否解锁首次完成计划成就
+        const userStats = await db.user.findUnique({
+          where: { id: session.user.id },
+          select: { totalCompletedProjects: true }
+        });
+        
+        if (userStats && userStats.totalCompletedProjects === 0) {
+          // 尝试创建首次完成计划成就（如果不存在）
+          await db.achievement.upsert({
+            where: {
+              userId_achievementId: {
+                userId: session.user.id,
+                achievementId: 'first_plan_completed'
+              }
+            },
+            create: {
+              userId: session.user.id,
+              achievementId: 'first_plan_completed',
+              category: 'milestone'
+            },
+            update: {}
+          });
+          console.log('[projects] 解锁首次完成计划成就');
+        }
+      }
+
       // 更新计划
       const updatedProject = await db.project.update({
         where: { id },

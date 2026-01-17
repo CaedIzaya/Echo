@@ -1,16 +1,20 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
+import { HeartTreeManager } from '~/lib/HeartTreeSystem';
+import { canWaterToday, loadHeartTreeExpState } from '~/lib/HeartTreeExpSystem';
 
 interface BottomNavigationProps {
   active: 'home' | 'focus' | 'plans' | 'heart-tree';
   hasFocusedToday?: boolean; // 今天是否有专注记录
+  todaySessions?: number; // 今天的专注次数
 }
 
-export default function BottomNavigation({ active, hasFocusedToday = false }: BottomNavigationProps) {
+export default function BottomNavigation({ active, hasFocusedToday = false, todaySessions = 0 }: BottomNavigationProps) {
   const router = useRouter();
   const [showFocusDot, setShowFocusDot] = useState(false);
+  const [showHeartTreeDot, setShowHeartTreeDot] = useState(false);
 
-  // 检查今天是否显示蓝绿点点
+  // 检查今天是否显示蓝绿点点（专注提醒）
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     const visitedFocusPageToday = localStorage.getItem(`focusPageVisited_${today}`) === 'true';
@@ -18,6 +22,35 @@ export default function BottomNavigation({ active, hasFocusedToday = false }: Bo
     // 如果今天没有专注记录 且 今天还没有访问过专注页面，则显示点点
     setShowFocusDot(!hasFocusedToday && !visitedFocusPageToday);
   }, [hasFocusedToday]);
+
+  // 检查心树是否可以浇水或施肥（显示绿色呼吸点）
+  useEffect(() => {
+    const checkHeartTreeStatus = () => {
+      if (typeof window === 'undefined') return;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const expState = loadHeartTreeExpState();
+      const hasCompletedFocusToday = todaySessions > 0;
+      
+      // 检查是否可以浇水
+      const canWater = canWaterToday(expState, today, hasCompletedFocusToday);
+      
+      // 检查是否有施肥机会
+      const fertilizeOps = HeartTreeManager.getFertilizeOpportunities();
+      const canFertilize = fertilizeOps > 0;
+      
+      // 只要满足任一条件就显示绿点
+      setShowHeartTreeDot(canWater || canFertilize);
+    };
+    
+    // 立即检查一次
+    checkHeartTreeStatus();
+    
+    // 每3秒检查一次（因为浇水和施肥机会可能会变化）
+    const interval = setInterval(checkHeartTreeStatus, 3000);
+    
+    return () => clearInterval(interval);
+  }, [todaySessions]);
 
   // 点击专注按钮时，标记为已访问，点点消失
   const handleFocusClick = () => {
@@ -88,6 +121,14 @@ export default function BottomNavigation({ active, hasFocusedToday = false }: Bo
               <span className="absolute top-1.5 right-2 flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-gradient-to-br from-teal-400 to-cyan-500"></span>
+              </span>
+            )}
+            
+            {/* 绿色提示点：在心树按钮上显示，当可以浇水或施肥时 */}
+            {item.key === 'heart-tree' && showHeartTreeDot && (
+              <span className="absolute top-1.5 right-2 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-gradient-to-br from-emerald-400 to-green-500"></span>
               </span>
             )}
             <span className="mb-1">{item.icon}</span>

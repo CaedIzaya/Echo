@@ -231,11 +231,8 @@ export default function PlansPage() {
       setPlans(updatedPlans);
       
       // 检查是否是第一次完成计划（首次成就）
-      const completedPlansCount = updatedPlans.filter((p: Project) => p.isCompleted).length;
-      if (completedPlansCount === 1) {
-        // 第一次完成计划，标记到 localStorage
-        localStorage.setItem('firstPlanCompleted', 'true');
-      }
+      // 通过检查用户的totalCompletedProjects字段，如果为1则触发首次完成成就
+      // 这个逻辑会在后端API中处理，这里只需要更新前端状态
       
       setCompletionPlan(selectedPlan);
       setShowCompletionDialog(true);
@@ -482,10 +479,8 @@ export default function PlansPage() {
 
         setPlans(updatedPlans);
 
-        // 如果是第一次创建小目标，标记到 localStorage
-        if (isFirstMilestone) {
-          localStorage.setItem('firstMilestoneCreated', 'true');
-        }
+        // 如果是第一次创建小目标，成就逻辑在后端API处理
+        // 前端只需要更新UI状态
 
         setShowAddMilestone(false);
         setMilestoneTargetPlanId(null);

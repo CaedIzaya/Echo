@@ -1192,7 +1192,7 @@ export default function Focus() {
             note: sessionName || null,
             rating: numericRating,
             flowIndex: numericRating,
-            projectId: selectedGoal || null,
+            projectId: selectedPlanId !== 'free' ? selectedPlanId : null, // ✅ 修复：使用计划ID而不是小目标ID
           }),
         }).then(response => {
           if (response.ok) {

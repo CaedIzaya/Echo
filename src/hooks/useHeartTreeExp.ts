@@ -107,9 +107,21 @@ export function useHeartTreeExp() {
           const error = await response.json();
           console.error('[useHeartTreeExp] 保存到数据库失败:', error);
         } else {
+          const data = await response.json();
           console.log('[useHeartTreeExp] 保存到数据库成功');
           // ✅ 使用用户隔离的 localStorage
         setUserStorage(SYNC_KEY, 'true');
+          
+          // 🔄 如果获得了果实，触发邮件刷新
+          if (data.fruitsEarned && data.fruitsEarned > 0) {
+            console.log('[useHeartTreeExp] 📧 检测到获得果实，刷新邮件系统');
+            try {
+              const { MailSystem } = await import('~/lib/MailSystem');
+              await MailSystem.getInstance().refresh();
+            } catch (error) {
+              console.error('[useHeartTreeExp] 邮件刷新失败:', error);
+            }
+          }
         }
       }
 

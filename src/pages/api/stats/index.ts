@@ -43,22 +43,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('[stats] 找到', focusSessions.length, '条专注记录');
 
+    // 获取用户全局统计数据
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        totalCompletedMilestones: true,
+        totalCompletedProjects: true,
+        streakDays: true,
+      }
+    });
+
     // 计算各项统计
     const todayStats = calculateTodayStats(focusSessions);
     const weeklyStats = calculateWeeklyStats(focusSessions);
     const totalStats = calculateTotalStats(focusSessions);
     const yesterdayMinutes = calculateYesterdayStats(focusSessions);
     const streakDays = calculateStreakDays(focusSessions);
-
-    // 计算完成的小目标数量
-    const completedMilestones = await db.milestone.count({
-      where: {
-        project: {
-          userId: session.user.id
-        },
-        isCompleted: true
-      }
-    });
 
     const stats = {
       // 今日统计
@@ -73,7 +73,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // 其他指标
       yesterdayMinutes,
       streakDays,
-      completedGoals: completedMilestones,
+      completedGoals: user?.totalCompletedMilestones || 0,
+      completedProjects: user?.totalCompletedProjects || 0,
       
       // 元数据
       calculatedAt: new Date().toISOString(),
@@ -83,7 +84,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       today: `${todayStats.minutes}分钟`,
       week: `${weeklyStats.totalMinutes}分钟`,
       total: `${totalStats.totalMinutes}分钟`,
-      streak: `${streakDays}天`
+      streak: `${streakDays}天`,
+      completedGoals: stats.completedGoals,
+      completedProjects: stats.completedProjects
     });
 
     return res.status(200).json(stats);

@@ -194,10 +194,22 @@ export function useUserExp() {
               console.error('[useUserExp] 保存到数据库失败:', error);
               // 数据库保存失败，但 localStorage 已更新，仍然算成功
             } else {
+              const data = await response.json();
               console.log('[useUserExp] ✅ 经验值已同步到数据库');
               // ✅ 使用用户隔离的 localStorage
               setUserStorage(SYNC_KEY, 'true');
               setUserStorage('userExpSyncedAt', new Date().toISOString());
+              
+              // 🔄 如果等级提升，触发邮件刷新
+              if (data.userLevel > levelInfo.currentLevel - 1) {
+                console.log('[useUserExp] 📧 检测到等级提升，刷新邮件系统');
+                try {
+                  const { MailSystem } = await import('~/lib/MailSystem');
+                  await MailSystem.getInstance().refresh();
+                } catch (error) {
+                  console.error('[useUserExp] 邮件刷新失败:', error);
+                }
+              }
             }
           } catch (error) {
             console.error('[useUserExp] 同步异常:', error);

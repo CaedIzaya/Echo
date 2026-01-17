@@ -62,6 +62,14 @@ const SHOP_ITEMS: ShopItem[] = [
     type: 'badge',
     price: 3,
   },
+  {
+    id: 'badge_diamond',
+    name: '钻石勋章',
+    description: '专注带来的永恒闪耀',
+    icon: '💎',
+    type: 'badge',
+    price: 10,
+  },
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

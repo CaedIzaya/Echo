@@ -335,7 +335,12 @@ export default function Dashboard() {
   // ========== 持久化 Hooks（数据库同步）==========
   const { userExp, userLevel: hookUserLevel, addUserExp, updateUserExp } = useUserExp();
   const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
-  const { unlockAchievement: unlockAchievementToDB } = useAchievements();
+  const { 
+    achievedIds,
+    unlockAchievement: unlockAchievementToDB, 
+    isAchievementUnlocked,
+    isLoading: isAchievementsLoading 
+  } = useAchievements();
   const { syncStatus, syncAllData } = useDataSync(); // 🆕 数据同步 Hook
   
   // 监听用户等级变化，触发等级提升文案
@@ -1866,8 +1871,24 @@ export default function Dashboard() {
     return computeFlowIndex(metrics, weeklyBehavior);
   }, [stats.streakDays, todayStats.minutes, weeklyStats.totalMinutes, totalFocusMinutes]);
 
+  // 🔥 修复：将 Hook 的成就数据同步到 AchievementManager
+  useEffect(() => {
+    if (isAchievementsLoading) return;
+    
+    const manager = getAchievementManager();
+    // 强制使用 Hook 的数据覆盖 manager 的 localStorage 数据
+    manager['achievedAchievements'] = new Set(achievedIds);
+    console.log('[Dashboard] 🔄 同步成就数据到 Manager:', achievedIds.size, '个');
+  }, [isAchievementsLoading, achievedIds]);
+
   // 初始化成就管理器 + 数据完整性检查
   useEffect(() => {
+    // 🔥 修复：等待成就数据加载完成后再进行成就检测，避免刷新页面时重复触发
+    if (isAchievementsLoading) {
+      console.log('[Dashboard] ⏳ 等待成就数据加载...');
+      return;
+    }
+    
     const manager = getAchievementManager();
     setAchievementManager(manager);
     
@@ -1879,12 +1900,9 @@ export default function Dashboard() {
       checkDataIntegrity(session.user.id).catch(error => {
         console.error('[Dashboard] 数据完整性检查失败:', error);
       });
-      
-      // 2. 从数据库同步成就数据
-      manager.syncFromDatabase().catch(error => {
-        console.error('[Dashboard] 成就数据同步失败:', error);
-      });
     }
+    
+    console.log('[Dashboard] ✅ 成就数据已加载，开始检测成就...', { achievedCount: achievedIds.size });
     
     // 检查当前状态的成就
     const flowAchievements = manager.checkFlowIndexAchievements(flowIndex.score);
@@ -1981,7 +1999,7 @@ export default function Dashboard() {
       // 3秒后自动清空，以便再次触发
       setTimeout(() => setNewAchievements([]), 3000);
     }
-  }, [flowIndex.score, totalFocusMinutes, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
+  }, [isAchievementsLoading, flowIndex.score, totalFocusMinutes, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
   
   // 从localStorage恢复未查看成就
   useEffect(() => {
@@ -2298,41 +2316,31 @@ export default function Dashboard() {
   };
 
   // 里程碑卡片组件
-  const MilestoneCard = () => {
-    const finalGoal = primaryPlan?.finalGoal;
-    
+  // 日记入口卡片组件
+  const JournalCard = () => {
     return (
       <div 
-        onClick={() => router.push('/plans')}
-        className="bg-gradient-to-br from-[#fff7da] via-[#f3c575] to-[#d88b3b] rounded-3xl p-6 shadow-lg shadow-amber-200/60 text-[#4f2a07] hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden group"
+        onClick={() => router.push('/journal')}
+        className="bg-gradient-to-br from-teal-400 via-cyan-400 to-blue-400 rounded-3xl p-6 shadow-lg shadow-teal-300/60 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden group"
       >
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-          <span className="text-6xl">🏔️</span>
+          <span className="text-6xl">📔</span>
         </div>
         
         <div className="flex items-center justify-between mb-4">
-          <p className="text-xs uppercase tracking-[0.4em] text-[#4f2a07]/70 font-medium">里程碑</p>
+          <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium">日记</p>
+          <span className="text-2xl">📖</span>
         </div>
         
         <div className="space-y-3 relative z-10">
-          {finalGoal ? (
-            <>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold line-clamp-2 leading-tight">
-                  {finalGoal.content}
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-baseline gap-2">
-                <p className="text-lg font-bold">这片领土还没有里程碑要征服</p>
-              </div>
-              <button className="mt-2 px-4 py-2 bg-white/30 backdrop-blur-sm rounded-lg text-sm font-semibold hover:bg-white/50 transition-colors">
-                去设置
-              </button>
-            </>
-          )}
+          <div className="flex items-baseline gap-2">
+            <p className="text-xl font-bold leading-tight">
+              回顾你专注的点滴时分
+            </p>
+          </div>
+          <p className="text-xs text-white/70 font-medium">
+            查看你的专注历程
+          </p>
         </div>
       </div>
     );
@@ -2898,7 +2906,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <MilestoneCard />
+            <JournalCard />
             <ShopCard />
           </div>
 
@@ -3032,7 +3040,11 @@ export default function Dashboard() {
         />
       </div>
 
-      <BottomNavigation active="home" hasFocusedToday={todayStats.minutes > 0} />
+      <BottomNavigation 
+        active="home" 
+        hasFocusedToday={todayStats.minutes > 0}
+        todaySessions={todayStats.minutes > 0 ? 1 : 0}
+      />
       
       {/* 成就面板 */}
       {showAchievementPanel && (
