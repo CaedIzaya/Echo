@@ -139,7 +139,3 @@ function generatePreview(text: string, maxLength: number): string {
   return cleaned;
 }
 
-
-
-
-

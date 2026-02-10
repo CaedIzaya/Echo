@@ -97,7 +97,8 @@ export function useUserStats() {
     } else {
       setIsLoading(false);
     }
-  }, [session?.user?.id, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]); // 🔥 只依赖 session?.user?.id，loadFromDatabase 在函数内部调用
 
   // 更新连续天数
   const updateStreakDays = useCallback(async (newStreakDays: number, date: string) => {

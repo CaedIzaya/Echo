@@ -69,6 +69,7 @@ export interface AwarenessContext {
   lastNDays: DayStats[];   // 最近 N 天，包含 today
   nowTs: number;
   nowLocalHour: number;    // 本地时间小时（0-23）
+  nowLocalMinute: number;  // 本地时间分钟（0-59）
   recentEvents: Event[];   // 最近 30~60 分钟内的事件
 }
 
@@ -93,7 +94,6 @@ export interface AwarenessResponse {
   copy: string;                 // 选中的文案
   heartTreeName?: string;       // 心树名字（如果由心树回应）
 }
-
 
 
 

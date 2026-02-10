@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import HeartTreeComponent from './dashboard/HeartTree';
 import BottomNavigation from './dashboard/BottomNavigation';
 import { getNamingGuideText, getFirstMeetingText } from '~/awareness/heart-tree-naming';
@@ -108,6 +109,9 @@ export default function HeartTreePage() {
     // 显示心树页面（无论是否命名都显示，但未命名时显示命名弹窗）
     return (
       <>
+        <Head>
+          <title>心树 | Echo</title>
+        </Head>
         <div className="min-h-screen bg-gradient-to-b from-sky-300 via-sky-100 to-white pb-20 relative overflow-hidden">
           {/* 云朵背景装饰 */}
           <div className="absolute top-[10%] left-[15%] w-24 h-8 bg-white/60 rounded-full blur-xl animate-pulse" style={{ animationDuration: '8s' }} />
@@ -120,7 +124,7 @@ export default function HeartTreePage() {
               <HeartTreeComponent
                 todaySessions={hasCompletedFocusToday ? 1 : 0}
                 completedMilestonesToday={0}
-                newAchievementsToday={1}
+                newAchievementsToday={0}
               />
             ) : (
               <div className="min-h-screen flex items-center justify-center">
@@ -206,11 +210,7 @@ export default function HeartTreePage() {
         )}
 
         {/* 移动端底部导航：当前页面为心树（无论是否命名都显示） */}
-        <BottomNavigation 
-          active="heart-tree" 
-          hasFocusedToday={hasCompletedFocusToday}
-          todaySessions={hasCompletedFocusToday ? 1 : 0}
-        />
+        <BottomNavigation active="heart-tree" />
       </>
     );
   }

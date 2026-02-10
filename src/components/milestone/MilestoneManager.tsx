@@ -49,7 +49,12 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
     onSave(newMilestone);
     setInputValue('');
     setIsCreating(false);
-    setShowCreateSuccess(true);
+    
+    // 🎉 显示设置成功提示
+    alert('✅ 里程碑已设定！');
+    
+    // 关闭弹窗
+    onClose();
 
     // 触发成就：设置新里程碑（如果是第一次，会由系统判断）
     const manager = getAchievementManager();

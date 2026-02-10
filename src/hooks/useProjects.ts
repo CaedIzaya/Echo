@@ -5,9 +5,10 @@
  * 优先级：数据库 > localStorage
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { getUserStorage, setUserStorage } from '~/lib/userStorage';
+import { trackEffect } from '~/lib/debugTools';
 
 export interface Milestone {
   id: string;
@@ -50,6 +51,7 @@ const SYNC_KEY = 'userPlansSynced';
 export function useProjects() {
   const { data: session, status } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsVersion, setProjectsVersion] = useState(0); // 🔥 添加版本号追踪变化
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -91,6 +93,7 @@ export function useProjects() {
         
         // 更新状态
         setProjects(dbProjects);
+        setProjectsVersion(prev => prev + 1); // 🔥 更新版本号
         
         // 🌟 优化：写入缓存并记录时间戳
         // ✅ 使用用户隔离的 localStorage
@@ -114,10 +117,13 @@ export function useProjects() {
     } finally {
       setIsLoading(false);
     }
-  }, [session?.user?.id, loadFromCache]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]); // 🔥 移除 loadFromCache 依赖，直接在函数内部调用
 
   // 初始化加载 - 完全依赖数据库
   useEffect(() => {
+    trackEffect('useProjects', 'init');
+    
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
@@ -127,7 +133,8 @@ export function useProjects() {
       setProjects([]);
       setIsLoading(false);
     }
-  }, [status, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // 🔥 只依赖 status，loadFromDatabase 在函数内部调用
 
   // 创建计划
   const createProject = useCallback(async (projectData: Partial<Project>) => {
@@ -362,10 +369,22 @@ export function useProjects() {
     }
   }, [session?.user?.id, loadFromCache, loadFromDatabase]);
 
+  // 🔥 使用 useMemo 稳定派生值，避免每次都创建新引用
+  const primaryProject = useMemo(
+    () => projects.find(p => p.isPrimary) || null,
+    [projectsVersion] // 🔥 依赖版本号而不是数组本身
+  );
+  
+  const activeProjects = useMemo(
+    () => projects.filter(p => p.isActive),
+    [projectsVersion] // 🔥 依赖版本号而不是数组本身
+  );
+
   return {
     projects,
-    primaryProject: projects.find(p => p.isPrimary) || null,
-    activeProjects: projects.filter(p => p.isActive),
+    primaryProject,
+    activeProjects,
+    projectsVersion, // 🔥 导出版本号供外部使用
     isLoading,
     isSaving,
     createProject,

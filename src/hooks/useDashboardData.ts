@@ -5,9 +5,10 @@
  * 优先级：数据库 > localStorage
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { getUserStorage, setUserStorage } from '~/lib/userStorage';
+import { trackEffect } from '~/lib/debugTools';
 
 export interface DashboardData {
   // 今日统计
@@ -58,18 +59,27 @@ export function useDashboardData() {
 
     console.log('[useDashboardData] 🔄 开始从数据库加载关键数据...');
     
-    setData(prev => ({ ...prev, isLoading: true }));
+    // 🔥 不再设置中间的 loading 状态，避免额外的渲染
+    // setData(prev => ({ ...prev, isLoading: true }));
 
     try {
       const response = await fetch('/api/dashboard/stats');
       
       if (!response.ok) {
-        throw new Error(`加载失败: ${response.status}`);
+        console.warn('[useDashboardData] 加载失败:', response.status);
+        setData(prev => ({ ...prev, isLoading: false }));
+        return;
       }
 
       const dbData = await response.json();
       
-      console.log('[useDashboardData] ✅ 数据库数据加载成功', dbData);
+      console.log('[useDashboardData] ✅ 数据库数据加载成功', {
+        todayMinutes: dbData.todayMinutes,
+        todayDate: dbData.todayDate,
+        weeklyMinutes: dbData.weeklyMinutes,
+        totalMinutes: dbData.totalMinutes,
+        streakDays: dbData.streakDays,
+      });
 
       const newData: DashboardData = {
         todayMinutes: dbData.todayMinutes || 0,
@@ -83,7 +93,7 @@ export function useDashboardData() {
         lastSyncAt: new Date().toISOString(),
       };
 
-      // 更新状态
+      // 🔥 一次性更新所有数据，避免多次渲染
       setData(newData);
 
       // 写入缓存
@@ -103,50 +113,40 @@ export function useDashboardData() {
     }
   }, [session?.user?.id]);
 
-  // 自动加载：登录时检查并同步
+  // 自动加载：每次登录都从数据库加载
   useEffect(() => {
+    trackEffect('useDashboardData', 'autoLoad');
+    
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      // ✅ 使用用户隔离的 localStorage
-      const synced = getUserStorage(SYNC_KEY);
-      const lastSyncAt = getUserStorage('dashboardDataSyncedAt');
-      
-      // 🌟 优化：检查是否需要同步（更严格的条件）
-      const needSync = !synced || !lastSyncAt || isDataStale(lastSyncAt);
-      
-      if (needSync) {
-        console.log('[useDashboardData] 📊 需要同步数据（首次加载或数据过期）');
-        loadFromDatabase();
-      } else {
-        console.log('[useDashboardData] ⚡ 使用缓存数据（性能优化）');
-        setData(prev => ({ ...prev, isLoading: false }));
-        
-        // 🌟 优化：仅在数据接近过期时后台同步（45分钟后）
-        const lastSync = new Date(lastSyncAt);
-        const now = new Date();
-        const minutesSinceSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
-        
-        if (minutesSinceSync > 45) {
-          console.log('[useDashboardData] 🔄 后台静默同步（数据接近过期）');
-          setTimeout(() => {
-            loadFromDatabase();
-          }, 3000); // 延迟3秒，避免阻塞初始渲染
-        }
-      }
+      console.log('[useDashboardData] 🔥 登录检测到，从数据库加载统计数据');
+      loadFromDatabase();
     } else {
-      // 未登录，使用缓存数据
-      setData(prev => ({ ...prev, isLoading: false }));
+      // 未登录，清空数据
+      setData(getDefaultData());
     }
-  }, [status, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // 🔥 只依赖 status，loadFromDatabase 在函数内部调用
 
-  // 手动刷新
-  const refresh = useCallback(() => {
-    return loadFromDatabase();
-  }, [loadFromDatabase]);
+  // 手动刷新 - 直接返回 loadFromDatabase 函数
+  const refresh = loadFromDatabase;
+
+  // 🔥 使用 useMemo 稳定返回值，避免每次渲染都创建新对象
+  const stableData = useMemo(() => data, [
+    data.todayMinutes,
+    data.todayDate,
+    data.weeklyMinutes,
+    data.weekStart,
+    data.totalMinutes,
+    data.streakDays,
+    data.lastStreakDate,
+    data.isLoading,
+    data.lastSyncAt,
+  ]);
 
   return {
-    data,
+    data: stableData,
     refresh,
     isLoading: data.isLoading,
   };

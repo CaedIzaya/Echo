@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
+import Head from 'next/head';
 import { useCachedProjects } from '~/hooks/useCachedProjects';
 import PlanCard from './PlanCard';
 import PlanManagement from './PlanManagement';
@@ -524,8 +525,12 @@ export default function PlansPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-24">
-      <div className="w-full max-w-5xl mx-auto px-5 sm:px-10 pt-20">
+    <>
+      <Head>
+        <title>计划管理 | Echo</title>
+      </Head>
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 pb-24">
+        <div className="w-full max-w-5xl mx-auto px-5 sm:px-10 pt-20">
         {/* 头部 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
           <div>
@@ -751,7 +756,8 @@ export default function PlansPage() {
           animation: pulse-border 2s ease-in-out infinite;
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }
 

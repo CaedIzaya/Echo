@@ -323,6 +323,7 @@ export default function GoalSetting() {
       };
 
       const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
+      let isFirstPlanEver = false;
       
       if (isEditMode && editPlanId) {
         const planIndex = existingPlans.findIndex((p: any) => p.id === editPlanId);
@@ -340,6 +341,7 @@ export default function GoalSetting() {
         }
       } else {
         const activePlans = existingPlans.filter((p: any) => p.isActive && !p.isCompleted);
+        isFirstPlanEver = activePlans.length === 0;
         if (activePlans.length === 0) {
           newPlan.isPrimary = true;
           existingPlans.forEach((p: any) => { p.isPrimary = false; });
@@ -441,10 +443,28 @@ export default function GoalSetting() {
 
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('forceOnboarding');
-        
-        // 🌟 标记为新用户首次进入，以便 Dashboard 显示启动激励
-        if (!allowReturn) {
-          localStorage.setItem('isNewUserFirstEntry', 'true');
+
+        // 🌟 首次创建计划当天：自动选中第一个小目标 + 触发启动节奏流程
+        if (isFirstPlanEver && !isEditMode) {
+          const today = new Date().toISOString().split('T')[0];
+          const existingFirstPlanDate = localStorage.getItem('firstPlanCreatedDate');
+          if (!existingFirstPlanDate) {
+            localStorage.setItem('firstPlanCreatedDate', today);
+          }
+          // 记录为“首次创建计划当天”，用于 Dashboard 当天自动弹出节奏设定
+          localStorage.setItem('isNewUserFirstEntry', today);
+
+          const milestones = newPlan.milestones || [];
+          const firstMilestone = [...milestones].sort((a: any, b: any) => {
+            const orderA = typeof a.order === 'number' ? a.order : 0;
+            const orderB = typeof b.order === 'number' ? b.order : 0;
+            return orderA - orderB;
+          })[0];
+
+          if (firstMilestone?.id) {
+            localStorage.setItem('todaySelectedGoalId', firstMilestone.id);
+            localStorage.setItem('todaySelectedGoalDate', today);
+          }
         }
       }
 

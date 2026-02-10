@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
+import Head from 'next/head';
 import BottomNavigation from '../dashboard/BottomNavigation';
 import InterruptedSessionAlert from './InterruptedSessionAlert';
 import EchoSpirit from '../dashboard/EchoSpirit';
@@ -498,7 +499,18 @@ export default function Focus() {
 
   // 从localStorage恢复状态 - 增强版恢复机制
   useEffect(() => {
-    const saved = localStorage.getItem('focusSession');
+    const urlParams = new URLSearchParams(window.location.search);
+    const isQuickStart = urlParams.get('quickStart') === 'true';
+
+    // 快速启动时，始终以全新会话开始，避免旧会话覆盖目标时长
+    if (isQuickStart) {
+      localStorage.removeItem('focusSession');
+      localStorage.removeItem('focusSessionEnded');
+      localStorage.removeItem('focusTimerLastSaved');
+      localStorage.removeItem(autoInterruptedAtKey);
+    }
+
+    const saved = isQuickStart ? null : localStorage.getItem('focusSession');
     if (saved) {
       try {
         const session: FocusSession = JSON.parse(saved);
@@ -1451,7 +1463,11 @@ export default function Focus() {
   // 准备状态UI
   if (state === 'preparing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#e0f7ff] to-[#e1ebff] pb-20 relative overflow-hidden">
+      <>
+        <Head>
+          <title>专注模式 | Echo</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-[#e0f7ff] to-[#e1ebff] pb-20 relative overflow-hidden">
         {/* 背景装饰 */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-10 w-72 h-72 bg-teal-300/20 rounded-full blur-3xl animate-pulse"></div>
@@ -1659,14 +1675,19 @@ export default function Focus() {
             background: rgba(20, 184, 166, 0.5);
           }
         `}</style>
-      </div>
+        </div>
+      </>
     );
   }
 
   // 3秒倒计时UI
   if (state === 'starting') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-500 via-teal-600 to-cyan-600 flex items-center justify-center relative overflow-hidden">
+      <>
+        <Head>
+          <title>专注模式 | Echo</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-teal-500 via-teal-600 to-cyan-600 flex items-center justify-center relative overflow-hidden">
         {/* 动态背景装饰 */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
@@ -1689,7 +1710,8 @@ export default function Focus() {
           <p className="text-2xl text-white/90 font-medium animate-fade-in">准备就绪</p>
           <p className="text-white/70 text-sm mt-2">深呼吸，让心静下来</p>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -1710,13 +1732,22 @@ export default function Focus() {
     // 金色背景：仅在本次专注达到本次设定时长时显示
     const isGolden = goldActivatedThisSessionRef.current;
     
+    // 每日最小专注目标：优先使用当前计划的 dailyGoalMinutes（与本次专注时长解耦）
+    const selectedPlan = selectedPlanId !== 'free'
+      ? availablePlans.find(p => p.id === selectedPlanId)
+      : null;
+    const dailyGoalMinutes = selectedPlan?.dailyGoalMinutes ?? plannedMinutes;
+    
     // 检查今日累计是否达标（用于显示"今日已达标"标识）
     const todayTotalMinutes = todayMinutesBeforeStartRef.current + Math.floor(currentElapsed / 60);
-    const dailyGoalMinutes = plannedMinutes; // 这里可以从计划中获取每日目标
-    const isDailyGoalMet = todayTotalMinutes >= dailyGoalMinutes;
+    const isDailyGoalMet = dailyGoalMinutes > 0 && todayTotalMinutes >= dailyGoalMinutes;
 
     return (
-      <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-colors duration-300 ${
+      <>
+        <Head>
+          <title>专注中 | Echo</title>
+        </Head>
+        <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-colors duration-300 ${
         isGolden ? 'bg-gradient-to-br from-amber-500 to-yellow-400' : 
         isDailyGoalMet ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 
         'bg-gradient-to-br from-teal-600 to-cyan-500'
@@ -1762,8 +1793,10 @@ export default function Focus() {
                 ✨ 超额完成中 ✨
               </div>
             )}
-            {!isGolden && isDailyGoalMet && (
-              <div className="text-white text-lg mt-2 font-semibold flex items-center justify-center gap-2">
+            {isDailyGoalMet && (
+              <div className={`mt-2 font-semibold flex items-center justify-center gap-2 ${
+                isGolden ? 'text-yellow-50/80 text-sm' : 'text-white text-lg'
+              }`}>
                 <span>✓</span>
                 <span>今日已达标</span>
               </div>
@@ -1888,7 +1921,8 @@ export default function Focus() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -1918,7 +1952,11 @@ export default function Focus() {
     const pauseDuration = getPauseDuration();
     
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center p-6">
+      <>
+        <Head>
+          <title>暂停中 | Echo</title>
+        </Head>
+        <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center">
           <div className="text-6xl font-bold text-white mb-6">
             {formatTime(currentElapsed)}
@@ -1985,7 +2023,8 @@ export default function Focus() {
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -2000,6 +2039,9 @@ export default function Focus() {
 
     return (
       <>
+        <Head>
+          <title>{completed ? '专注完成' : '专注中断'} | Echo</title>
+        </Head>
         {/* 礼花效果 */}
         {showConfetti && (
           <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
@@ -2092,6 +2134,7 @@ export default function Focus() {
                 state={highFivePhase === 'ready' ? 'highfive' : highFivePhase === 'success' ? 'highfive-success' : 'idle'}
                 isCompleted={true}
                 className="w-32 h-32 md:w-40 md:h-40 cursor-pointer hover:scale-105 transition-transform"
+                disableAutoInteract={true}
                 onClick={handleHighFiveClick}
               />
             </div>
@@ -2154,6 +2197,9 @@ export default function Focus() {
   if (showInterruptedAlert && interruptedSessionData) {
     return (
       <>
+        <Head>
+          <title>专注模式 | Echo</title>
+        </Head>
         <InterruptedSessionAlert
           minutes={interruptedSessionData.minutes}
           timestamp={interruptedSessionData.timestamp}

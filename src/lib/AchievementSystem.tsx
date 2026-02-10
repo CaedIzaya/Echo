@@ -10,77 +10,74 @@ export interface Achievement {
 export class AchievementManager {
   private achievedAchievements: Set<string> = new Set();
   private databaseSynced: boolean = false;
+  private isSyncing: boolean = false;
 
   constructor() {
-    this.loadAchievedAchievements();
+    // 不再从localStorage加载，完全依赖数据库
+    console.log('[AchievementSystem] 初始化成就系统（等待数据库同步）');
   }
 
   private loadAchievedAchievements() {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('achievedAchievements');
-      if (stored) {
-        try {
-          this.achievedAchievements = new Set(JSON.parse(stored));
-          console.log('[AchievementSystem] 从 localStorage 加载成就:', this.achievedAchievements.size);
-        } catch (e) {
-          console.error('[AchievementSystem] 加载成就失败:', e);
-        }
-      }
-    }
+    // 已废弃，保留空方法避免错误
   }
   
   /**
-   * 从数据库同步成就数据
-   * 防止 localStorage 被清除导致的数据丢失
+   * 从数据库同步成就数据（完全依赖数据库）
    */
   async syncFromDatabase(): Promise<void> {
-    if (this.databaseSynced) {
-      return; // 已同步，避免重复
+    if (this.isSyncing) {
+      console.log('[AchievementSystem] 正在同步中，跳过');
+      return;
     }
+    
+    this.isSyncing = true;
     
     try {
       const response = await fetch('/api/achievements');
       if (response.ok) {
         const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
-          // 合并数据库中的成就
-          const dbAchievements = new Set(data.map((a: any) => a.achievementId));
-          
-          // 如果数据库有成就但 localStorage 没有，说明 localStorage 被清除了
-          if (dbAchievements.size > this.achievedAchievements.size) {
-            console.warn('[AchievementSystem] 检测到数据不一致，从数据库恢复成就');
-            console.log('  - 数据库成就数:', dbAchievements.size);
-            console.log('  - 本地成就数:', this.achievedAchievements.size);
-            
-            // 使用数据库数据
-            this.achievedAchievements = dbAchievements;
-            this.saveAchievedAchievements();
-          }
-          
-          this.databaseSynced = true;
-          console.log('[AchievementSystem] ✅ 数据库同步完成，共', this.achievedAchievements.size, '个成就');
-        }
+        
+        console.log('[AchievementSystem] 数据库返回:', data);
+        
+        // 🔥 完全使用数据库数据，忽略localStorage
+        const achievements = data.achievements || [];
+        const dbAchievements = new Set<string>(achievements.map((a: any) => a.id as string));
+        this.achievedAchievements = dbAchievements;
+        this.databaseSynced = true;
+        
+        console.log('[AchievementSystem] ✅ 从数据库加载成就:', this.achievedAchievements.size, '个');
+        
+        // 不再保存到localStorage，完全依赖数据库
+      } else {
+        console.error('[AchievementSystem] 数据库加载失败:', response.status);
       }
     } catch (error) {
       console.error('[AchievementSystem] 数据库同步失败:', error);
+    } finally {
+      this.isSyncing = false;
     }
   }
 
   private saveAchievedAchievements() {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('achievedAchievements', JSON.stringify(Array.from(this.achievedAchievements)));
-    }
+    // 已废弃，不再使用localStorage
   }
 
   private unlockAchievement(achievementId: string): Achievement | null {
+    // 🔥 如果数据库还没同步，拒绝解锁任何成就
+    if (!this.databaseSynced) {
+      console.warn('[AchievementSystem] ⚠️ 数据库未同步，拒绝解锁:', achievementId);
+      return null;
+    }
+    
     if (!this.achievedAchievements.has(achievementId)) {
       this.achievedAchievements.add(achievementId);
-      this.saveAchievedAchievements();
+      console.log('[AchievementSystem] ✅ 解锁新成就:', achievementId);
       
       // Return the achievement object
       const allAchievements = this.getAllAchievements();
       return allAchievements.find(a => a.id === achievementId) || null;
     }
+    console.log('[AchievementSystem] 成就已存在，跳过:', achievementId);
     return null;
   }
 

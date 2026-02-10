@@ -62,11 +62,12 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
     { key: 'milestone', label: '小目标', icon: '🎯' },
   ];
   
-  // 勋章数据
+  // 勋章数据（按等级排序）
   const badgeData = [
-    { id: 'badge_bronze', name: '青铜勋章', icon: '🥉', description: '彰显你的努力与坚持' },
-    { id: 'badge_silver', name: '白银勋章', icon: '🥈', description: '展现你的专注与毅力' },
-    { id: 'badge_gold', name: '黄金勋章', icon: '🥇', description: '证明你的卓越与非凡' },
+    { id: 'badge_diamond', name: '钻石勋章', icon: '💎', description: '专注带来的永恒闪耀', level: 4 },
+    { id: 'badge_gold', name: '黄金勋章', icon: '🥇', description: '证明你的卓越与非凡', level: 3 },
+    { id: 'badge_silver', name: '白银勋章', icon: '🥈', description: '展现你的专注与毅力', level: 2 },
+    { id: 'badge_bronze', name: '青铜勋章', icon: '🥉', description: '彰显你的努力与坚持', level: 1 },
   ];
 
   return (
@@ -116,7 +117,7 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
         {/* 成就列表 */}
         <div className="flex-1 overflow-y-auto p-6">
           {/* 勋章展示区（仅在全部或勋章分类时显示） */}
-          {(selectedCategory === 'all' || selectedCategory === 'badge') && badges.length > 0 && (
+          {(selectedCategory === 'all' || selectedCategory === 'badge') && (
             <div className="mb-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <span>🎖️</span>
@@ -125,7 +126,6 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {badgeData.map(badge => {
                   const owned = badges.includes(badge.id);
-                  if (!owned && selectedCategory === 'badge') return null;
                   
                   return (
                     <div
@@ -137,18 +137,16 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
                       }`}
                     >
                       <div className="text-center">
-                        <div className="text-6xl mb-3">{badge.icon}</div>
+                        <div className="text-6xl mb-3 opacity-${owned ? 100 : 40}">{badge.icon}</div>
                         <h4 className={`font-bold text-lg mb-2 ${owned ? 'text-white' : 'text-gray-500'}`}>
                           {badge.name}
                         </h4>
                         <p className={`text-sm ${owned ? 'text-white/90' : 'text-gray-400'}`}>
                           {badge.description}
                         </p>
-                        {owned && (
-                          <div className="mt-3 text-xs text-white/80 bg-white/20 rounded-full px-3 py-1 inline-block">
-                            ✓ 已拥有
-                          </div>
-                        )}
+                        <div className="mt-3 text-xs rounded-full px-3 py-1 inline-block ${owned ? 'text-white/80 bg-white/20' : 'text-gray-400 bg-gray-100'}">
+                          {owned ? '✓ 已拥有' : '未解锁'}
+                        </div>
                       </div>
                     </div>
                   );

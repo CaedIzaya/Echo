@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface EchoSpiritProps {
   state?: 'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success';
@@ -6,6 +6,8 @@ interface EchoSpiritProps {
   onStateChange?: (state: string) => void;
   onClick?: () => void;
   isCompleted?: boolean; // 专注是否完成，决定颜色：false=idle颜色，true=completed颜色
+  disableAutoInteract?: boolean; // 禁用随机动作池，仅触发点击回调（用于特定场景）
+  autoAnimation?: { token: number; type: 'happy' | 'nod' | 'excited'; durationMs?: number };
 }
 
 export default function EchoSpirit({ 
@@ -13,11 +15,15 @@ export default function EchoSpirit({
   className = '', 
   onStateChange, 
   onClick,
-  isCompleted = false
+  isCompleted = false,
+  disableAutoInteract = false,
+  autoAnimation
 }: EchoSpiritProps) {
   const [currentState, setCurrentState] = useState(state);
   const [isAnimating, setIsAnimating] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const animationSourceRef = useRef<'click' | 'auto' | null>(null);
+  const lastAutoTokenRef = useRef<number | null>(null);
 
   // 根据isCompleted获取颜色配置（复制自手机端）
   const getColors = () => {
@@ -49,26 +55,50 @@ export default function EchoSpirit({
     }
   }, [state, isAnimating]);
 
+  const startAnimation = useCallback((nextState: 'happy' | 'nod' | 'excited', durationMs: number, source: 'click' | 'auto') => {
+    if (source === 'click' && isAnimating && animationSourceRef.current === 'click') {
+      return;
+    }
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    setIsAnimating(true);
+    animationSourceRef.current = source;
+    setCurrentState(nextState);
+    if (onStateChange) onStateChange(nextState);
+    
+    timerRef.current = setTimeout(() => {
+      setIsAnimating(false);
+      animationSourceRef.current = null;
+      setCurrentState('idle');
+      if (onStateChange) onStateChange('idle');
+    }, durationMs);
+  }, [isAnimating, onStateChange]);
+
   // Interaction: Trigger animations based on state
   const handleInteract = () => {
-    if (isAnimating) return;
-    
-    setIsAnimating(true);
+    if (isAnimating && animationSourceRef.current === 'click') return;
     if (onClick) onClick();
+
+    if (disableAutoInteract) {
+      return;
+    }
     
     // Randomly choose happy, nod, or excited (三个动作：摆头、点头、弹跳)
     const actions: ('happy' | 'nod' | 'excited')[] = ['happy', 'nod', 'excited'];
     const nextState = actions[Math.floor(Math.random() * actions.length)];
-    setCurrentState(nextState);
-    if (onStateChange) onStateChange(nextState);
-    
-    // Reset after animation
-    timerRef.current = setTimeout(() => {
-      setIsAnimating(false);
-      setCurrentState('idle');
-      if (onStateChange) onStateChange('idle');
-    }, 2000);
+    startAnimation(nextState, 2000, 'click');
   };
+
+  useEffect(() => {
+    if (!autoAnimation) return;
+    if (lastAutoTokenRef.current === autoAnimation.token) return;
+    lastAutoTokenRef.current = autoAnimation.token;
+    startAnimation(autoAnimation.type, autoAnimation.durationMs ?? 2000, 'auto');
+  }, [autoAnimation, startAnimation]);
 
   return (
       <div 
@@ -100,6 +130,7 @@ export default function EchoSpirit({
         
         {/* --- GROUP: MAIN ROTATOR (Handles Body Tilt) --- */}
         <g className="main-rotator" transform="translate(100, 100)">
+          <g className="main-rotator-inner">
           {/* 外圈光晕层 - 扩大半径确保可见，且位于底层 */}
           <circle cx="0" cy="0" r="110" fill="url(#glow)" className="glow-layer" />
           
@@ -156,6 +187,7 @@ export default function EchoSpirit({
                 </g>
               </g>
             </g>
+          </g>
           </g>
         </g>
         
@@ -236,7 +268,7 @@ export default function EchoSpirit({
         }
         
         /* --- APPLY IDLE --- */
-        .echo-spirit-container[data-state="idle"] .main-rotator {
+        .echo-spirit-container[data-state="idle"] .main-rotator-inner {
           animation: floatIdle 4s ease-in-out infinite;
           transform-origin: center center;
         }
@@ -306,7 +338,7 @@ export default function EchoSpirit({
         }
         
         /* happy状态 - 组合动画：headShake和happyWiggle都应用在main-rotator上，避免容器位移 */
-        .echo-spirit-container[data-state="happy"] .main-rotator {
+        .echo-spirit-container[data-state="happy"] .main-rotator-inner {
           animation: happyWiggle 0.6s ease-in-out infinite, headShake 2s ease-in-out infinite;
           transform-origin: center center;
         }
@@ -335,7 +367,7 @@ export default function EchoSpirit({
         }
         
         /* nod状态 - 头部点头 - 参考手机版，应用在main-rotator上避免容器位移 */
-        .echo-spirit-container[data-state="nod"] .main-rotator {
+        .echo-spirit-container[data-state="nod"] .main-rotator-inner {
           animation: nodHeadTilt 1.2s ease-in-out infinite;
           transform-origin: center bottom; /* 头部底部中心 */
         }
@@ -371,7 +403,7 @@ export default function EchoSpirit({
           80% { transform: translateY(5px) scale(1.05, 0.95); } /* Land */
         }
         
-        .echo-spirit-container[data-state="excited"] .main-rotator {
+        .echo-spirit-container[data-state="excited"] .main-rotator-inner {
           animation: excitedBounce 0.8s ease-in-out infinite;
           transform-origin: center center;
         }
@@ -401,8 +433,8 @@ export default function EchoSpirit({
         
         /* highfive 准备状态：抬头 */
         @keyframes headLookUp {
-          0%, 100% { transform: translate(0, 100) rotate(-5deg) translateY(-5px); }
-          50% { transform: translate(0, 100) rotate(-8deg) translateY(-8px); }
+          0%, 100% { transform: rotate(-5deg) translateY(-5px); }
+          50% { transform: rotate(-8deg) translateY(-8px); }
         }
 
         /* highfive 准备状态：举手 */
@@ -424,7 +456,7 @@ export default function EchoSpirit({
         }
 
         /* Apply highfive ready */
-        .echo-spirit-container[data-state="highfive"] .main-rotator {
+        .echo-spirit-container[data-state="highfive"] .main-rotator-inner {
           animation: headLookUp 3s ease-in-out infinite;
           transform-origin: center center;
         }
@@ -445,7 +477,7 @@ export default function EchoSpirit({
         }
 
         /* Apply highfive success */
-        .echo-spirit-container[data-state="highfive-success"] .main-rotator {
+        .echo-spirit-container[data-state="highfive-success"] .main-rotator-inner {
           animation: successNod 0.4s ease-in-out infinite;
           transform-origin: center bottom;
         }

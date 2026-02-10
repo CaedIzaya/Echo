@@ -64,16 +64,11 @@ export const COPY_POOL: CopyPool = {
 
   // 🜄 场景 5：深夜上线（Lumi）
   SCENE5_LATE_NIGHT_ONLINE_LUMI: [
-    '这个时间你还醒着啊。',
-    '你心里一定装了些什么。',
-    '你今天是不是难睡？',
-    '你是来找一点安静的吗？',
-    '你现在需要的不是效率，是休息。',
-    '你这会儿的心挺重的吧。',
-    '睡不着的时候，人会特别脆。',
-    '你今天好像背了很多。',
-    '你现在的眼睛……很累了。',
-    '去睡吧，剩下的我帮你看着。',
+    '全世界都睡了。这个秘密基地现在只属于我们。',
+    '夜晚很安静，但你并不孤独',
+    '星光不够亮？我会让自己亮一点',
+    '这个点还在，是有什么心事吗？',
+    '月亮很安静，你也一样。',
   ],
 
   // 🜅 场景 6：点击 Lumi 太多次（Lumi）
@@ -109,7 +104,6 @@ export function selectCopy(ruleId: string, responder: 'LUMI' | 'HEART_TREE'): st
   const index = Math.floor(Math.random() * pool.length);
   return pool[index];
 }
-
 
 
 

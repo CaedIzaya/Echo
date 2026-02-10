@@ -174,10 +174,10 @@ const R4_MULTI_SHORT_SESSIONS: AwarenessRule = {
 };
 
 /**
- * 🜄 场景 5：深夜上线（23:00–4:00）
+ * 🜄 场景 5：深夜上线（22:30–4:00）
  * 触发时机：
- * - localTime(中国大陆)/userTime 在 23~04
- * - 或深夜反复启动 app
+ * - localTime(中国大陆)/userTime 在 22:30~04
+ * - 且用户仍在线（近期前台事件）
  * 谁来说：Lumi
  * 呈现方式：Lumi 说话
  */
@@ -187,16 +187,18 @@ const R5_LATE_NIGHT_ONLINE: AwarenessRule = {
   cooldownMinutes: 180, // 3 小时
   detect(ctx: AwarenessContext): AwarenessMatch | null {
     const h = ctx.nowLocalHour;
-    const isLateNight = h >= 23 || h < 4;
+    const m = ctx.nowLocalMinute ?? 0;
+    const isLateNight = h > 22 || (h === 22 && m >= 30) || h < 4;
     
     if (!isLateNight) return null;
     
-    // 检查最近 10 分钟内是否有 APP_LAUNCH 事件
-    const launchCount = ctx.recentEvents.filter(
-      e => e.type === 'APP_LAUNCH' && isWithinMinutes(e.ts, ctx.nowTs, 10)
+    // 检查最近 10 分钟内是否有前台/启动事件，确保用户仍在线
+    const onlineCount = ctx.recentEvents.filter(
+      e =>
+        (e.type === 'APP_FOREGROUND_START' || e.type === 'APP_LAUNCH') &&
+        isWithinMinutes(e.ts, ctx.nowTs, 10),
     ).length;
-    
-    if (launchCount < 1) return null;
+    if (onlineCount < 1) return null;
 
     return {
       ruleId: this.id,
@@ -262,4 +264,3 @@ export const rules: AwarenessRule[] = [
   R5_LATE_NIGHT_ONLINE,
   R6_LUMI_CLICK_MANY,
 ];
-

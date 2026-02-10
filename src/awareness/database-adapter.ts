@@ -4,7 +4,7 @@
  */
 
 import { UserState, DayStats, Event, AwarenessContext } from './types';
-import { formatDate, getLocalHour } from './utils';
+import { formatDate, getLocalHour, getLocalMinute } from './utils';
 
 /**
  * 数据库用户模型（示例，需要根据实际数据库结构调整）
@@ -160,6 +160,7 @@ export async function buildAwarenessContext(
     lastNDays,
     nowTs: now.getTime(),
     nowLocalHour: getLocalHour(now, userState.timezone),
+    nowLocalMinute: getLocalMinute(now, userState.timezone),
     recentEvents,
   };
 }
@@ -178,7 +179,6 @@ export function adaptPrismaUser(prismaUser: any): UserState {
     heartTreeName: prismaUser.heartTreeName,
   }, prismaUser.id);
 }
-
 
 
 

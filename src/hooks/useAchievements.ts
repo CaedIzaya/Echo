@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { getUserStorage, setUserStorage } from '~/lib/userStorage';
+import { trackEffect } from '~/lib/debugTools';
 
 const STORAGE_KEY = 'achievedAchievements';
 const SYNC_KEY = 'achievementsSynced';
@@ -14,6 +15,7 @@ const SYNC_KEY = 'achievementsSynced';
 export function useAchievements() {
   const { data: session, status } = useSession();
   const [achievedIds, setAchievedIds] = useState<Set<string>>(new Set());
+  const [achievedCount, setAchievedCount] = useState(0); // 🔥 添加计数器，避免 Set 引用变化
   const [isLoading, setIsLoading] = useState(true);
   const [isUnlocking, setIsUnlocking] = useState(false);
 
@@ -29,6 +31,7 @@ export function useAchievements() {
         
         // 更新状态和 localStorage
         setAchievedIds(ids);
+        setAchievedCount(ids.size); // 🔥 同步更新计数器
         // ✅ 使用用户隔离的 localStorage
         setUserStorage(STORAGE_KEY, JSON.stringify(Array.from(ids)));
         setUserStorage(SYNC_KEY, 'true');
@@ -45,6 +48,7 @@ export function useAchievements() {
           const idsArray = JSON.parse(stored) as string[];
           const ids = new Set<string>(idsArray);
           setAchievedIds(ids);
+          setAchievedCount(ids.size); // 🔥 同步更新计数器
         } catch (e) {
           console.error('[useAchievements] 解析 localStorage 失败:', e);
         }
@@ -56,51 +60,39 @@ export function useAchievements() {
 
   // 初始化
   useEffect(() => {
+    trackEffect('useAchievements', 'init');
+    console.log('[useAchievements] init triggered, status:', status);
+    
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      // 🌟 优化：立即显示 localStorage 数据
-      // ✅ 使用用户隔离的 localStorage
+      console.log('[useAchievements] 🔥 登录检测到，从数据库加载成就数据');
+      
+      // 先显示缓存（避免闪烁）
       const stored = getUserStorage(STORAGE_KEY);
       if (stored) {
         try {
           const idsArray = JSON.parse(stored) as string[];
           const ids = new Set<string>(idsArray);
           setAchievedIds(ids);
+          setAchievedCount(ids.size); // 🔥 同步更新计数器
+          console.log('[useAchievements] ⚡ 临时显示缓存:', ids.size, '个');
         } catch (e) {
           console.error('[useAchievements] 解析失败:', e);
         }
       }
       setIsLoading(false);
       
-      // 🌟 优化：仅在未同步或超过24小时时才查询数据库（极低频数据）
-      // ✅ 使用用户隔离的 localStorage
-      const synced = getUserStorage(SYNC_KEY);
-      const lastSyncAt = getUserStorage('achievementsSyncedAt');
-      
-      const needSync = !synced || !lastSyncAt || isAchievementDataStale(lastSyncAt);
-      
-      if (needSync) {
-        console.log('[useAchievements] 📊 成就数据需要同步（首次或超过24小时）');
-        loadFromDatabase();
-      } else {
-        console.log('[useAchievements] ⚡ 跳过数据库查询（缓存有效，极低频数据）');
-      }
+      // 🔥 每次登录都从数据库加载
+      loadFromDatabase();
     } else {
-      // ✅ 使用用户隔离的 localStorage
-      const stored = getUserStorage(STORAGE_KEY);
-      if (stored) {
-        try {
-          const idsArray = JSON.parse(stored) as string[];
-          const ids = new Set<string>(idsArray);
-          setAchievedIds(ids);
-        } catch (e) {
-          console.error('[useAchievements] 解析失败:', e);
-        }
-      }
+      // 未登录，清空数据
+      setAchievedIds(new Set());
+      setAchievedCount(0); // 🔥 同步更新计数器
       setIsLoading(false);
     }
-  }, [status, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // 🔥 只依赖 status，loadFromDatabase 在函数内部调用
 
   // 解锁成就
   const unlockAchievement = useCallback(async (achievementId: string, category: string) => {
@@ -116,6 +108,7 @@ export function useAchievements() {
       const newIds = new Set(achievedIds);
       newIds.add(achievementId);
       setAchievedIds(newIds);
+      setAchievedCount(newIds.size); // 🔥 同步更新计数器
       // ✅ 使用用户隔离的 localStorage
       setUserStorage(STORAGE_KEY, JSON.stringify(Array.from(newIds)));
 
@@ -212,7 +205,7 @@ export function useAchievements() {
 
   return {
     achievedIds,
-    achievedCount: achievedIds.size,
+    achievedCount, // 🔥 返回稳定的计数器而不是 Set.size
     isLoading,
     isUnlocking,
     unlockAchievement,

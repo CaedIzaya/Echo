@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import ProgressRing from './dashboard/ProgressRing';
 import EchoSpirit from './dashboard/EchoSpirit';
 import { setCurrentUserId, migrateToUserStorage } from '~/lib/userStorage';
@@ -216,8 +217,8 @@ const LandingHero = ({
           </h1>
 
           <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
-            <p>安静不下来，不是你的问题。</p>
-            <p>你只是需要一个陪你安静开始的空间。</p>
+            <p>Echo 是一个不催促、不评判的专注空间</p>
+            <p>帮你把注意力从外界噪音，慢慢带回自己身上。</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -903,7 +904,11 @@ export default function Home() {
 
   // 未登录时显示欢迎界面
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 relative font-sans">
+    <>
+      <Head>
+        <title>Echo - 夺回时间，从心开始</title>
+      </Head>
+      <div className="min-h-screen bg-slate-50 text-slate-900 relative font-sans">
       <LandingNavbar onPrimaryAction={handlePrimaryAction} onSecondaryAction={handleSecondaryAction} />
       <main>
         <LandingHero
@@ -957,6 +962,7 @@ export default function Home() {
           animation: slide-up 0.3s ease-out;
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }

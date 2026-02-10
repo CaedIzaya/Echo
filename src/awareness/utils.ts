@@ -67,6 +67,17 @@ export function getLocalHour(date: Date, timezone: string = 'Asia/Shanghai'): nu
   return date.getHours();
 }
 
+/**
+ * 获取本地时间的分钟数（0-59）
+ */
+export function getLocalMinute(date: Date, timezone: string = 'Asia/Shanghai'): number {
+  // 简化实现：如果时区是 Asia/Shanghai，直接使用本地时间
+  if (timezone === 'Asia/Shanghai' || timezone.includes('Shanghai')) {
+    return date.getMinutes();
+  }
+  // 其他时区可以扩展
+  return date.getMinutes();
+}
 
 
 

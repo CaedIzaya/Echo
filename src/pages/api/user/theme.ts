@@ -10,23 +10,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'GET') {
-    // 主题设置存储在 localStorage，服务端返回默认值
-    return res.status(200).json({ 
-      theme: 'default',
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { theme: true },
+    });
+
+    return res.status(200).json({
+      theme: user?.theme || 'default',
     });
   }
 
   if (req.method === 'POST') {
-    // 主题设置存储在 localStorage，服务端不持久化
     const { theme } = req.body;
 
-    if (!theme || !['default', 'echo', 'salt_blue', 'fresh_green'].includes(theme)) {
+    if (!theme || !['default', 'echo', 'salt_blue', 'fresh_green', 'spring', 'summer', 'autumn', 'winter'].includes(theme)) {
       return res.status(400).json({ error: 'Invalid theme' });
     }
+
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { theme },
+    });
 
     return res.status(200).json({ success: true, theme });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
-

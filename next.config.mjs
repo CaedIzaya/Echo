@@ -154,10 +154,8 @@ const nextConfig = {
   // 性能配置
   poweredByHeader: false,
   
-  // 开发服务器配置
-  devIndicators: {
-    position: 'bottom-right',
-  },
+  // 开发服务器配置（关闭 Next.js DevTools 浮标）
+  devIndicators: false,
 };
 
 export default nextConfig;

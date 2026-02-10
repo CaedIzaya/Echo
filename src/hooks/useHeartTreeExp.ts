@@ -75,7 +75,8 @@ export function useHeartTreeExp() {
       setExpState(localState);
       setIsLoading(false);
     }
-  }, [status, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // 🔥 只依赖 status，loadFromDatabase 在函数内部调用
 
   // 更新经验状态
   const updateExpState = useCallback(async (newState: HeartTreeExpState) => {

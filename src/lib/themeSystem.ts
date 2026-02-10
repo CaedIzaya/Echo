@@ -3,7 +3,15 @@
  * 管理用户的主题偏好设置
  */
 
-export type ThemeType = 'default' | 'echo' | 'salt_blue' | 'fresh_green';
+export type ThemeType =
+  | 'default'
+  | 'echo'
+  | 'salt_blue'
+  | 'fresh_green'
+  | 'spring'
+  | 'summer'
+  | 'autumn'
+  | 'winter';
 
 export interface ThemeConfig {
   id: ThemeType;
@@ -42,6 +50,38 @@ export const THEMES: Record<ThemeType, ThemeConfig> = {
       background: 'linear-gradient(to bottom right, rgba(220, 252, 231, 0.6), rgba(236, 253, 245, 0.55), rgba(240, 253, 244, 0.6))',
     },
   },
+  spring: {
+    id: 'spring',
+    name: '盎然春意',
+    bgColor: '#dcfce7',
+    bgStyle: {
+      background: 'linear-gradient(to bottom, rgba(255, 228, 214, 0.45), rgba(253, 186, 116, 0.3), rgba(34, 197, 94, 0.22), rgba(167, 243, 208, 0.48), rgba(236, 253, 245, 0.7))',
+    },
+  },
+  summer: {
+    id: 'summer',
+    name: '炎炎夏日',
+    bgColor: '#0ea5e9',
+    bgStyle: {
+      background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(186, 230, 253, 0.55), rgba(94, 234, 212, 0.5), rgba(56, 189, 248, 0.55), rgba(186, 230, 253, 0.75))',
+    },
+  },
+  autumn: {
+    id: 'autumn',
+    name: '诗意深秋',
+    bgColor: '#fde68a',
+    bgStyle: {
+      background: 'linear-gradient(to bottom, rgba(255, 228, 214, 0.45), rgba(251, 146, 60, 0.35), rgba(234, 88, 12, 0.35), rgba(251, 146, 60, 0.45), rgba(254, 215, 170, 0.7))',
+    },
+  },
+  winter: {
+    id: 'winter',
+    name: '冬日暖晕',
+    bgColor: '#fef3c7',
+    bgStyle: {
+      background: 'linear-gradient(to bottom, rgba(8, 47, 73, 0.55), rgba(253, 230, 138, 0.45), rgba(254, 243, 199, 0.6))',
+    },
+  },
 };
 
 const STORAGE_KEY = 'selectedTheme';
@@ -61,7 +101,14 @@ export function getCurrentTheme(): ThemeType {
     return 'echo';
   }
   
-  if (stored === 'echo' || stored === 'salt_blue' || stored === 'fresh_green' || stored === 'default') {
+  if (stored === 'echo'
+    || stored === 'salt_blue'
+    || stored === 'fresh_green'
+    || stored === 'spring'
+    || stored === 'summer'
+    || stored === 'autumn'
+    || stored === 'winter'
+    || stored === 'default') {
     return stored as ThemeType;
   }
   

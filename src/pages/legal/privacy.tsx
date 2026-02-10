@@ -33,58 +33,65 @@ export default function PrivacyPolicy() {
           <div className="bg-white/70 backdrop-blur-2xl rounded-3xl p-8 shadow-lg border border-white/60">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Echo 隐私政策（V1.0）</h2>
-              <p className="text-sm text-gray-500">最后更新日期：2025年11月</p>
+              <p className="text-sm text-gray-500">最后更新日期：2026年1月</p>
             </div>
 
             <div className="prose prose-gray max-w-none space-y-6">
               <div>
                 <p className="text-gray-700 leading-relaxed">
-                  欢迎使用 Echo。我们深知个人信息对您的重要性，并会尽全力保护您的隐私安全。本政策旨在向您说明我们如何收集、使用、存储和保护您的个人信息。
+                  欢迎使用 Echo。我们深知个人信息对您的重要性，并会尽力保护您的隐私安全。本政策会以“我们实际会收集/存储/使用的数据”为准，向您说明 Echo 在运行过程中会处理哪些信息、为何处理、保存多久，以及您可以如何管理这些信息。
                 </p>
               </div>
 
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">一、我们收集的信息</h3>
-                <p className="text-gray-700 leading-relaxed mb-3">
-                  在您使用 Echo 的过程中，我们可能会收集以下类型的信息：
-                </p>
-                <ol className="list-decimal list-inside space-y-2 text-gray-700 ml-4">
-                  <li>账户信息：包括您注册时填写的用户名、邮箱、头像等；</li>
-                  <li>安全信息：如您设置的密保问题及答案，用于找回密码；</li>
-                  <li>使用数据：包括您的使用时间、操作记录、偏好数据，用于改进体验；</li>
-                  <li>设备信息：如设备型号、系统版本、IP 地址等（仅用于安全分析和性能优化）。</li>
-                </ol>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">一、我们收集与生成的信息（以实际功能为准）</h3>
+                <p className="text-gray-700 leading-relaxed mb-3">Echo 主要收集/生成以下信息：</p>
+                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                  <li><strong>账户信息</strong>：邮箱（用于登录与识别账号）、昵称（可选）、密码的加密摘要（我们不会保存明文密码）。</li>
+                  <li><strong>安全信息</strong>：您在“账号安全”里设置的密保问题与答案摘要（答案会做规范化与加盐哈希处理）。</li>
+                  <li><strong>会话与认证信息</strong>：用于保持登录状态的会话记录，以及必要的认证 Cookie（由认证系统生成与管理）。</li>
+                  <li><strong>专注与成长数据</strong>：专注会话（开始/结束时间、时长、心流评分/指标等）、连续天数、累计专注时长、经验值/等级、心树经验/等级、浇水/施肥次数等。</li>
+                  <li><strong>计划与里程碑数据</strong>：计划（项目）信息、里程碑（小目标）内容与完成状态、是否为主要计划等。</li>
+                  <li><strong>内容与记录</strong>：日小结、周报（以结构化数据形式存储）、分享链接（用于您主动分享时生成的 token 及其有效期）。</li>
+                  <li><strong>成就与商店</strong>：已解锁的成就、商店购买记录、主题/徽章等偏好。</li>
+                  <li><strong>站内信</strong>：包括欢迎邮件等站内消息。欢迎邮件会以“永久站内信”的形式随账号长期保存（除非您注销账号）。</li>
+                  <li><strong>本地缓存（在您的设备上）</strong>：为提升体验，部分状态会在浏览器本地存储（如主题选择、部分 UI 缓存、今日选中的小目标等）。这些数据主要用于更快加载与跨刷新保持状态，登录后关键数据以数据库为准。</li>
+                </ul>
                 <p className="text-gray-700 leading-relaxed mt-3">
-                  我们不会收集与服务无关的个人信息，也不会以任何形式出售、出租或转让您的数据。
+                  我们不会将您的数据出售或出租给第三方。除非为了提供服务所必需（例如托管与数据库基础设施），或法律法规要求，我们不会向第三方披露您的个人信息。
                 </p>
               </div>
 
               <div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">二、我们如何使用这些信息</h3>
-                <ol className="list-decimal list-inside space-y-2 text-gray-700 ml-4">
-                  <li>提供、维护、改进我们的服务；</li>
-                  <li>保障账户与数据安全；</li>
-                  <li>向您提供更个性化的内容；</li>
-                  <li>处理您反馈的问题与建议。</li>
-                </ol>
-              </div>
-
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">三、信息的存储与保护</h3>
                 <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                  <li>我们将采取合理的安全措施（如加密存储、访问控制）保护您的数据；</li>
-                  <li>您的数据将保存在中国境内的服务器；</li>
-                  <li>一旦发生数据安全事件，我们会在法律规定时间内告知您。</li>
+                  <li><strong>提供核心功能</strong>：创建/管理计划与里程碑、记录专注、计算心流与统计、等级与心树成长、成就、商店与主题等。</li>
+                  <li><strong>账号与安全</strong>：登录认证、会话管理、密保验证与密码重置。</li>
+                  <li><strong>体验与一致性</strong>：跨设备同步关键数据（以数据库为准），并在本地做必要缓存减少闪烁和加载等待。</li>
+                  <li><strong>生成内容</strong>：根据您的历史记录生成周报/站内信等内容展示（在应用内呈现）。</li>
                 </ul>
               </div>
 
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">四、您的权利</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">三、信息的存储、保留期限与保护</h3>
+                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                  <li><strong>存储位置</strong>：您的关键数据会存储在我们的数据库中；本地缓存仅保存在您的设备浏览器中。</li>
+                  <li><strong>保留期限（默认）</strong>：除非您主动删除/清除或注销账号，我们会持续保存您的专注与成长数据，以便为您提供长期趋势与跨设备一致性。</li>
+                  <li><strong>短期/临时数据</strong>：密码重置 token 等安全类临时数据会设置有效期，过期或使用后会失效。</li>
+                  <li><strong>分享链接</strong>：当您主动生成分享链接时，我们会保存 token 及可能的过期时间；过期后链接不可用。</li>
+                  <li><strong>站内信</strong>：欢迎邮件会标记为永久站内信，不会被系统定期清理；如您注销账号，则随账号一并删除。</li>
+                  <li><strong>安全措施</strong>：我们对密码与密保答案使用加盐哈希；对核心数据访问进行鉴权控制；并采取合理的安全措施降低数据泄露风险。</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">四、您的权利与可控项</h3>
                 <p className="text-gray-700 leading-relaxed mb-2">您可以在 Echo 中：</p>
                 <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                  <li>查看、更正、删除您的个人信息；</li>
-                  <li>撤回授权；</li>
-                  <li>注销账户（注销后您的所有数据将被删除或匿名化）。</li>
+                  <li><strong>查看与更正</strong>：查看并修改昵称、个性签名等资料信息。</li>
+                  <li><strong>退出登录</strong>：在设备上清除登录状态。</li>
+                  <li><strong>清理本地缓存</strong>：通过浏览器设置清除本地存储数据（这可能会影响离线体验与部分 UI 记忆）。</li>
+                  <li><strong>联系我们</strong>：如需导出或删除账号数据，请联系下方邮箱（我们会在核验身份后处理）。</li>
                 </ul>
               </div>
 
@@ -114,7 +121,7 @@ export default function PrivacyPolicy() {
 
               <div className="mt-8 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-500 text-center">
-                  © 2025 Echo Project. All rights reserved.
+                  © 2026 Echo Project. All rights reserved.
                 </p>
               </div>
             </div>

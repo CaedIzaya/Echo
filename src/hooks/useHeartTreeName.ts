@@ -81,7 +81,8 @@ export function useHeartTreeName() {
       }
       setIsLoading(false);
     }
-  }, [status, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // 🔥 只依赖 status，loadFromDatabase 在函数内部调用
 
   // 更新心树名字
   const updateTreeName = useCallback(async (newName: string) => {

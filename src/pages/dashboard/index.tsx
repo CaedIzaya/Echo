@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import ProgressRing from './ProgressRing';
 import BottomNavigation from './BottomNavigation';
 import UserMenu from './UserMenu';
@@ -15,6 +16,7 @@ import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import StartupMotivation from './StartupMotivation';
 import ShopModal from '~/components/shop/ShopModal';
+import CalendarCard from '~/components/calendar/CalendarCard';
 import { getCurrentTheme, getThemeConfig } from '~/lib/themeSystem';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import type { Achievement } from '~/lib/AchievementSystem';
@@ -136,6 +138,14 @@ function AchievementsSection() {
   const [isExpanded, setIsExpanded] = useState(true);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pinnedBadge, setPinnedBadge] = useState<any | null>(null);
+
+  const badgeData = [
+    { id: 'badge_diamond', name: '钻石勋章', icon: '💎', description: '专注带来的永恒闪耀', level: 4 },
+    { id: 'badge_gold', name: '黄金勋章', icon: '🥇', description: '证明你的卓越与非凡', level: 3 },
+    { id: 'badge_silver', name: '白银勋章', icon: '🥈', description: '展现你的专注与毅力', level: 2 },
+    { id: 'badge_bronze', name: '青铜勋章', icon: '🥉', description: '彰显你的努力与坚持', level: 1 },
+  ];
 
   // 监听localStorage变化以自动刷新成就
   useEffect(() => {
@@ -161,6 +171,41 @@ function AchievementsSection() {
       clearInterval(interval);
     };
   }, [achievements.length]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPinnedBadge = async () => {
+      try {
+        const res = await fetch('/api/shop/items');
+        if (!res.ok) return;
+        const items = await res.json();
+        const purchased = items
+          .filter((item: any) => item.type === 'badge' && item.purchased)
+          .map((item: any) => item.id);
+
+        const badgePriority = ['badge_diamond', 'badge_gold', 'badge_silver', 'badge_bronze'];
+        const highestId = badgePriority.find(id => purchased.includes(id));
+        const highestBadge = badgeData.find(b => b.id === highestId) || null;
+
+        if (mounted) {
+          setPinnedBadge(
+            highestBadge
+              ? { ...highestBadge, category: 'badge' }
+              : null
+          );
+        }
+      } catch (error) {
+        console.error('加载勋章失败:', error);
+      }
+    };
+
+    loadPinnedBadge();
+    const interval = setInterval(loadPinnedBadge, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
   
   useEffect(() => {
     const manager = getAchievementManager();
@@ -200,13 +245,18 @@ function AchievementsSection() {
         return 'from-yellow-400 to-orange-500';
       case 'first':
         return 'from-indigo-400 to-purple-500';
+      case 'badge':
+        return 'from-amber-500 to-yellow-400';
       default:
         return 'from-gray-400 to-gray-500';
     }
   };
   
   // 获取最近5个成就
-  const recentAchievements = achievements.slice(0, 5);
+  const recentAchievements = pinnedBadge
+    ? [pinnedBadge, ...achievements.filter(a => a.id !== pinnedBadge.id)].slice(0, 5)
+    : achievements.slice(0, 5);
+  const unlockedCount = achievements.length + (pinnedBadge ? 1 : 0);
   
   return (
     <div className="mb-6">
@@ -214,9 +264,9 @@ function AchievementsSection() {
         <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
           <span>🏆</span>
           最近成就
-          {achievements.length > 0 && (
+          {unlockedCount > 0 && (
             <span className="text-sm font-normal text-gray-500">
-              ({achievements.length}个已解锁)
+              ({unlockedCount}个已解锁)
             </span>
           )}
         </h2>
@@ -335,12 +385,7 @@ export default function Dashboard() {
   // ========== 持久化 Hooks（数据库同步）==========
   const { userExp, userLevel: hookUserLevel, addUserExp, updateUserExp } = useUserExp();
   const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
-  const { 
-    achievedIds,
-    unlockAchievement: unlockAchievementToDB, 
-    isAchievementUnlocked,
-    isLoading: isAchievementsLoading 
-  } = useAchievements();
+  const { unlockAchievement: unlockAchievementToDB } = useAchievements();
   const { syncStatus, syncAllData } = useDataSync(); // 🆕 数据同步 Hook
   
   // 监听用户等级变化，触发等级提升文案
@@ -387,6 +432,8 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 小精灵状态
   const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success'>('idle'); // 用于对话框的状态
+  const [autoSpiritAnimation, setAutoSpiritAnimation] = useState<{ token: number; type: 'happy' | 'nod' | 'excited'; durationMs: number } | null>(null);
+  const [initialPeriodicTimestamp, setInitialPeriodicTimestamp] = useState<number | null>(null);
   const spiritDialogRef = useRef<SpiritDialogRef>(null); // 对话框ref
   
   // 获取今日日期的工具函数
@@ -589,9 +636,67 @@ export default function Dashboard() {
       lastNDays: [dayStats],
       nowTs: now,
       nowLocalHour: new Date(now).getHours(),
+      nowLocalMinute: new Date(now).getMinutes(),
       recentEvents,
     };
   };
+
+  // 构建深夜在线觉察上下文（用于 22:30 之后的自动陪伴）
+  const buildLateNightAwarenessContext = useCallback((): AwarenessContext => {
+    const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai';
+
+    let hasNamedHeartTree = false;
+    let heartTreeName: string | undefined = undefined;
+    if (typeof window !== 'undefined') {
+      const storedName = localStorage.getItem('heartTreeNameV1');
+      if (storedName && storedName.trim().length > 0) {
+        hasNamedHeartTree = true;
+        heartTreeName = storedName.trim();
+      }
+    }
+
+    const userState = {
+      userId: userId || 'local_user',
+      currentStreak: Math.max(1, stats.streakDays || 1),
+      streakStableDays: Math.max(0, stats.streakDays || 0),
+      lastActiveDate: today,
+      timezone,
+      hasNamedHeartTree,
+      heartTreeName,
+    };
+
+    const dayStats = {
+      date: today,
+      appForegroundMinutes: 0,
+      homeStayMinutes: 0,
+      focusTotalMinutes: todayStats.minutes || 0,
+      focusGoalMinutes: undefined,
+      focusSessionCount: 0,
+      focusShortSessionCount: 0,
+      focusTimerOpenCountNoStart: 0,
+      lumiClickCount: 0,
+    };
+
+    const recentEvents = [
+      {
+        userId: userState.userId,
+        type: 'APP_FOREGROUND_START' as const,
+        ts: now,
+      },
+    ];
+
+    return {
+      userState,
+      today: dayStats,
+      lastNDays: [dayStats],
+      nowTs: now,
+      nowLocalHour: new Date(now).getHours(),
+      nowLocalMinute: new Date(now).getMinutes(),
+      recentEvents,
+    };
+  }, [stats.streakDays, todayStats.minutes, userId]);
 
   // 处理规则6（多次点击小精灵）觉察触发
   const handleLumiClickAwareness = (clicks: number[]): boolean => {
@@ -645,6 +750,63 @@ export default function Dashboard() {
       console.log('[Dashboard] 觉察已处理或ref不存在');
     }
   };
+
+  const triggerAutoSpiritAnimation = (animation?: 'happy' | 'nod' | 'excited', durationMs: number = 2000) => {
+    if (!animation) return;
+    setAutoSpiritAnimation({
+      token: Date.now(),
+      type: animation,
+      durationMs,
+    });
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (initialPeriodicTimestamp !== null) return;
+    const cached = localStorage.getItem('lastPeriodicSpiritAt');
+    if (cached) {
+      const parsed = Date.parse(cached);
+      if (!Number.isNaN(parsed)) {
+        setInitialPeriodicTimestamp(parsed);
+      }
+    }
+  }, [initialPeriodicTimestamp]);
+
+  const loadSpiritDialogState = async () => {
+    try {
+      const response = await fetch('/api/user/spirit-dialog');
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      if (data?.lastWelcomeDate) {
+        localStorage.setItem('lastWelcomeDate', data.lastWelcomeDate);
+      }
+      if (data?.lastPeriodicSpiritAt) {
+        localStorage.setItem('lastPeriodicSpiritAt', data.lastPeriodicSpiritAt);
+        const parsed = Date.parse(data.lastPeriodicSpiritAt);
+        if (!Number.isNaN(parsed)) {
+          setInitialPeriodicTimestamp(parsed);
+        }
+      }
+      return data as { lastWelcomeDate?: string | null; lastPeriodicSpiritAt?: string | null };
+    } catch (error) {
+      console.warn('[Dashboard] 读取小精灵状态失败，使用本地缓存:', error);
+      return null;
+    }
+  };
+
+  const persistSpiritDialogState = async (payload: { lastWelcomeDate?: string; lastPeriodicSpiritAt?: string }) => {
+    try {
+      await fetch('/api/user/spirit-dialog', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.warn('[Dashboard] 同步小精灵状态失败:', error);
+    }
+  };
   const [newAchievements, setNewAchievements] = useState<any[]>([]);
   const [unviewedAchievements, setUnviewedAchievements] = useState<any[]>([]);
   const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
@@ -665,7 +827,7 @@ export default function Dashboard() {
   const [showFlowInfo, setShowFlowInfo] = useState(false);
   const [showShopModal, setShowShopModal] = useState(false);
   const [fruits, setFruits] = useState(0);
-  const [theme, setThemeState] = useState<'default' | 'echo' | 'salt_blue' | 'fresh_green'>('default');
+  const [theme, setThemeState] = useState<'default' | 'echo' | 'salt_blue' | 'fresh_green' | 'spring' | 'summer' | 'autumn' | 'winter'>('default');
   
   // 客户端加载主题（必须在useEffect中，避免SSR问题）
   useEffect(() => {
@@ -673,6 +835,34 @@ export default function Dashboard() {
     console.log('[Dashboard] 客户端加载主题:', savedTheme);
     setThemeState(savedTheme);
   }, []);
+
+  // 登录后从数据库同步主题（跨设备一致性）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!authKey.startsWith('authenticated_')) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/user/theme');
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverTheme = data?.theme;
+        if (serverTheme && ['default', 'echo', 'salt_blue', 'fresh_green', 'spring', 'summer', 'autumn', 'winter'].includes(serverTheme)) {
+          localStorage.setItem('selectedTheme', serverTheme);
+          if (!cancelled) {
+            setThemeState(serverTheme);
+          }
+        }
+      } catch (err) {
+        console.warn('[Dashboard] 同步主题失败，使用本地主题:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authKey]);
   
   // 启动激励相关状态
   const [showStartupMotivation, setShowStartupMotivation] = useState(false);
@@ -1605,23 +1795,30 @@ export default function Dashboard() {
         const today = getTodayDate();
         const lastStartupMotivationDate = localStorage.getItem('lastStartupMotivationDate');
         const hasCompletedOnboarding = session?.user?.hasCompletedOnboarding;
-        const isNewUser = localStorage.getItem('isNewUserFirstEntry') === 'true';
+        const newUserEntryDate = localStorage.getItem('isNewUserFirstEntry');
+        const firstPlanCreatedDate = localStorage.getItem('firstPlanCreatedDate');
+        const isFirstPlanDay = newUserEntryDate === today || firstPlanCreatedDate === today;
+
+        // 清理过期的新手标记（非今日则移除）
+        if (newUserEntryDate && newUserEntryDate !== today) {
+          localStorage.removeItem('isNewUserFirstEntry');
+        }
         
         // 检查是否应该显示启动激励
-        // 条件：1. 今天还没显示过 2. 今天还没有专注过 3. 已完成 onboarding
-        // 特殊情况：新用户首次进入（刚完成 onboarding）也应该显示
+        // 新规则：仅在首次创建计划当天自动弹出；否则仅对未触发过“首次创建计划”用户保留每日自动弹出
+        const allowDailyAuto = !firstPlanCreatedDate;
         const shouldShowMotivation = (
-          (lastStartupMotivationDate !== today && todayStats.minutes === 0 && hasCompletedOnboarding) ||
-          (isNewUser && hasCompletedOnboarding)
+          (isFirstPlanDay && hasCompletedOnboarding) ||
+          (allowDailyAuto && lastStartupMotivationDate !== today && todayStats.minutes === 0 && hasCompletedOnboarding)
         );
         
         if (shouldShowMotivation) {
-          console.log('🌟 触发启动激励弹窗', { isNewUser, hasCompletedOnboarding });
+          console.log('🌟 触发启动激励弹窗', { isFirstPlanDay, hasCompletedOnboarding });
           setShowStartupMotivation(true);
           localStorage.setItem('lastStartupMotivationDate', today);
           
           // 清除新用户标记
-          if (isNewUser) {
+          if (newUserEntryDate) {
             localStorage.removeItem('isNewUserFirstEntry');
           }
           return;
@@ -1692,7 +1889,8 @@ export default function Dashboard() {
 
         backfillMails();
         
-        const lastWelcomeDate = localStorage.getItem('lastWelcomeDate');
+        const remoteSpiritState = await loadSpiritDialogState();
+        const lastWelcomeDate = remoteSpiritState?.lastWelcomeDate ?? localStorage.getItem('lastWelcomeDate');
 
         // 构造首页状态快照（EchoHomeStatus）
         const hasFocusToday = todayStats.minutes > 0;
@@ -1731,6 +1929,7 @@ export default function Dashboard() {
           localStorage.removeItem(JUST_COMPLETED_FOCUS_FLAG);
           localStorage.setItem('afterFocusFirstShownDate', today);
           localStorage.setItem('lastWelcomeDate', today);
+          persistSpiritDialogState({ lastWelcomeDate: today });
           return;
         }
 
@@ -1745,6 +1944,7 @@ export default function Dashboard() {
             // 根据实际使用的语境池记录当日标记，避免重复触发“首次”类文案
             if (pool === 'idle_first') {
               localStorage.setItem('lastWelcomeDate', today);
+              persistSpiritDialogState({ lastWelcomeDate: today });
             }
             if (pool === 'min_focus_first') {
               localStorage.setItem('minFocusFirstShownDate', today);
@@ -1755,6 +1955,7 @@ export default function Dashboard() {
             if (pool === 'streak7_event') {
               localStorage.setItem('streak7ShownDate', today);
               localStorage.setItem('lastWelcomeDate', today);
+              persistSpiritDialogState({ lastWelcomeDate: today });
             }
           }
           return;
@@ -1827,6 +2028,68 @@ export default function Dashboard() {
   }, [authKey, todayStats.minutes]); // 依赖authKey和todayStats.minutes
 
   // ============================================
+  // 深夜在线觉察（22:30 后，用户仍在线则自动触发，最高优先级）
+  // - 每个夜晚仅触发一次（22:30 ~ 04:00 视作同一夜晚）
+  // - 用户不交互则文案不消失
+  // ============================================
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!authKey.startsWith('authenticated_')) return;
+
+    const getLateNightKeyDate = (now: Date) => {
+      if (now.getHours() < 4) {
+        const prev = new Date(now);
+        prev.setDate(now.getDate() - 1);
+        return prev.toISOString().split('T')[0];
+      }
+      return now.toISOString().split('T')[0];
+    };
+
+    const isAfterLateNight = (now: Date) => {
+      const h = now.getHours();
+      const m = now.getMinutes();
+      return h > 22 || (h === 22 && m >= 30) || h < 4;
+    };
+
+    const checkAndTriggerLateNight = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = new Date();
+      if (!isAfterLateNight(now)) return;
+
+      const keyDate = getLateNightKeyDate(now);
+      const shownKey = localStorage.getItem('lateNightAwarenessShownDate');
+      if (shownKey === keyDate) return;
+
+      try {
+        const ctx = buildLateNightAwarenessContext();
+        const response = handleAwarenessEvent(ctx);
+        if (response && response.match.ruleId === 'SCENE5_LATE_NIGHT_ONLINE' && response.copy) {
+          spiritDialogRef.current?.showAwarenessMessage?.(response.copy, 0);
+          localStorage.setItem('lateNightAwarenessShownDate', keyDate);
+        }
+      } catch (err) {
+        console.warn('触发觉察机制时出现问题（LATE_NIGHT）:', err);
+      }
+    };
+
+    // 初始检查 + 每分钟检查
+    checkAndTriggerLateNight();
+    const interval = setInterval(checkAndTriggerLateNight, 60 * 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndTriggerLateNight();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [authKey, buildLateNightAwarenessContext]);
+
+  // ============================================
   // 心流指数说明 - 目前在UI中隐藏，但保留完整逻辑
   // 即使UI隐藏，仍保持所有计算逻辑和算法最新
   // 
@@ -1871,24 +2134,8 @@ export default function Dashboard() {
     return computeFlowIndex(metrics, weeklyBehavior);
   }, [stats.streakDays, todayStats.minutes, weeklyStats.totalMinutes, totalFocusMinutes]);
 
-  // 🔥 修复：将 Hook 的成就数据同步到 AchievementManager
-  useEffect(() => {
-    if (isAchievementsLoading) return;
-    
-    const manager = getAchievementManager();
-    // 强制使用 Hook 的数据覆盖 manager 的 localStorage 数据
-    manager['achievedAchievements'] = new Set(achievedIds);
-    console.log('[Dashboard] 🔄 同步成就数据到 Manager:', achievedIds.size, '个');
-  }, [isAchievementsLoading, achievedIds]);
-
   // 初始化成就管理器 + 数据完整性检查
   useEffect(() => {
-    // 🔥 修复：等待成就数据加载完成后再进行成就检测，避免刷新页面时重复触发
-    if (isAchievementsLoading) {
-      console.log('[Dashboard] ⏳ 等待成就数据加载...');
-      return;
-    }
-    
     const manager = getAchievementManager();
     setAchievementManager(manager);
     
@@ -1900,9 +2147,12 @@ export default function Dashboard() {
       checkDataIntegrity(session.user.id).catch(error => {
         console.error('[Dashboard] 数据完整性检查失败:', error);
       });
+      
+      // 2. 从数据库同步成就数据
+      manager.syncFromDatabase().catch(error => {
+        console.error('[Dashboard] 成就数据同步失败:', error);
+      });
     }
-    
-    console.log('[Dashboard] ✅ 成就数据已加载，开始检测成就...', { achievedCount: achievedIds.size });
     
     // 检查当前状态的成就
     const flowAchievements = manager.checkFlowIndexAchievements(flowIndex.score);
@@ -1999,7 +2249,7 @@ export default function Dashboard() {
       // 3秒后自动清空，以便再次触发
       setTimeout(() => setNewAchievements([]), 3000);
     }
-  }, [isAchievementsLoading, flowIndex.score, totalFocusMinutes, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
+  }, [flowIndex.score, totalFocusMinutes, weeklyStats.totalMinutes, todayStats.minutes, stats.completedGoals]);
   
   // 从localStorage恢复未查看成就
   useEffect(() => {
@@ -2314,38 +2564,6 @@ export default function Dashboard() {
       </div>
     );
   };
-
-  // 里程碑卡片组件
-  // 日记入口卡片组件
-  const JournalCard = () => {
-    return (
-      <div 
-        onClick={() => router.push('/journal')}
-        className="bg-gradient-to-br from-teal-400 via-cyan-400 to-blue-400 rounded-3xl p-6 shadow-lg shadow-teal-300/60 text-white hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden group"
-      >
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-          <span className="text-6xl">📔</span>
-        </div>
-        
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium">日记</p>
-          <span className="text-2xl">📖</span>
-        </div>
-        
-        <div className="space-y-3 relative z-10">
-          <div className="flex items-baseline gap-2">
-            <p className="text-xl font-bold leading-tight">
-              回顾你专注的点滴时分
-            </p>
-          </div>
-          <p className="text-xs text-white/70 font-medium">
-            查看你的专注历程
-          </p>
-        </div>
-      </div>
-    );
-  };
-
   const renderPlanDetails = () => {
     if (!primaryPlan) {
       return (
@@ -2528,15 +2746,37 @@ export default function Dashboard() {
   const themeConfig = getThemeConfig(theme);
   
   return (
-    <div 
-      className={`min-h-screen text-zinc-900 relative pb-24 transition-all duration-500 ${theme !== 'default' ? 'animate-breathing-bg' : ''}`}
-      style={{
-        backgroundColor: themeConfig.bgColor,
-        ...(themeConfig.bgStyle || {}),
-      }}
-    >
-      {/* 成就通知 */}
-      <AchievementNotification />
+    <>
+      <Head>
+        <title>Echo回心 | Echo</title>
+      </Head>
+      <div 
+        className={`min-h-screen text-zinc-900 relative pb-24 transition-all duration-500 ${theme !== 'default' ? 'animate-breathing-bg' : ''}`}
+        style={{
+          backgroundColor: themeConfig.bgColor,
+          ...(themeConfig.bgStyle || {}),
+        }}
+      >
+        {/* 季节主题的场景动画层 */}
+        {['spring', 'summer', 'autumn', 'winter'].includes(theme) && (
+          <div className={`season-overlay season-${theme}`} aria-hidden="true">
+            {Array.from({ length: 12 }).map((_, index) => (
+              <span
+                key={index}
+                className="season-particle"
+                style={{
+                  left: `${5 + (index * 8) % 90}%`,
+                  width: `${6 + (index % 3) * 3}px`,
+                  height: `${8 + (index % 3) * 3}px`,
+                  animationDelay: `${index * 0.8}s`,
+                  animationDuration: `${8 + (index % 4) * 2}s`,
+                }}
+              />
+            ))}
+          </div>
+        )}
+        {/* 成就通知 */}
+        <AchievementNotification />
       
       {/* 小精灵对话 */}
       <SpiritDialog
@@ -2544,6 +2784,17 @@ export default function Dashboard() {
         spiritState={effectiveSpiritState}
         onStateChange={(newState) => {
           setCurrentSpiritState(newState);
+        }}
+        onCueStart={(cue) => {
+          if (cue.source !== 'click') {
+            triggerAutoSpiritAnimation(cue.animation, 2000);
+          }
+        }}
+        initialPeriodicTimestamp={initialPeriodicTimestamp ?? undefined}
+        onPeriodicMessageShown={(timestamp) => {
+          const iso = new Date(timestamp).toISOString();
+          localStorage.setItem('lastPeriodicSpiritAt', iso);
+          persistSpiritDialogState({ lastPeriodicSpiritAt: iso });
         }}
         mobileContainerClassName="sm:hidden fixed pointer-events-none w-[220px] max-w-[220px] z-50"
         mobileContainerStyle={{ bottom: '15.5rem', right: '-1.6rem' }}
@@ -2664,13 +2915,13 @@ export default function Dashboard() {
                 开始专注
               </button>
               
-              {/* 🌟 目标设定按钮 - 与开始专注按钮大小一致 */}
+              {/* 🌟 节奏设定按钮 - 与开始专注按钮大小一致 */}
               <button
                 onClick={() => setShowStartupMotivation(true)}
                 className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30"
-                title="目标设定"
+                title="节奏设定"
               >
-                目标设定
+                节奏设定
               </button>
             </div>
           </div>
@@ -2823,29 +3074,8 @@ export default function Dashboard() {
 
           {/* 4. 心流 & 成就 (Mobile) */}
           <div className="space-y-6">
-            {/* 移动端里程碑卡片 */}
-            <div 
-              onClick={() => router.push('/plans')}
-              className="bg-gradient-to-br from-[#fff7da] via-[#f3c575] to-[#d88b3b] rounded-3xl p-6 shadow-lg shadow-amber-200/60 text-[#4f2a07] active:scale-[0.98] transition-all duration-300 cursor-pointer relative overflow-hidden"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-[#4f2a07]/70 font-medium">里程碑</p>
-                <span className="text-2xl">🏔️</span>
-              </div>
-              
-              {primaryPlan?.finalGoal ? (
-                <div className="space-y-2">
-                  <p className="text-xl font-bold line-clamp-2 leading-tight">
-                    {primaryPlan.finalGoal.content}
-                  </p>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold">暂无里程碑</p>
-                  <span className="text-xs bg-white/30 px-3 py-1 rounded-full">去设置</span>
-                </div>
-              )}
-            </div>
+            {/* 移动端日历卡片 */}
+            <CalendarCard userId={session?.user?.id} />
 
             <ShopCard />
             <AchievementsSection />
@@ -2881,18 +3111,18 @@ export default function Dashboard() {
                     开始专注
                   </button>
                   
-                  {/* 🌟 目标设定按钮 - 与开始专注按钮大小一致 */}
+                  {/* 🌟 节奏设定按钮 - 与开始专注按钮大小一致 */}
                   <button
                     onClick={() => setShowStartupMotivation(true)}
                     className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
-                    title="目标设定"
+                    title="节奏设定"
                   >
-                    目标设定
+                    节奏设定
                   </button>
                 </div>
               </div>
               {/* 小精灵 */}
-              <div className="absolute pointer-events-none" style={{ bottom: '-60px', left: 'calc(50% + 50px)', transform: 'translateX(-50%)' }}>
+              <div className="absolute pointer-events-none" style={{ bottom: '16px', left: '50%', transform: 'translateX(-50%)' }}>
                 <div className="pointer-events-auto">
                   <EchoSpirit
                     state="idle"
@@ -2901,12 +3131,13 @@ export default function Dashboard() {
                         setCurrentSpiritState(newState as 'idle' | 'happy' | 'excited');
                       }
                     }}
+                    autoAnimation={autoSpiritAnimation ?? undefined}
                     onClick={handleSpiritClick}
                   />
                 </div>
               </div>
             </div>
-            <JournalCard />
+            <CalendarCard userId={session?.user?.id} />
             <ShopCard />
           </div>
 
@@ -3029,6 +3260,7 @@ export default function Dashboard() {
           state={currentSpiritState}
           allowFocus={false}
           isCompleted={progress >= 1}
+          autoAnimation={autoSpiritAnimation ?? undefined}
           onStateChange={(newState) => {
             if (newState === 'focus') {
               setCurrentSpiritState('idle');
@@ -3040,11 +3272,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <BottomNavigation 
-        active="home" 
-        hasFocusedToday={todayStats.minutes > 0}
-        todaySessions={todayStats.minutes > 0 ? 1 : 0}
-      />
+      <BottomNavigation active="home" hasFocusedToday={todayStats.minutes > 0} />
       
       {/* 成就面板 */}
       {showAchievementPanel && (
@@ -3128,6 +3356,73 @@ export default function Dashboard() {
             opacity: 1;
           }
         }
+        :global(.season-overlay) {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: hidden;
+          z-index: 1;
+        }
+        :global(.season-spring),
+        :global(.season-autumn) {
+          mix-blend-mode: multiply;
+          opacity: 0.85;
+        }
+        :global(.season-summer) {
+          mix-blend-mode: screen;
+          opacity: 0.85;
+        }
+        :global(.season-winter) {
+          mix-blend-mode: normal;
+          opacity: 1;
+        }
+        :global(.season-particle) {
+          position: absolute;
+          top: -10%;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+        :global(.season-spring .season-particle) {
+          background: rgba(132, 204, 22, 0.75);
+          border-radius: 4px 10px 4px 10px;
+          animation-name: season-fall-leaf;
+        }
+        :global(.season-autumn .season-particle) {
+          background: rgba(249, 115, 22, 0.8);
+          border-radius: 6px 12px 6px 12px;
+          animation-name: season-fall-leaf;
+        }
+        :global(.season-winter .season-particle) {
+          background: white;
+          border-radius: 999px;
+          box-shadow: 0 0 4px rgba(148, 163, 184, 0.5);
+          animation-name: season-snow-fall;
+        }
+        :global(.season-summer .season-particle) {
+          border: 1.5px solid rgba(56, 189, 248, 0.9);
+          border-radius: 999px;
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.6), rgba(186, 230, 253, 0.35) 45%, rgba(14, 116, 144, 0.15) 100%);
+          box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+          animation-name: season-bubble-rise;
+        }
+
+        @keyframes season-fall-leaf {
+          0% { transform: translateY(-10%) rotate(0deg); opacity: 0; }
+          10% { opacity: 0.7; }
+          100% { transform: translateY(110vh) rotate(160deg); opacity: 0; }
+        }
+
+        @keyframes season-snow-fall {
+          0% { transform: translateY(-5%) translateX(0); opacity: 0; }
+          10% { opacity: 0.9; }
+          100% { transform: translateY(110vh) translateX(20px); opacity: 0.2; }
+        }
+
+        @keyframes season-bubble-rise {
+          0% { transform: translateY(110vh) scale(0.7); opacity: 0; }
+          10% { opacity: 0.5; }
+          100% { transform: translateY(-10%) scale(1); opacity: 0; }
+        }
         :global(.animate-breathing) {
           animation: breathing 2s ease-in-out infinite;
         }
@@ -3141,7 +3436,7 @@ export default function Dashboard() {
           animation: breathing-bg 4s ease-in-out infinite;
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }
-

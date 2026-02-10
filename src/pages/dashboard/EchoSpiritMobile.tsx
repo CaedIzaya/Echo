@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 interface EchoSpiritMobileProps {
   state?: 'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success';
@@ -7,6 +7,7 @@ interface EchoSpiritMobileProps {
   onClick?: () => void; // 点击回调
   allowFocus?: boolean; // 是否允许focus状态（主页应该设为false）
   isCompleted?: boolean; // 专注是否完成，决定颜色：false=idle颜色，true=completed颜色
+  autoAnimation?: { token: number; type: 'happy' | 'nod' | 'excited'; durationMs?: number };
 }
 
 export default function EchoSpiritMobile({ 
@@ -15,12 +16,15 @@ export default function EchoSpiritMobile({
   onStateChange,
   onClick,
   allowFocus = false,
-  isCompleted = false
+  isCompleted = false,
+  autoAnimation
 }: EchoSpiritMobileProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isUserControlledRef = useRef(false); // 标记是否由用户点击控制
   const isAnimatingRef = useRef(false); // 标记是否正在动画中（2s内不可打断）
+  const animationSourceRef = useRef<'click' | 'auto' | null>(null);
+  const lastAutoTokenRef = useRef<number | null>(null);
   const [currentState, setCurrentState] = useState(state);
   // 根据isCompleted获取颜色配置，确保交互时不变色
   // 专注未完成：使用idle颜色（暖黄色）
@@ -70,7 +74,7 @@ export default function EchoSpiritMobile({
     
     // 如果用户没有主动控制（没有点击过），则同步外部state
     // 但忽略focus状态（focus状态不应该在主页显示）
-    if (!isUserControlledRef.current && state !== 'focus') {
+    if (!isUserControlledRef.current && !isAnimatingRef.current && state !== 'focus') {
       // 如果用户没有主动控制（没有点击过），则同步外部state
       // 但忽略focus状态（focus状态不应该在主页显示）
       setCurrentState(state);
@@ -82,14 +86,52 @@ export default function EchoSpiritMobile({
     }
   }, [state, onStateChange, currentState, allowFocus]);
 
+  const startAnimation = useCallback(
+    (nextState: 'happy' | 'nod', durationMs: number, source: 'click' | 'auto') => {
+      if (source === 'click' && isAnimatingRef.current && animationSourceRef.current === 'click') {
+        return;
+      }
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      isAnimatingRef.current = true;
+      animationSourceRef.current = source;
+      if (source === 'click') {
+        isUserControlledRef.current = true;
+      }
+
+      setCurrentState(nextState);
+      if (onStateChange) {
+        onStateChange(nextState);
+      }
+
+      timerRef.current = setTimeout(() => {
+        setCurrentState('idle');
+        timerRef.current = null;
+        isAnimatingRef.current = false;
+        animationSourceRef.current = null;
+        if (source === 'click') {
+          isUserControlledRef.current = false;
+        }
+        if (onStateChange) {
+          onStateChange('idle');
+        }
+      }, durationMs);
+    },
+    [onStateChange],
+  );
+
   // 点击处理逻辑 - 与PC端相同
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
 
     const handleClick = () => {
-      // 如果正在动画中（2s内），忽略点击
-      if (isAnimatingRef.current) {
+      // 如果正在点击动画中，忽略点击
+      if (isAnimatingRef.current && animationSourceRef.current === 'click') {
         return;
       }
       
@@ -97,41 +139,11 @@ export default function EchoSpiritMobile({
       if (onClick) {
         onClick();
       }
-      
-      // 标记为用户控制和正在动画中
-      isUserControlledRef.current = true;
-      isAnimatingRef.current = true;
-      
-      // 清除之前的定时器
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      
-      setCurrentState(prev => {
-        // 随机选择happy或nod
-        const states: ('happy' | 'nod')[] = ['happy', 'nod'];
-        const nextState = states[Math.floor(Math.random() * states.length)];
-        
-        // 通知状态变化
-        if (onStateChange) {
-          onStateChange(nextState);
-        }
-        
-        // 2秒后自动恢复到idle，并重置用户控制标记和动画标记
-        timerRef.current = setTimeout(() => {
-          setCurrentState('idle');
-          timerRef.current = null;
-          // 恢复后允许外部state控制和再次交互
-          isUserControlledRef.current = false;
-          isAnimatingRef.current = false;
-          if (onStateChange) {
-            onStateChange('idle');
-          }
-        }, 2000);
-        
-        return nextState;
-      });
+
+      // 随机选择happy或nod
+      const states: ('happy' | 'nod')[] = ['happy', 'nod'];
+      const nextState = states[Math.floor(Math.random() * states.length)];
+      startAnimation(nextState, 2000, 'click');
     };
 
     const handleDoubleClick = () => {
@@ -166,7 +178,15 @@ export default function EchoSpiritMobile({
         timerRef.current = null;
       }
     };
-  }, [onClick, onStateChange, currentState, state, allowFocus]);
+  }, [onClick, onStateChange, currentState, state, allowFocus, startAnimation]);
+
+  useEffect(() => {
+    if (!autoAnimation) return;
+    if (lastAutoTokenRef.current === autoAnimation.token) return;
+    lastAutoTokenRef.current = autoAnimation.token;
+    const nextState = autoAnimation.type === 'excited' ? 'happy' : autoAnimation.type;
+    startAnimation(nextState, autoAnimation.durationMs ?? 2000, 'auto');
+  }, [autoAnimation, startAnimation]);
 
   const colors = getColors();
 
@@ -524,4 +544,3 @@ export default function EchoSpiritMobile({
     </>
   );
 }
-

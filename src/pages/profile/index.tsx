@@ -151,8 +151,12 @@ export default function Profile() {
 
   // Sub-components for Layout
   const PageLayout = ({ children, title, onBack }: { children: React.ReactNode, title: string, onBack?: () => void }) => (
-    <div className="min-h-screen bg-[#F5F7F9] pb-24">
-      {/* Header */}
+    <>
+      <Head>
+        <title>{title} | Echo</title>
+      </Head>
+      <div className="min-h-screen bg-[#F5F7F9] pb-24">
+        {/* Header */}
       <div className="bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-20">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -177,7 +181,8 @@ export default function Profile() {
       </div>
 
       <BottomNavigation active="home" />
-    </div>
+      </div>
+    </>
   );
 
   const MenuGroup = ({ title, children }: { title?: string, children: React.ReactNode }) => (

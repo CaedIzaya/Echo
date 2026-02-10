@@ -132,6 +132,27 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
     [data?.todayHasSummary, data?.todaySummary?.text]
   );
 
+  // 🔥 自动触发"目标设定弹出"的逻辑（修复：移到组件顶层）
+  useEffect(() => {
+    // 仅在"有专注但无小结"时触发
+    if (!hasFocus || hasSummary) return;
+    
+    const today = new Date().toLocaleDateString('en-CA');
+    const alreadyShownToday = sessionStorage.getItem(`goalSetPromptShown_${today}`) === 'true';
+    
+    // 每天仅触发一次
+    if (!alreadyShownToday) {
+      // 延迟1秒展示，避免页面加载时的闪烁
+      const timer = setTimeout(() => {
+        // 触发一个自定义事件，通知 Dashboard 弹出目标设定
+        window.dispatchEvent(new CustomEvent('showGoalSetPrompt'));
+        sessionStorage.setItem(`goalSetPromptShown_${today}`, 'true');
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [hasFocus, hasSummary]);
+
   if (loading) {
     return (
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 h-48 flex items-center justify-center animate-pulse">
@@ -152,7 +173,7 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
         </div>
         <a 
           href="/focus"
-          className="w-full mt-4 bg-teal-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-teal-700 transition-colors shadow-sm"
+          className="w-full mt-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 hover:from-teal-600 hover:to-cyan-600 transition-all shadow-md hover:shadow-lg"
         >
           去专注
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,38 +186,20 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
 
   // State 2: 今天有专注，但还没有小结
   if (hasFocus && !hasSummary) {
-    // 🔥 新增：自动触发一次"目标设定弹出"的回调
-    useEffect(() => {
-      const today = new Date().toLocaleDateString('en-CA');
-      const alreadyShownToday = sessionStorage.getItem(`goalSetPromptShown_${today}`) === 'true';
-      
-      // 每天仅触发一次
-      if (!alreadyShownToday) {
-        // 延迟1秒展示，避免页面加载时的闪烁
-        const timer = setTimeout(() => {
-          // 触发一个自定义事件，通知 Dashboard 弹出目标设定
-          window.dispatchEvent(new CustomEvent('showGoalSetPrompt'));
-          sessionStorage.setItem(`goalSetPromptShown_${today}`, 'true');
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-      }
-    }, []);
-    
     return (
-      <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-3xl p-6 shadow-lg text-white h-full flex flex-col justify-between relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl transform translate-x-10 -translate-y-10 group-hover:bg-white/20 transition-all"></div>
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 h-full flex flex-col justify-between relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-full blur-3xl transform translate-x-10 -translate-y-10 group-hover:bg-teal-100 transition-all"></div>
         
         <div className="relative z-10">
-          <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium mb-4">今日小结</p>
-          <p className="text-teal-100 text-sm">
+          <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium mb-4">今日小结</p>
+          <p className="text-gray-600 text-sm">
             你的专注，值得一次小结。
           </p>
         </div>
 
         <a
           href={`/daily-summary?focusDuration=${data?.totalFocusMinutes ?? 0}`}
-          className="relative z-10 w-full mt-4 bg-white text-teal-700 font-semibold py-3 rounded-xl shadow-lg hover:bg-teal-50 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+          className="relative z-10 w-full mt-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold py-3 rounded-xl shadow-md hover:from-teal-600 hover:to-cyan-600 hover:shadow-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -229,7 +232,7 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
 
       <a
         href="/daily-summary"
-        className="w-full bg-teal-600 text-white font-semibold py-2.5 rounded-xl hover:bg-teal-700 transition-colors text-sm text-center block shadow-sm"
+        className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold py-2.5 rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all text-sm text-center block shadow-md hover:shadow-lg"
       >
         查看小结
       </a>

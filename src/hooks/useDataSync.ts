@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { getUserStorage, setUserStorage } from '~/lib/userStorage';
+import { trackEffect } from '~/lib/debugTools';
 
 interface SyncStatus {
   isSyncing: boolean;
@@ -145,6 +146,8 @@ export function useDataSync() {
    * 自动同步：登录时检查并同步
    */
   useEffect(() => {
+    trackEffect('useDataSync', 'autoSync');
+    
     if (status === 'loading') return;
     
     if (status === 'authenticated' && shouldSync()) {
@@ -155,7 +158,8 @@ export function useDataSync() {
       
       return () => clearTimeout(timer);
     }
-  }, [status, shouldSync, syncAllData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // 🔥 只依赖 status，避免无限循环
 
   return {
     syncStatus,

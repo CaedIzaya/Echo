@@ -124,7 +124,8 @@ export function useCachedProjects(sessionStatus: string) {
       // 没有缓存，直接从数据库加载
       loadFromDatabase().finally(() => setIsLoading(false));
     }
-  }, [sessionStatus, loadFromCache, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStatus]); // 🔥 只依赖 sessionStatus，loadFromCache 和 loadFromDatabase 在函数内部调用
 
   // 更新项目（同时更新缓存和数据库）
   const updateProject = useCallback(async (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { LevelManager } from '~/lib/LevelSystem';
 import { setProtectionMarker } from '~/lib/DataIntegritySystem';
@@ -143,7 +143,8 @@ export function useUserExp() {
       }
       setIsLoading(false);
     }
-  }, [status, loadFromDatabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // 🔥 只依赖 status，loadFromDatabase 在函数内部调用
 
   // 更新经验值
   const updateUserExp = useCallback(async (newExp: number) => {
@@ -263,7 +264,8 @@ export function useUserExp() {
     }
   }, [session?.user?.id]);
 
-  return {
+  // 🔥 使用 useMemo 稳定化返回对象，避免每次都创建新引用
+  return useMemo(() => ({
     userExp,
     userLevel,
     isLoading,
@@ -272,7 +274,7 @@ export function useUserExp() {
     addUserExp,
     syncToDatabase,
     reload: loadFromDatabase,
-  };
+  }), [userExp, userLevel, isLoading, isSaving, updateUserExp, addUserExp, syncToDatabase, loadFromDatabase]);
 }
 
 // 检查经验值数据是否过期（1小时）

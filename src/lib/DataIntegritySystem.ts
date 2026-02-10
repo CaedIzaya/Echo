@@ -235,6 +235,16 @@ export async function recoverDataFromDatabase(): Promise<boolean> {
  * 数据完整性检查（启动时调用）
  */
 export async function checkDataIntegrity(userId: string): Promise<void> {
+  // 🔥 检查是否刚清理过缓存，如果是则跳过检查（避免与 versionManager 冲突）
+  if (typeof window !== 'undefined') {
+    const justCleaned = localStorage.getItem('just_cleaned_cache');
+    if (justCleaned === 'true') {
+      console.log('[DataIntegrity] 跳过检查（刚清理过缓存，数据将由 Hook 自动加载）');
+      localStorage.removeItem('just_cleaned_cache'); // 清除标记
+      return;
+    }
+  }
+  
   console.log('[DataIntegrity] 开始数据完整性检查...');
   
   const result = await isReallyNewUser(userId);
@@ -253,8 +263,8 @@ export async function checkDataIntegrity(userId: string): Promise<void> {
     const recovered = await recoverDataFromDatabase();
     
     if (recovered) {
-      console.log('[DataIntegrity] ✅ 数据已自动恢复，请刷新页面');
-      // 可以选择自动刷新页面
+      console.log('[DataIntegrity] ✅ 数据已自动恢复，建议刷新页面');
+      // 🔥 不自动刷新，避免循环
       // window.location.reload();
     } else {
       console.error('[DataIntegrity] ❌ 数据恢复失败，请联系客服');

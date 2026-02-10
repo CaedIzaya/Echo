@@ -3,8 +3,7 @@ generator client {
 }
 
 datasource db {
-  // 支持 PostgreSQL 和 SQLite，根据 DATABASE_URL 自动切换
-  // 本地开发推荐使用 SQLite
+  // 使用本地 SQLite
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
@@ -66,15 +65,18 @@ model User {
   heartTreeTotalExp      Float          @default(0)
   fruits                 Int            @default(0)     // 🍎 当前果实
   totalFruitsEarned      Int            @default(0)     // 🍎 累计获得果实
+  theme                  String         @default("default")
+  lastWelcomeDate        String?        // 最近一次欢迎文案触发日期 (YYYY-MM-DD)
+  lastPeriodicSpiritAt   DateTime?      // 最近一次定时陪伴文案触发时间
   lastWateredDate        String?
   fertilizerExpiresAt    DateTime?
   fertilizerMultiplier   Float?
   flowMetrics            Json?          // 心流指标数据（impression, tempFlow等）
-  streakDays             Int            @default(0)     // 🔥 连续专注天数（全局，所有计划累计）
+  streakDays             Int            @default(0)     // 🔥 连续专注天数
   lastStreakDate         String?                        // 🔥 最后一次更新连续天数的日期 (YYYY-MM-DD)
-  totalFocusMinutes      Int            @default(0)     // 🔥 总专注时长（分钟，全局）
-  totalCompletedMilestones Int          @default(0)     // 📊 总完成小目标数（全局统计）
-  totalCompletedProjects Int            @default(0)     // 📊 总完成计划数（全局统计）
+  totalFocusMinutes      Int            @default(0)     // 🔥 总专注时长（分钟）
+  totalCompletedMilestones Int          @default(0)     @map("total_completedmilestones")
+  totalCompletedProjects  Int           @default(0)     @map("total_completedprojects")
   accounts               Account[]
   sessions               Session[]
   projects               Project[]

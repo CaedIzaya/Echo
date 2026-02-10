@@ -46,8 +46,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log('[projects] 创建计划:', { name, icon, dailyGoalMinutes, isPrimary });
 
+      // 检查用户是否已有其他计划
+      const existingProjects = await db.project.findMany({
+        where: { userId: session.user.id },
+        select: { id: true, isPrimary: true }
+      });
+
+      // 如果用户没有其他计划，默认设置为主要计划
+      let shouldBePrimary = isPrimary;
+      if (existingProjects.length === 0 && isPrimary === undefined) {
+        shouldBePrimary = true;
+        console.log('[projects] 用户首个计划，默认设置为主要计划');
+      }
+
       // 如果设置为主要计划，先取消其他计划的主要标记
-      if (isPrimary) {
+      if (shouldBePrimary) {
         console.log('[projects] 取消其他计划的主要标记');
         await db.project.updateMany({
           where: { 
@@ -69,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dailyGoalMinutes: dailyGoalMinutes || 25,
         targetDate: targetDate ? new Date(targetDate) : null,
         isActive: isActive !== false, // 默认为 true
-        isPrimary: isPrimary || false,
+        isPrimary: shouldBePrimary || false,
         isCompleted: isCompleted || false,
         userId: session.user.id,
         milestones: {

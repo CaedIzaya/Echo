@@ -129,11 +129,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
 
-        // 🔥 保留最近 100 条小结，支持近100天历史数据查询
+        // 🔥 保留最近 10 条小结，确保上周数据能完整保存
         const overflow = await db.dailySummary.findMany({
           where: { userId },
           orderBy: { date: 'desc' },
-          skip: 100,
+          skip: 10,
           select: { id: true },
         });
 

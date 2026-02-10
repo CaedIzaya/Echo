@@ -11,7 +11,7 @@ import {
   AwarenessResponse,
 } from './types';
 import { triggerAwareness, registerResponseHandler } from './dispatcher';
-import { formatDate, getLocalHour } from './utils';
+import { formatDate, getLocalHour, getLocalMinute } from './utils';
 
 /**
  * 示例：在 App 启动时触发觉察检测
@@ -29,6 +29,7 @@ export function onAppLaunch(
     lastNDays: lastNDaysStats,
     nowTs: Date.now(),
     nowLocalHour: getLocalHour(new Date(), userState.timezone),
+    nowLocalMinute: getLocalMinute(new Date(), userState.timezone),
     recentEvents,
   };
 
@@ -73,6 +74,7 @@ export function onFocusTimerEnd(
     lastNDays: lastNDaysStats,
     nowTs: Date.now(),
     nowLocalHour: getLocalHour(new Date(), userState.timezone),
+    nowLocalMinute: getLocalMinute(new Date(), userState.timezone),
     recentEvents: [...recentEvents, event],
   };
 
@@ -108,6 +110,7 @@ export function onLumiClick(
     lastNDays: lastNDaysStats,
     nowTs: Date.now(),
     nowLocalHour: getLocalHour(new Date(), userState.timezone),
+    nowLocalMinute: getLocalMinute(new Date(), userState.timezone),
     recentEvents: [...recentEvents, event],
   };
 
@@ -138,6 +141,7 @@ export function onAppForegroundUpdate(
     lastNDays: lastNDaysStats,
     nowTs: Date.now(),
     nowLocalHour: getLocalHour(new Date(), userState.timezone),
+    nowLocalMinute: getLocalMinute(new Date(), userState.timezone),
     recentEvents,
   };
 
@@ -188,7 +192,6 @@ export function setupAwarenessResponseHandler(): void {
     }
   });
 }
-
 
 
 

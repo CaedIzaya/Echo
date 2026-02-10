@@ -40,6 +40,6 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules", ".next", "docs"
+    "node_modules", ".next", "docs", "public/noctis"
   ]
 }

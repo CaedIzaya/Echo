@@ -277,6 +277,7 @@ export default function Dashboard() {
   const { expState: heartTreeExpState, updateExpState: updateHeartTreeExpState } = useHeartTreeExp();
   const { 
     achievedIds,
+    achievedCount, // 🔥 使用稳定的计数器
     unlockAchievement: unlockAchievementToDB, 
     isAchievementUnlocked,
     isLoading: isAchievementsLoading 
@@ -294,10 +295,21 @@ export default function Dashboard() {
   }, [sessionStatus, userId]);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [panicMode, setPanicMode] = useState(false);
+  const renderLimitRef = useRef(0);
   const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 小精灵状态
   const [currentSpiritState, setCurrentSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod' | 'highfive' | 'highfive-success'>('idle'); // 用于对话框的状态
   const spiritDialogRef = useRef<SpiritDialogRef>(null); // 对话框ref
   
+  useEffect(() => {
+    // 仅在客户端统计渲染次数，避免 hooks 顺序被中途 return 破坏
+    renderLimitRef.current += 1;
+    if (renderLimitRef.current > 25) {
+      console.error('[Dashboard] 🚨 渲染次数超限，进入 panicMode（不再自动清缓存/刷新）');
+      setPanicMode(true);
+    }
+  });
+
   // 获取今日日期的工具函数
   const getTodayDate = () => new Date().toISOString().split('T')[0];
   
@@ -1295,8 +1307,9 @@ export default function Dashboard() {
     const manager = getAchievementManager();
     // 强制使用 Hook 的数据覆盖 manager 的 localStorage 数据
     manager['achievedAchievements'] = new Set(achievedIds);
-    console.log('[Dashboard Mobile] 🔄 同步成就数据到 Manager:', achievedIds.size, '个');
-  }, [isAchievementsLoading, achievedIds]);
+    console.log('[Dashboard Mobile] 🔄 同步成就数据到 Manager:', achievedCount, '个');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAchievementsLoading, achievedCount]); // 🔥 使用 achievedCount 而不是 achievedIds，避免 Set 引用变化导致无限循环
 
   // 初始化成就管理器
   useEffect(() => {
@@ -1543,21 +1556,8 @@ export default function Dashboard() {
   };
 
   // 加载状态
-  if (sessionStatus === 'loading' || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // 未认证状态
-  if (sessionStatus === 'unauthenticated' || !session) {
-    return null;
-  }
+  const showLoading = sessionStatus === 'loading' || isLoading;
+  const showUnauthed = sessionStatus === 'unauthenticated' || !session;
 
   // 进度数据 - 今日专注百分比 = 今日专注/日目标
   const todayGoal = primaryPlan?.dailyGoalMinutes || 0;
@@ -1877,24 +1877,50 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 relative pb-24">
-      {/* 成就通知 */}
-      <AchievementNotification />
-      
-      {/* 小精灵对话 */}
-      <SpiritDialog
-        ref={spiritDialogRef}
-        spiritState={effectiveSpiritState}
-        onStateChange={(newState) => {
-          setCurrentSpiritState(newState);
-        }}
-        mobileContainerClassName="sm:hidden fixed pointer-events-none w-[220px] max-w-[220px] z-50"
-        mobileContainerStyle={{ bottom: '15.5rem', right: '-1.6rem' }}
-      />
+      {panicMode ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <p className="text-gray-700">页面状态异常，但已保护，不会再自杀式刷新。</p>
+            <button
+              className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.clear();
+                  window.location.reload();
+                }
+              }}
+            >
+              手动清缓存并刷新
+            </button>
+          </div>
+        </div>
+      ) : showLoading ? (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">加载中...</p>
+          </div>
+        </div>
+      ) : showUnauthed ? null : (
+        <>
+          {/* 成就通知 */}
+          <AchievementNotification />
+          
+          {/* 小精灵对话 */}
+          <SpiritDialog
+            ref={spiritDialogRef}
+            spiritState={effectiveSpiritState}
+            onStateChange={(newState) => {
+              setCurrentSpiritState(newState);
+            }}
+            mobileContainerClassName="sm:hidden fixed pointer-events-none w-[220px] max-w-[220px] z-50"
+            mobileContainerStyle={{ bottom: '15.5rem', right: '-1.6rem' }}
+          />
 
-      {/* 新版布局 - 顶部导航栏仅在dashboard页面显示 */}
-      {router.pathname === '/dashboard' && (
-        <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/70 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          {/* 新版布局 - 顶部导航栏仅在dashboard页面显示 */}
+          {router.pathname === '/dashboard' && (
+            <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/70 shadow-sm">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.7)]" />
             <div>
@@ -2274,9 +2300,11 @@ export default function Dashboard() {
         onClose={() => setShowShopModal(false)} 
       />
       
-      {/* 快速查找指南 */}
-      {showQuickSearchGuide && (
-        <QuickSearchGuide onClose={() => setShowQuickSearchGuide(false)} />
+          {/* 快速查找指南 */}
+          {showQuickSearchGuide && (
+            <QuickSearchGuide onClose={() => setShowQuickSearchGuide(false)} />
+          )}
+        </>
       )}
     </div>
   );
