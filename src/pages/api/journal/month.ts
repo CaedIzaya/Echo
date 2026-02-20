@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { db } from '~/server/db';
 
+const FALLBACK_SUMMARY_TEXT = '今日很忙碌，暂无感悟';
+
 /**
  * 获取某月的所有专注小结摘要
  * 
@@ -54,33 +56,92 @@ export default async function handler(
       dateRange: `${startDateStr} ~ ${endDateStr}`,
     });
 
-    // 查询该月的所有小结（只需要摘要信息）
-    const summaries = await db.dailySummary.findMany({
-      where: {
-        userId: session.user.id,
-        date: {
-          gte: startDateStr,
-          lte: endDateStr,
+    const [summaries, focusSessions] = await Promise.all([
+      db.dailySummary.findMany({
+        where: {
+          userId: session.user.id,
+          date: {
+            gte: startDateStr,
+            lte: endDateStr,
+          },
         },
-      },
-      select: {
-        date: true,
-        text: true,
-        totalFocusMinutes: true,
-      },
-      orderBy: {
-        date: 'asc',
-      },
-    });
+        select: {
+          date: true,
+          text: true,
+          totalFocusMinutes: true,
+        },
+        orderBy: {
+          date: 'asc',
+        },
+      }),
+      db.focusSession.findMany({
+        where: {
+          userId: session.user.id,
+          duration: {
+            gt: 0,
+          },
+          startTime: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        select: {
+          startTime: true,
+          duration: true,
+        },
+      }),
+    ]);
 
-    // 转换为日历视图所需的格式
-    const result = summaries.map((summary) => ({
-      date: summary.date,
-      // 生成摘要：去掉多余空格和换行，最多60字
-      preview: generatePreview(summary.text, 60),
-      hasSummary: summary.text && summary.text.trim().length > 0,
-      totalFocusMinutes: summary.totalFocusMinutes,
-    }));
+    const dayMap = new Map<
+      string,
+      {
+        date: string;
+        text: string;
+        totalFocusMinutes: number;
+        hasRealSummary: boolean;
+      }
+    >();
+
+    for (const summary of summaries) {
+      const text = (summary.text || '').trim();
+      dayMap.set(summary.date, {
+        date: summary.date,
+        text,
+        totalFocusMinutes: summary.totalFocusMinutes || 0,
+        hasRealSummary: text.length > 0,
+      });
+    }
+
+    for (const sessionRow of focusSessions) {
+      const date = formatDate(sessionRow.startTime);
+      const existed = dayMap.get(date);
+
+      if (existed) {
+        if (!existed.hasRealSummary) {
+          existed.totalFocusMinutes += sessionRow.duration || 0;
+        }
+        continue;
+      }
+
+      dayMap.set(date, {
+        date,
+        text: '',
+        totalFocusMinutes: sessionRow.duration || 0,
+        hasRealSummary: false,
+      });
+    }
+
+    const result = Array.from(dayMap.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((day) => ({
+        date: day.date,
+        preview: day.hasRealSummary
+          ? generatePreview(day.text, 60)
+          : FALLBACK_SUMMARY_TEXT,
+        // 该接口面向星空卡片：有专注或有小结都算有痕迹
+        hasSummary: true,
+        totalFocusMinutes: day.totalFocusMinutes,
+      }));
 
     console.log('[journal/month] 查询成功', {
       count: result.length,

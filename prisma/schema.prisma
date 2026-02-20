@@ -60,6 +60,7 @@ model User {
   heartTreeName          String?        @default("心树")
   userExp                Float          @default(0)
   userLevel              Int            @default(1)
+  lastAnnouncedLevel     Int            @default(1)
   heartTreeLevel         Int            @default(1)
   heartTreeCurrentExp    Float          @default(0)
   heartTreeTotalExp      Float          @default(0)

@@ -94,6 +94,25 @@ interface Milestone {
 
 const MIN_FOCUS_MINUTES = 25; // 用于判断“达到最小专注时长”的日级阈值（可按需调整）
 const JUST_COMPLETED_FOCUS_FLAG = 'justCompletedFocusAt';
+const FOCUS_END_AGITATED_MESSAGES = [
+  '这段并不轻松，但你还是带着它走到了终点。',
+  '你没有假装轻松，这反而很真实。',
+  '你今天走得不顺，可你没有丢下自己。',
+  '这一路有点重，但你还是把它走完了。',
+  '你把难的部分带过来了，这很了不起。',
+];
+const FOCUS_END_EARLY_MESSAGES = [
+  '到这里也可以。',
+  '不是每一次都要走到最后。',
+  '这一次先停在这里，也没关系。',
+  '你愿意停下来，也是一种照顾。',
+  '走到这就够了，剩下的以后再说。',
+];
+
+const pickRandomFromPool = (pool: string[]) => {
+  if (!pool.length) return '';
+  return pool[Math.floor(Math.random() * pool.length)];
+};
 
 // 分离的数据结构 - 今日数据和累计数据独立
 interface TodayStats {
@@ -388,18 +407,88 @@ export default function Dashboard() {
   const { unlockAchievement: unlockAchievementToDB } = useAchievements();
   const { syncStatus, syncAllData } = useDataSync(); // 🆕 数据同步 Hook
   
-  // 监听用户等级变化，触发等级提升文案
+  // 监听用户等级变化，触发等级提升文案（数据库一致性 + 首次水合防误判）
   const prevUserLevelRef = useRef<number>(hookUserLevel);
-  useEffect(() => {
-    if (hookUserLevel > prevUserLevelRef.current && prevUserLevelRef.current > 0) {
-      console.log(`[Dashboard] 🎉 用户等级提升: ${prevUserLevelRef.current} → ${hookUserLevel}`);
-      // 触发等级提升文案
-      if (spiritDialogRef.current?.showLevelUpMessage) {
-        spiritDialogRef.current.showLevelUpMessage();
-      }
+  const levelHydratedRef = useRef(false);
+  const remoteLastAnnouncedLevelRef = useRef(1);
+  const sessionAnnouncedLevelRef = useRef(1);
+
+  const persistAnnouncedLevel = useCallback(async (level: number) => {
+    try {
+      await fetch('/api/user/exp/announce-level', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ announcedLevel: level }),
+      });
+    } catch (error) {
+      console.warn('[Dashboard] 持久化 lastAnnouncedLevel 失败:', error);
     }
-    prevUserLevelRef.current = hookUserLevel;
-  }, [hookUserLevel]);
+  }, []);
+
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) {
+      prevUserLevelRef.current = hookUserLevel;
+      levelHydratedRef.current = false;
+      remoteLastAnnouncedLevelRef.current = 1;
+      sessionAnnouncedLevelRef.current = 1;
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      // 首次水合：只校准基线，不触发升级播报
+      if (!levelHydratedRef.current) {
+        let remoteLast = 1;
+        try {
+          const response = await fetch('/api/user/exp');
+          if (response.ok) {
+            const data = await response.json();
+            const parsed = Number(data?.lastAnnouncedLevel);
+            remoteLast = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1;
+          }
+        } catch (error) {
+          console.warn('[Dashboard] 获取 lastAnnouncedLevel 失败，使用本地基线:', error);
+        }
+        if (cancelled) return;
+
+        const baseline = Math.max(1, hookUserLevel, remoteLast);
+        remoteLastAnnouncedLevelRef.current = baseline;
+        sessionAnnouncedLevelRef.current = baseline;
+        prevUserLevelRef.current = hookUserLevel;
+        levelHydratedRef.current = true;
+
+        if (baseline > remoteLast) {
+          void persistAnnouncedLevel(baseline);
+        }
+        return;
+      }
+
+      const didLevelUp = hookUserLevel > prevUserLevelRef.current;
+      const lastAnnouncedLevel = Math.max(
+        remoteLastAnnouncedLevelRef.current,
+        sessionAnnouncedLevelRef.current,
+      );
+      const shouldAnnounce = didLevelUp && hookUserLevel > lastAnnouncedLevel;
+
+      if (shouldAnnounce) {
+        console.log(`[Dashboard] 🎉 用户等级提升: ${prevUserLevelRef.current} → ${hookUserLevel}`);
+        if (spiritDialogRef.current?.showLevelUpMessage) {
+          spiritDialogRef.current.showLevelUpMessage();
+        }
+        sessionAnnouncedLevelRef.current = hookUserLevel;
+        remoteLastAnnouncedLevelRef.current = hookUserLevel;
+        void persistAnnouncedLevel(hookUserLevel);
+      }
+
+      prevUserLevelRef.current = hookUserLevel;
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [hookUserLevel, session?.user?.id, persistAnnouncedLevel]);
   
   // 🔥 统计数据从数据库加载
   const { 
@@ -1790,6 +1879,20 @@ export default function Dashboard() {
           }
           return;
         }
+
+        const focusEndReason = localStorage.getItem('focusEndReason');
+        if (focusEndReason && spiritDialogRef.current) {
+          const pool =
+            focusEndReason === 'agitated_end'
+              ? FOCUS_END_AGITATED_MESSAGES
+              : FOCUS_END_EARLY_MESSAGES;
+          const text = pickRandomFromPool(pool);
+          if (text) {
+            spiritDialogRef.current.showTypedMessage?.(text, 'philosophical');
+          }
+          localStorage.removeItem('focusEndReason');
+          return;
+        }
         
         // 🌟 启动激励逻辑：当日首次进入 App，且当日尚未开始任何一次专注
         const today = getTodayDate();
@@ -2316,6 +2419,20 @@ export default function Dashboard() {
               localStorage.removeItem('focusCompleted');
             }
           }, 500);
+          return;
+        }
+
+        const focusEndReason = localStorage.getItem('focusEndReason');
+        if (focusEndReason && spiritDialogRef.current) {
+          const pool =
+            focusEndReason === 'agitated_end'
+              ? FOCUS_END_AGITATED_MESSAGES
+              : FOCUS_END_EARLY_MESSAGES;
+          const text = pickRandomFromPool(pool);
+          if (text) {
+            spiritDialogRef.current.showTypedMessage?.(text, 'philosophical');
+          }
+          localStorage.removeItem('focusEndReason');
         }
       }
     };
@@ -2760,16 +2877,16 @@ export default function Dashboard() {
         {/* 季节主题的场景动画层 */}
         {['spring', 'summer', 'autumn', 'winter'].includes(theme) && (
           <div className={`season-overlay season-${theme}`} aria-hidden="true">
-            {Array.from({ length: 12 }).map((_, index) => (
+            {Array.from({ length: theme === 'summer' ? 16 : 12 }).map((_, index) => (
               <span
                 key={index}
                 className="season-particle"
                 style={{
                   left: `${5 + (index * 8) % 90}%`,
-                  width: `${6 + (index % 3) * 3}px`,
-                  height: `${8 + (index % 3) * 3}px`,
+                  width: `${theme === 'summer' ? 10 + (index % 4) * 5 : 6 + (index % 3) * 3}px`,
+                  height: `${theme === 'summer' ? 10 + (index % 4) * 5 : 8 + (index % 3) * 3}px`,
                   animationDelay: `${index * 0.8}s`,
-                  animationDuration: `${8 + (index % 4) * 2}s`,
+                  animationDuration: `${theme === 'summer' ? 9 + (index % 4) * 2.2 : 8 + (index % 4) * 2}s`,
                 }}
               />
             ))}
@@ -3399,10 +3516,18 @@ export default function Dashboard() {
           animation-name: season-snow-fall;
         }
         :global(.season-summer .season-particle) {
-          border: 1.5px solid rgba(56, 189, 248, 0.9);
+          border: 2px solid rgba(255, 255, 255, 0.9);
           border-radius: 999px;
-          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.6), rgba(186, 230, 253, 0.35) 45%, rgba(14, 116, 144, 0.15) 100%);
-          box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+          background: radial-gradient(
+            circle at 28% 24%,
+            rgba(255, 255, 255, 0.98) 0%,
+            rgba(255, 255, 255, 0.88) 26%,
+            rgba(224, 247, 255, 0.6) 58%,
+            rgba(150, 227, 255, 0.28) 100%
+          );
+          box-shadow:
+            0 0 14px rgba(255, 255, 255, 0.4),
+            0 0 18px rgba(103, 232, 249, 0.28);
           animation-name: season-bubble-rise;
         }
 

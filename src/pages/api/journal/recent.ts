@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { db } from '~/server/db';
 
+const FALLBACK_SUMMARY_TEXT = '今日很忙碌，暂无感悟';
+
 /**
  * 获取最近 N 天的专注小结摘要（最多 100 条）
  *
@@ -33,26 +35,92 @@ export default async function handler(
       limit,
     });
 
-    const summaries = await db.dailySummary.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      select: {
-        date: true,
-        text: true,
-        totalFocusMinutes: true,
-      },
-      orderBy: {
-        date: 'desc',
-      },
-      take: limit,
-    });
+    const [summaries, focusSessions] = await Promise.all([
+      db.dailySummary.findMany({
+        where: {
+          userId: session.user.id,
+        },
+        select: {
+          date: true,
+          text: true,
+          totalFocusMinutes: true,
+        },
+        orderBy: {
+          date: 'desc',
+        },
+        // 先取更多一点，后续和 focus session 合并再截断
+        take: Math.min(limit * 2, 200),
+      }),
+      db.focusSession.findMany({
+        where: {
+          userId: session.user.id,
+          duration: {
+            gt: 0,
+          },
+        },
+        select: {
+          startTime: true,
+          duration: true,
+        },
+        orderBy: {
+          startTime: 'desc',
+        },
+        take: 5000,
+      }),
+    ]);
 
-    const result = summaries.map((summary) => ({
-      date: summary.date,
-      preview: generatePreview(summary.text, 60),
-      hasSummary: summary.text && summary.text.trim().length > 0,
-      totalFocusMinutes: summary.totalFocusMinutes,
+    const dayMap = new Map<
+      string,
+      {
+        date: string;
+        text: string;
+        totalFocusMinutes: number;
+        hasRealSummary: boolean;
+      }
+    >();
+
+    for (const summary of summaries) {
+      const text = (summary.text || '').trim();
+      dayMap.set(summary.date, {
+        date: summary.date,
+        text,
+        totalFocusMinutes: summary.totalFocusMinutes || 0,
+        hasRealSummary: text.length > 0,
+      });
+    }
+
+    for (const sessionRow of focusSessions) {
+      const date = formatDate(sessionRow.startTime);
+      const existed = dayMap.get(date);
+
+      if (existed) {
+        // 若该天没有真实小结，就累计分钟数用于展示
+        if (!existed.hasRealSummary) {
+          existed.totalFocusMinutes += sessionRow.duration || 0;
+        }
+        continue;
+      }
+
+      dayMap.set(date, {
+        date,
+        text: '',
+        totalFocusMinutes: sessionRow.duration || 0,
+        hasRealSummary: false,
+      });
+    }
+
+    const mergedDays = Array.from(dayMap.values())
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, limit);
+
+    const result = mergedDays.map((day) => ({
+      date: day.date,
+      preview: day.hasRealSummary
+        ? generatePreview(day.text, 60)
+        : FALLBACK_SUMMARY_TEXT,
+      // 星星判定：有专注或有小结即显示，因此这里统一可点击
+      hasSummary: true,
+      totalFocusMinutes: day.totalFocusMinutes,
     }));
 
     console.log('[journal/recent] 查询成功', {
@@ -96,5 +164,12 @@ function generatePreview(text: string, maxLength: number): string {
   }
 
   return cleaned;
+}
+
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 

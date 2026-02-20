@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { db } from '~/server/db';
 
+const FALLBACK_SUMMARY_TEXT = '今日很忙碌，暂无感悟';
+
 /**
  * 获取某天的完整小结详情
  * 
@@ -128,12 +130,21 @@ export default async function handler(
       projectIcon: session.project?.icon,
     }));
 
+    const realSummaryText = (summary?.text || '').trim();
+    const hasFocusAction = totalFocusMinutes > 0 || sessionCount > 0;
+    const resolvedSummaryText =
+      realSummaryText.length > 0
+        ? realSummaryText
+        : hasFocusAction
+          ? FALLBACK_SUMMARY_TEXT
+          : '';
+
     const result = {
       date,
-      hasSummary: summary && summary.text && summary.text.trim().length > 0,
+      hasSummary: resolvedSummaryText.length > 0,
       summary: {
-        text: summary?.text || '',
-        totalFocusMinutes: summary?.totalFocusMinutes || 0,
+        text: resolvedSummaryText,
+        totalFocusMinutes: summary?.totalFocusMinutes || totalFocusMinutes,
         completedTaskCount: summary?.completedTaskCount || 0,
         createdAt: summary?.createdAt?.toISOString(),
         updatedAt: summary?.updatedAt?.toISOString(),

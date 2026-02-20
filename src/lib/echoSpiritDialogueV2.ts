@@ -258,7 +258,18 @@ export const defaultEchoPools: EchoPools = {
   // 主页 · 完成一次完整专注
   after_focus_first_pool: [],
   focus_done_daily_pool: [],
-  half_focus_daily_pool: [],
+  half_focus_daily_pool: [
+    '上一次没走完，也不算白走。',
+    '刚才那段虽然短，但你回来了。',
+    '不用补回来，从这里继续就好。',
+    '短一点也没关系，你在就行。',
+    '你回来了，这比时长更重要。',
+    '上次停得有点快，不过没关系。',
+    '不是每次都要刚好，下一次再调整。',
+    '你没有放弃，只是暂时停了一下。',
+    '回来这件事本身，就说明了很多。',
+    '我们慢慢来，不赶。',
+  ],
 
   // 彩蛋 / 独立事件池
   water_pool: [],
@@ -514,6 +525,11 @@ export function resolveHomeContextKey(status: EchoHomeStatus): EchoPoolKey | Ech
 
   if (hasCompletedSessionToday && hasShownAfterFocusFirstToday) {
     return 'focus_done_daily';
+  }
+
+  // 今天有过专注但未达到最小时长（未达标专注后的轻提醒）
+  if (hasFocusToday && !minFocusReachedToday) {
+    return 'half_focus_daily';
   }
 
   // ④ 无特定状态：回落到通用人格

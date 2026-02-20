@@ -40,6 +40,32 @@ interface FocusSession {
   customDuration: number;   // 用户自定义时长（分钟）
 }
 
+const FOCUS_PAUSE_MESSAGE = '休息一下吧，我一直在。';
+const FOCUS_AGITATION_MESSAGES = {
+  mild: [
+    '内心好像轻轻晃了一下，我在。',
+    '我看见你的小波动了，别紧张。',
+    '你刚才那一下很轻，我接住了。',
+  ],
+  moderate: [
+    '刚刚好像有点难，还好吗？',
+    '你现在的节奏有点不稳，我在看着。',
+    '这一段不轻松，我听见了。',
+  ],
+  severe: [
+    '如果你还想继续的话，我陪着你。',
+    '你不用把它一个人扛完，我在。',
+    '这段很重，但你不是一个人。',
+  ],
+};
+
+const pickRandomMessage = (pool: string[]) => {
+  if (!pool.length) return '';
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+type AgitationTier = 0 | 1 | 2 | 3;
+
 export default function Focus() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -68,12 +94,18 @@ export default function Focus() {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [pendingEndCompleted, setPendingEndCompleted] = useState(false);
   const [celebrateMode, setCelebrateMode] = useState<'session' | 'daily' | null>(null);
+  const [isLumiHidden, setIsLumiHidden] = useState(false);
+  const [focusLumiMessage, setFocusLumiMessage] = useState<string | null>(null);
+  const [focusLumiAutoAnimation, setFocusLumiAutoAnimation] = useState<{ token: number; type: 'happy' | 'nod' | 'excited'; durationMs?: number } | null>(null);
   
 
   // 击掌功能相关状态
   const [highFivePhase, setHighFivePhase] = useState<'none' | 'ready' | 'success' | 'finished'>('none');
   const [highFiveText, setHighFiveText] = useState('');
   const highFiveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const focusLumiMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const focusLumiAnimationTokenRef = useRef(0);
+  const isLumiHiddenRef = useRef(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionRef = useRef<FocusSession | null>(null);
@@ -85,6 +117,259 @@ export default function Focus() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null); // Wake Lock 引用
   const autoInterruptedAtKey = 'focusSessionAutoInterruptedAt';
+  const focusStateRef = useRef<FocusState>('preparing');
+  const agitationScoreRef = useRef(0);
+  const agitationTriggeredRef = useRef({ mild: false, moderate: false, severe: false });
+  const agitatedDuringSessionRef = useRef(false);
+  const agitationDecayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAgitationSignalRef = useRef<Record<string, number>>({});
+  const currentAgitationTierRef = useRef<AgitationTier>(0);
+  const tierLastNotifyAtRef = useRef<Record<number, number>>({ 1: 0, 2: 0, 3: 0 });
+  const lumiHoverTrackerRef = useRef({ count: 0, windowStart: 0 });
+  const pendingAgitationComfortRef = useRef(false);
+  const mouseTrackerRef = useRef({
+    lastX: null as number | null,
+    lastY: null as number | null,
+    lastTime: 0,
+    distance: 0,
+    directionChanges: 0,
+    lastDx: 0,
+    lastDy: 0,
+    windowStart: 0,
+  });
+
+  const triggerFocusLumiAnimation = (type: 'happy' | 'nod' | 'excited', durationMs: number = 2000) => {
+    focusLumiAnimationTokenRef.current += 1;
+    setFocusLumiAutoAnimation({ token: focusLumiAnimationTokenRef.current, type, durationMs });
+  };
+
+  const showFocusLumiMessage = (
+    text: string,
+    durationMs: number = 8000,
+    animation: 'happy' | 'nod' | 'excited' = 'nod',
+  ) => {
+    if (!text) return;
+    if (isLumiHiddenRef.current) return;
+
+    setFocusLumiMessage(text);
+    triggerFocusLumiAnimation(animation);
+
+    if (focusLumiMessageTimerRef.current) {
+      clearTimeout(focusLumiMessageTimerRef.current);
+      focusLumiMessageTimerRef.current = null;
+    }
+
+    if (durationMs > 0) {
+      focusLumiMessageTimerRef.current = setTimeout(() => {
+        setFocusLumiMessage(null);
+      }, durationMs);
+    }
+  };
+
+  const resetAgitationTracking = () => {
+    agitationScoreRef.current = 0;
+    agitationTriggeredRef.current = { mild: false, moderate: false, severe: false };
+    agitatedDuringSessionRef.current = false;
+    lastAgitationSignalRef.current = {};
+    currentAgitationTierRef.current = 0;
+    tierLastNotifyAtRef.current = { 1: 0, 2: 0, 3: 0 };
+    lumiHoverTrackerRef.current = { count: 0, windowStart: 0 };
+    pendingAgitationComfortRef.current = false;
+    mouseTrackerRef.current = {
+      lastX: null,
+      lastY: null,
+      lastTime: 0,
+      distance: 0,
+      directionChanges: 0,
+      lastDx: 0,
+      lastDy: 0,
+      windowStart: 0,
+    };
+    if (agitationDecayTimerRef.current) {
+      clearInterval(agitationDecayTimerRef.current);
+      agitationDecayTimerRef.current = null;
+    }
+  };
+
+  const getAgitationTierByScore = (score: number, currentTier: AgitationTier): AgitationTier => {
+    if (score >= 115) return 3;
+    if (score >= 85) return currentTier >= 2 ? currentTier : 2;
+    if (score >= 55) return currentTier >= 1 ? currentTier : 1;
+
+    // 滞后降档，避免阈值附近抖动
+    if (currentTier === 3 && score < 95) return 2;
+    if (currentTier === 2 && score < 65) return 1;
+    if (currentTier === 1 && score < 35) return 0;
+    return currentTier;
+  };
+
+  const evaluateAgitationThresholds = () => {
+    const now = Date.now();
+    const score = agitationScoreRef.current;
+    const prevTier = currentAgitationTierRef.current;
+    const nextTier = getAgitationTierByScore(score, prevTier);
+    currentAgitationTierRef.current = nextTier;
+
+    if (nextTier <= prevTier || nextTier === 0) return;
+
+    agitatedDuringSessionRef.current = true;
+    const lastNotifyAt = tierLastNotifyAtRef.current[nextTier] || 0;
+    if (now - lastNotifyAt < 20000) return;
+    tierLastNotifyAtRef.current[nextTier] = now;
+
+    if (nextTier === 3) {
+      agitationTriggeredRef.current.severe = true;
+      agitationTriggeredRef.current.moderate = true;
+      agitationTriggeredRef.current.mild = true;
+      pendingAgitationComfortRef.current = true;
+      showFocusLumiMessage(pickRandomMessage(FOCUS_AGITATION_MESSAGES.severe), 10000, 'excited');
+      return;
+    }
+    if (nextTier === 2) {
+      agitationTriggeredRef.current.moderate = true;
+      agitationTriggeredRef.current.mild = true;
+      pendingAgitationComfortRef.current = true;
+      showFocusLumiMessage(pickRandomMessage(FOCUS_AGITATION_MESSAGES.moderate), 9000, 'happy');
+      return;
+    }
+    if (nextTier === 1) {
+      agitationTriggeredRef.current.mild = true;
+      pendingAgitationComfortRef.current = true;
+      showFocusLumiMessage(pickRandomMessage(FOCUS_AGITATION_MESSAGES.mild), 8000, 'nod');
+    }
+  };
+
+  const handleAgitationComfortClick = () => {
+    if (!pendingAgitationComfortRef.current) return;
+    pendingAgitationComfortRef.current = false;
+    showFocusLumiMessage('收到，让我们安心继续吧！', 5000, 'nod');
+  };
+
+  const registerAgitationSignal = (signal: 'visibility' | 'blur' | 'mouse' | 'hover') => {
+    if (focusStateRef.current !== 'running') return;
+    const now = Date.now();
+    const last = lastAgitationSignalRef.current[signal] || 0;
+    const cooldownMs =
+      signal === 'mouse'
+        ? 5000
+        : signal === 'hover'
+          ? 4000
+          : 2500;
+    if (now - last < cooldownMs) return;
+    lastAgitationSignalRef.current[signal] = now;
+
+    const delta =
+      signal === 'visibility'
+        ? 28
+        : signal === 'blur'
+          ? 20
+          : signal === 'mouse'
+            ? 14
+            : 10;
+    agitationScoreRef.current = Math.min(150, agitationScoreRef.current + delta);
+    evaluateAgitationThresholds();
+  };
+
+  const onLumiHover = () => {
+    if (focusStateRef.current !== 'running') return;
+    const now = Date.now();
+    const tracker = lumiHoverTrackerRef.current;
+    if (!tracker.windowStart || now - tracker.windowStart > 10000) {
+      tracker.windowStart = now;
+      tracker.count = 1;
+      return;
+    }
+    tracker.count += 1;
+    if (tracker.count >= 4) {
+      registerAgitationSignal('hover');
+      tracker.count = 0;
+      tracker.windowStart = now;
+    }
+  };
+
+  useEffect(() => {
+    focusStateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    isLumiHiddenRef.current = isLumiHidden;
+  }, [isLumiHidden]);
+
+  useEffect(() => {
+    if (state !== 'running') return;
+
+    const handleBlur = () => registerAgitationSignal('blur');
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        registerAgitationSignal('visibility');
+      }
+    };
+    const handleMouseMove = (event: MouseEvent) => {
+      const tracker = mouseTrackerRef.current;
+      const now = Date.now();
+      if (!tracker.windowStart) tracker.windowStart = now;
+      if (tracker.lastX !== null && tracker.lastY !== null) {
+        const dx = event.clientX - tracker.lastX;
+        const dy = event.clientY - tracker.lastY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        tracker.distance += dist;
+
+        const dot = dx * tracker.lastDx + dy * tracker.lastDy;
+        if ((tracker.lastDx !== 0 || tracker.lastDy !== 0) && dot < 0) {
+          tracker.directionChanges += 1;
+        }
+        tracker.lastDx = dx;
+        tracker.lastDy = dy;
+      }
+      tracker.lastX = event.clientX;
+      tracker.lastY = event.clientY;
+      tracker.lastTime = now;
+
+      if (now - tracker.windowStart >= 6000) {
+        if (tracker.distance > 4200 || tracker.directionChanges > 18) {
+          registerAgitationSignal('mouse');
+        }
+        tracker.distance = 0;
+        tracker.directionChanges = 0;
+        tracker.windowStart = now;
+      }
+    };
+
+    agitationDecayTimerRef.current = setInterval(() => {
+      if (focusStateRef.current !== 'running') return;
+      const current = agitationScoreRef.current;
+      const decay = current >= 100 ? 4 : current >= 50 ? 6 : 8;
+      agitationScoreRef.current = Math.max(0, current - decay);
+      evaluateAgitationThresholds();
+    }, 4000);
+
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (agitationDecayTimerRef.current) {
+        clearInterval(agitationDecayTimerRef.current);
+        agitationDecayTimerRef.current = null;
+      }
+    };
+  }, [state]);
+
+  useEffect(() => {
+    return () => {
+      if (focusLumiMessageTimerRef.current) {
+        clearTimeout(focusLumiMessageTimerRef.current);
+        focusLumiMessageTimerRef.current = null;
+      }
+      if (agitationDecayTimerRef.current) {
+        clearInterval(agitationDecayTimerRef.current);
+        agitationDecayTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // 播放温柔的成就提示音
   const playGoalAchievementSound = () => {
@@ -939,6 +1224,7 @@ export default function Focus() {
     
     // 清理可能存在的旧计时器
     cleanupInterval();
+    resetAgitationTracking();
     
     // 如果是新开始，记录开始时间
     if (!sessionRef.current.startTime || sessionRef.current.status === 'preparing') {
@@ -1023,6 +1309,9 @@ export default function Focus() {
       pauseCount: pauseCount + 1,
       elapsedTime: currentElapsed
     });
+
+    // 暂停时的小精灵反应（若用户已隐藏 Lumi，则不会触发）
+    showFocusLumiMessage(FOCUS_PAUSE_MESSAGE, 8000, 'nod');
   };
 
   // 恢复专注（含跨日处理）
@@ -1154,8 +1443,17 @@ export default function Focus() {
     }
     
     // 如果要庆祝（本次完成 or 今日达标），设置标记以便dashboard显示祝贺文案
+    // 成功完成覆盖心烦意乱判定：不写入 focusEndReason
     if (shouldCelebrate && finalElapsedTime > 0) {
       localStorage.setItem('focusCompleted', 'true');
+      localStorage.removeItem('focusEndReason');
+    } else if (finalElapsedTime > 0) {
+      // 未成功完成：根据是否触发过心烦意乱写入不同原因
+      if (agitatedDuringSessionRef.current) {
+        localStorage.setItem('focusEndReason', 'agitated_end');
+      } else {
+        localStorage.setItem('focusEndReason', 'early_end');
+      }
     }
     
     // 记录本次结算模式（用于结算页文案）
@@ -1862,6 +2160,53 @@ export default function Focus() {
           </div>
         </div>
 
+        {/* 右下角 Lumi（专注中） */}
+        {!isLumiHidden && (
+          <div className="fixed bottom-8 right-8 z-30 flex flex-col items-center gap-2">
+            {focusLumiMessage && (
+              <div className={`max-w-[200px] px-3 py-2 rounded-xl text-sm font-medium shadow-lg animate-fade-in ${
+                isGolden
+                  ? 'bg-yellow-50/90 text-yellow-900 border border-yellow-200'
+                  : 'bg-white/90 text-teal-800 border border-white/60'
+              }`}>
+                {focusLumiMessage}
+              </div>
+            )}
+            <div onMouseEnter={onLumiHover}>
+              <EchoSpirit
+                state="idle"
+                isCompleted={false}
+                className="w-14 h-14 opacity-70 hover:opacity-100 transition-opacity"
+                disableAutoInteract={true}
+                autoAnimation={focusLumiAutoAnimation ?? undefined}
+                onClick={handleAgitationComfortClick}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* 隐藏/显示 Lumi 按钮（专注中） */}
+        <button
+          onClick={() => {
+            setIsLumiHidden(prev => {
+              const next = !prev;
+              isLumiHiddenRef.current = next;
+              if (next) {
+                setFocusLumiMessage(null);
+              }
+              return next;
+            });
+          }}
+          className={`fixed bottom-8 z-30 transition-all text-xs font-medium rounded-full px-3 py-1.5 backdrop-blur-sm ${
+            isLumiHidden
+              ? 'right-8 bg-white/15 text-white/40 hover:text-white/70 hover:bg-white/25'
+              : 'right-[6.5rem] bg-white/15 text-white/40 hover:text-white/70 hover:bg-white/25'
+          }`}
+          title={isLumiHidden ? '显示 Lumi' : '隐藏 Lumi'}
+        >
+          {isLumiHidden ? '🔮' : '✕'}
+        </button>
+
         {/* 暂停确认弹窗 */}
         {showPauseConfirm && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -2023,6 +2368,50 @@ export default function Focus() {
             </button>
           </div>
         </div>
+
+        {/* 右下角 Lumi（暂停中，等待动画） */}
+        {!isLumiHidden && (
+          <div className="fixed bottom-10 right-10 z-30 flex flex-col items-center gap-3">
+            <div className="max-w-[200px] px-3 py-2 rounded-xl text-sm font-medium shadow-lg bg-white/15 text-blue-100 border border-white/20 backdrop-blur-sm">
+              {focusLumiMessage || FOCUS_PAUSE_MESSAGE}
+            </div>
+            <div style={{ animation: 'lumi-breathe 3s ease-in-out infinite' }}>
+              <EchoSpirit
+                state="idle"
+                isCompleted={false}
+                className="w-16 h-16 opacity-80"
+                disableAutoInteract={true}
+                onClick={handleAgitationComfortClick}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* 隐藏/显示 Lumi 按钮（暂停中） */}
+        <button
+          onClick={() => {
+            setIsLumiHidden(prev => {
+              const next = !prev;
+              isLumiHiddenRef.current = next;
+              return next;
+            });
+          }}
+          className={`fixed bottom-10 z-30 transition-all text-xs font-medium rounded-full px-3 py-1.5 backdrop-blur-sm ${
+            isLumiHidden
+              ? 'right-10 bg-white/15 text-blue-200/50 hover:text-blue-100 hover:bg-white/25'
+              : 'right-[7rem] bg-white/15 text-blue-200/50 hover:text-blue-100 hover:bg-white/25'
+          }`}
+          title={isLumiHidden ? '显示 Lumi' : '隐藏 Lumi'}
+        >
+          {isLumiHidden ? '🔮' : '✕'}
+        </button>
+
+        <style jsx>{`
+          @keyframes lumi-breathe {
+            0%, 100% { transform: scale(1) translateY(0); opacity: 0.8; }
+            50% { transform: scale(1.06) translateY(-3px); opacity: 1; }
+          }
+        `}</style>
         </div>
       </>
     );
