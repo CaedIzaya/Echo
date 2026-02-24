@@ -74,6 +74,14 @@ export default function CalendarCard({ userId }: CalendarCardProps) {
     router.push('/journal');
   };
 
+  const formatMonthDay = (dateString: string) => {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${month}.${day}`;
+  };
+
   return (
     <div 
       onClick={handleCardClick}
@@ -109,7 +117,6 @@ export default function CalendarCard({ userId }: CalendarCardProps) {
             {/* UI: 星轨预览（最多 10 颗） */}
             <div className="flex items-end justify-between gap-3">
               {visibleStars.map((day) => {
-                const dayOfMonth = new Date(day.date).getDate();
                 return (
                   <div key={day.date} className="group flex flex-col items-center gap-3">
                     <div className="relative w-10 h-10 flex items-center justify-center">
@@ -117,7 +124,7 @@ export default function CalendarCard({ userId }: CalendarCardProps) {
                       <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
                     </div>
                     <div className="text-[10px] font-light text-white/70">
-                      {dayOfMonth}
+                      {formatMonthDay(day.date)}
                     </div>
                   </div>
                 );

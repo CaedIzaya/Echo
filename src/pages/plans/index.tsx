@@ -6,7 +6,7 @@ import { useCachedProjects } from '~/hooks/useCachedProjects';
 import PlanCard from './PlanCard';
 import PlanManagement from './PlanManagement';
 import CompletionDialog from './CompletionDialog';
-import AddMilestoneModal from './AddMilestoneModal';
+import GoalInputModal from '~/components/goals/GoalInputModal';
 import EditPlanModal from './EditPlanModal';
 import ManageMilestonesModal from '~/components/plans/ManageMilestonesModal';
 import MilestoneManager, { FinalGoal } from '~/components/milestone/MilestoneManager';
@@ -445,10 +445,10 @@ export default function PlansPage() {
   // 添加小目标
   const handleAddMilestone = async (title: string, targetPlanId?: string) => {
     const planId = targetPlanId || milestoneTargetPlanId;
-    if (!planId) return;
+    if (!planId) return false;
 
     const targetPlan = plans.find(p => p.id === planId);
-    if (!targetPlan) return;
+    if (!targetPlan) return false;
 
     // 获取下一个order
     const maxOrder = targetPlan.milestones.length > 0 
@@ -473,7 +473,7 @@ export default function PlansPage() {
         const { milestone } = await response.json();
         
         const updatedPlans = plans.map(plan => 
-          plan.id === milestoneTargetPlanId
+          plan.id === planId
             ? { ...plan, milestones: [...plan.milestones, milestone] }
             : plan
         );
@@ -483,8 +483,7 @@ export default function PlansPage() {
         // 如果是第一次创建小目标，成就逻辑在后端API处理
         // 前端只需要更新UI状态
 
-        setShowAddMilestone(false);
-        setMilestoneTargetPlanId(null);
+        return true;
       } else {
         alert('添加小目标失败，请重试');
       }
@@ -492,6 +491,7 @@ export default function PlansPage() {
       console.error('添加小目标失败:', error);
       alert('添加小目标失败，请重试');
     }
+    return false;
   };
 
   // 认证检查
@@ -647,13 +647,22 @@ export default function PlansPage() {
       />
 
       {/* 添加小目标弹窗 */}
-      <AddMilestoneModal
+      <GoalInputModal
         visible={showAddMilestone}
+        userId={session?.user?.id}
+        title="添加小目标"
+        placeholder="输入小目标"
         onClose={() => {
           setShowAddMilestone(false);
           setMilestoneTargetPlanId(null);
         }}
-        onSave={handleAddMilestone}
+        onConfirm={async (goalTitle) => {
+          const success = await handleAddMilestone(goalTitle);
+          if (success) {
+            setShowAddMilestone(false);
+            setMilestoneTargetPlanId(null);
+          }
+        }}
       />
 
       {/* 编辑计划弹窗 */}
@@ -692,7 +701,7 @@ export default function PlansPage() {
           }}
           onSave={handleSaveMilestones}
           onDelete={handleDeleteMilestone}
-          onAdd={handleAddMilestone}
+          onRequestAdd={handleOpenAddMilestone}
         />
       )}
 

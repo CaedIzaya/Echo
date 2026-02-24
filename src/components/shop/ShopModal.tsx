@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ShopItem } from '~/pages/api/shop/items';
 import { getCurrentTheme, setTheme, ThemeType } from '~/lib/themeSystem';
+import { trackEvent } from '~/lib/analytics';
 
 interface ShopModalProps {
   isOpen: boolean;
@@ -18,6 +19,12 @@ export default function ShopModal({ isOpen, onClose }: ShopModalProps) {
 
   useEffect(() => {
     if (isOpen) {
+      trackEvent({
+        name: 'shop_open',
+        feature: 'shop',
+        page: '/dashboard',
+        action: 'open',
+      });
       loadData();
     }
   }, [isOpen]);
@@ -479,7 +486,6 @@ export default function ShopModal({ isOpen, onClose }: ShopModalProps) {
     </div>
   );
 }
-
 
 
 

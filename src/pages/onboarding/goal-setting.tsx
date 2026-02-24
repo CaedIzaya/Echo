@@ -42,10 +42,6 @@ enum FormStep {
   Date = 'DATE',
 }
 
-// 分支建议（暂时为空，后续会从数据库获取）
-// 即使为空，也会显示5个空泡泡
-const BRANCH_SUGGESTIONS: string[] = [];
-
 // 里程碑提示（中文）
 const MILESTONE_HINTS = [
   { label: '小步骤', delay: '0s' },
@@ -56,14 +52,90 @@ const MILESTONE_HINTS = [
 // 时间选项
 const TIME_OPTIONS = [15, 30, 45, 60];
 
-// 通用精进分支建议（当用户手动输入分支时使用）
-const GENERIC_DETAIL_SUGGESTIONS = [
-  '基础入门',
-  '进阶技巧',
-  '实战演练',
-  '理论学习',
-  '创意实践',
-];
+// 兜底兴趣方向与分支（可直接作为计划使用）
+const FALLBACK_INTEREST_POOLS = [
+  {
+    key: 'fitness',
+    label: '健身训练',
+    details: ['力量训练', '跑步耐力', '减脂计划', '拉伸体态', '居家自重'],
+  },
+  {
+    key: 'english',
+    label: '英语提升',
+    details: ['日常口语', '听力精听', '词汇积累', '阅读理解', '写作表达'],
+  },
+  {
+    key: 'photo',
+    label: '摄影修图',
+    details: ['手机摄影', '人像构图', '风景拍摄', 'Lightroom 调色', '短片剪辑'],
+  },
+  {
+    key: 'video',
+    label: '短视频创作',
+    details: ['选题策划', '脚本撰写', '拍摄运镜', '剪辑节奏', '封面标题优化'],
+  },
+  {
+    key: 'cooking',
+    label: '烹饪轻食',
+    details: ['家常快手菜', '低脂轻食', '烘焙入门', '汤品炖煮', '一周备餐'],
+  },
+] as const;
+
+const normalizeText = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '');
+
+const pickRandomItems = <T,>(items: readonly T[], count: number): T[] => {
+  const cloned = [...items];
+  for (let i = cloned.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cloned[i], cloned[j]] = [cloned[j], cloned[i]];
+  }
+  return cloned.slice(0, Math.min(count, cloned.length));
+};
+
+const matchFallbackPoolFromInput = (input: string) => {
+  const normalizedInput = normalizeText(input);
+  if (!normalizedInput) return undefined;
+
+  return FALLBACK_INTEREST_POOLS.find((pool) => {
+    const candidates = [pool.label, pool.key, ...pool.details].map(normalizeText);
+    return candidates.some(
+      (candidate) =>
+        candidate === normalizedInput ||
+        candidate.includes(normalizedInput) ||
+        normalizedInput.includes(candidate)
+    );
+  });
+};
+
+const matchCategoryFromInput = (
+  domain: InterestDomain | undefined,
+  input: string
+): InterestCategory | undefined => {
+  if (!domain || !input.trim()) return undefined;
+  const normalizedInput = normalizeText(input);
+  if (!normalizedInput) return undefined;
+
+  return domain.categories.find((category) => {
+    const candidates = [
+      category.label,
+      category.key,
+      category.id,
+      ...category.items.map((item) => item.name),
+      ...category.items.flatMap((item) => item.tags ?? []),
+    ].map(normalizeText);
+
+    return candidates.some(
+      (candidate) =>
+        candidate === normalizedInput ||
+        candidate.includes(normalizedInput) ||
+        normalizedInput.includes(candidate)
+    );
+  });
+};
 
 export default function GoalSetting() {
   const router = useRouter();
@@ -110,6 +182,64 @@ export default function GoalSetting() {
     if (!selectedCategory || !selectedDetailItemId) return undefined;
     return selectedCategory.items.find((i) => i.id === selectedDetailItemId);
   }, [selectedCategory, selectedDetailItemId]);
+
+  // 当用户手动输入一级方向时，尝试匹配预设 category（例如：输入 FPS）
+  const matchedCategoryFromInput: InterestCategory | undefined = useMemo(() => {
+    if (selectedCategory) return selectedCategory;
+    return matchCategoryFromInput(interestDomain, formData.focusBranch);
+  }, [selectedCategory, interestDomain, formData.focusBranch]);
+
+  const selectedFallbackPool = useMemo(() => {
+    if (!selectedBranchCategoryKey?.startsWith('fallback_')) return undefined;
+    const poolKey = selectedBranchCategoryKey.replace('fallback_', '');
+    return FALLBACK_INTEREST_POOLS.find((pool) => pool.key === poolKey);
+  }, [selectedBranchCategoryKey]);
+
+  const matchedFallbackPoolFromInput = useMemo(
+    () => matchFallbackPoolFromInput(formData.focusBranch),
+    [formData.focusBranch]
+  );
+
+  // 分支页展示的 5 个方向泡泡
+  const branchSuggestions: InterestCategory[] = useMemo(() => {
+    const categories = interestDomain?.categories ?? [];
+    if (categories.length > 0) {
+      return categories.slice(0, 5);
+    }
+
+    return FALLBACK_INTEREST_POOLS.map((pool, index) => ({
+      id: `fallback_direction_${pool.key}`,
+      key: `fallback_${pool.key}`,
+      label: pool.label,
+      order: index + 1,
+      items: [],
+    }));
+  }, [interestDomain]);
+
+  // 详细分支页展示的 5 个分支泡泡
+  const detailBubbleSuggestions = useMemo(() => {
+    const matchedItems = matchedCategoryFromInput?.items ?? [];
+    if (matchedItems.length > 0) {
+      return {
+        suggestions: pickRandomItems(matchedItems, 5).map((item) => ({
+          label: item.name,
+          itemId: item.id,
+        })),
+      };
+    }
+
+    const fallbackPool =
+      selectedFallbackPool ||
+      matchedFallbackPoolFromInput ||
+      pickRandomItems(FALLBACK_INTEREST_POOLS as unknown as Array<(typeof FALLBACK_INTEREST_POOLS)[number]>, 1)[0];
+
+    return {
+      suggestions: pickRandomItems(fallbackPool?.details ?? [], 5).map((label) => ({
+        label,
+        itemId: null as string | null,
+      })),
+    };
+  }, [matchedCategoryFromInput, selectedFallbackPool, matchedFallbackPoolFromInput]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -163,7 +293,7 @@ export default function GoalSetting() {
             setFormData((prev) => ({
               ...prev,
               focusBranch: planToEdit.focusBranch || '',
-              // 编辑模式下目前没有单独存 focusDetail，就保持原值
+              focusDetail: planToEdit.focusDetail || '',
               firstMilestone: planToEdit.milestones?.[0]?.title || '',
               projectName: planToEdit.name || `我为${interest.name}而投资`,
               dailyMinTime: planToEdit.dailyGoalMinutes || 30,
@@ -212,19 +342,10 @@ export default function GoalSetting() {
     setSelectedDetailItemId(null);
   };
 
-  // 处理从泡泡选择具体分支（Item）
-  const handleDetailSelectFromBubble = (item: InterestItem) => {
-    if (!item) return;
-    setFormData(prev => ({ ...prev, focusDetail: item.name }));
-    setSelectedDetailFromBubble(true);
-    setSelectedDetailItemId(item.id);
-  };
-
   const handleNext = () => {
     // 验证当前步骤
     if (currentStep === FormStep.Branch && !formData.focusBranch.trim()) return;
-    if (currentStep === FormStep.DetailBranch && !formData.focusDetail.trim()) return;
-    if (currentStep === FormStep.Milestone && !formData.firstMilestone.trim()) return;
+    // DetailBranch 标注为“可跳过”，允许空值直接下一步
     if (currentStep === FormStep.Name && !formData.projectName.trim()) return;
     if (currentStep === FormStep.Time && !formData.dailyMinTime) return;
     
@@ -236,7 +357,9 @@ export default function GoalSetting() {
     if (steps[currentIndex + 1] === FormStep.Name) {
       setFormData(prev => ({
         ...prev,
-        projectName: `${prev.focusBranch} 专注计划：${prev.focusDetail}`
+        projectName: prev.focusDetail.trim()
+          ? `${prev.focusBranch} 专注计划：${prev.focusDetail}`
+          : `${prev.focusBranch} 专注计划`
       }));
     }
 
@@ -291,7 +414,7 @@ export default function GoalSetting() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.projectName || (!isEditMode && !formData.firstMilestone)) {
+    if (!formData.projectName.trim()) {
       return;
     }
 
@@ -307,16 +430,17 @@ export default function GoalSetting() {
         id: Date.now().toString(),
         name: formData.projectName,
         focusBranch: formData.focusBranch || focusedInterest?.name || '',
-        // 注意：这里没有保存 focusDetail 到数据库，因为它被合并到了 projectName 中
-        // 或者我们可以考虑拼接到 focusBranch 中，例如： `${formData.focusBranch} - ${formData.focusDetail}`
+        focusDetail: formData.focusDetail.trim(),
         icon: focusedInterest?.icon || '📝',
         dailyGoalMinutes: formData.dailyMinTime,
-        milestones: isEditMode ? [] : [{
-          id: `milestone-${Date.now()}`,
-          title: formData.firstMilestone,
-          isCompleted: false,
-          order: 1
-        }],
+        milestones: !isEditMode && formData.firstMilestone.trim()
+          ? [{
+              id: `milestone-${Date.now()}`,
+              title: formData.firstMilestone.trim(),
+              isCompleted: false,
+              order: 1
+            }]
+          : [],
         isActive: true,
         isPrimary: false,
         isCompleted: false
@@ -325,14 +449,23 @@ export default function GoalSetting() {
       const existingPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
       let isFirstPlanEver = false;
       
-      if (isEditMode && editPlanId) {
+      if (isEditMode) {
+        if (!editPlanId) {
+          alert('编辑失败：缺少计划ID');
+          setIsSubmitting(false);
+          return;
+        }
+
         const planIndex = existingPlans.findIndex((p: any) => p.id === editPlanId);
-        if (planIndex !== -1) {
-          const existingPlan = existingPlans[planIndex];
+        const existingPlan = planIndex !== -1 ? existingPlans[planIndex] : null;
+
+        // 编辑模式：本地先就地更新，避免新增条目
+        if (existingPlan && planIndex !== -1) {
           existingPlans[planIndex] = {
             ...existingPlan,
             name: formData.projectName,
             focusBranch: formData.focusBranch || focusedInterest?.name || '',
+            focusDetail: formData.focusDetail.trim(),
             dailyGoalMinutes: formData.dailyMinTime,
             icon: focusedInterest?.icon || existingPlan.icon,
             milestones: existingPlan.milestones || [],
@@ -359,6 +492,7 @@ export default function GoalSetting() {
                 id: `blank_${Date.now()}_${index}`,
                 name: `我为${interest.name}而投资`,
                 focusBranch: interest.name,
+                focusDetail: '',
                 icon: interest.icon,
                 dailyGoalMinutes: 30,
                 milestones: [],
@@ -372,14 +506,53 @@ export default function GoalSetting() {
         }
       }
 
-      // 🔥 保存到数据库（关键修复）
-      try {
+      // 保存到数据库
+      if (isEditMode && editPlanId) {
+        console.log('✏️ 更新计划到数据库', { id: editPlanId, name: formData.projectName });
+
+        const response = await fetch(`/api/projects/${editPlanId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.projectName,
+            description: formData.focusBranch || focusedInterest?.name || '',
+            focusDetail: formData.focusDetail.trim(),
+            icon: focusedInterest?.icon || '📝',
+            dailyGoalMinutes: formData.dailyMinTime,
+            targetDate: formData.targetDate || null,
+            isActive: true,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`更新计划失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const planIndex = existingPlans.findIndex((p: any) => p.id === editPlanId);
+        const normalizedUpdatedPlan = {
+          ...(planIndex !== -1 ? existingPlans[planIndex] : {}),
+          id: data.project.id,
+          name: data.project.name,
+          focusBranch: data.project.description || formData.focusBranch,
+          focusDetail: data.project.focusDetail || formData.focusDetail.trim(),
+          icon: data.project.icon || focusedInterest?.icon || '📝',
+          dailyGoalMinutes: data.project.dailyGoalMinutes || formData.dailyMinTime,
+          milestones: data.project.milestones || [],
+          isBlank: false
+        };
+        if (planIndex !== -1) {
+          existingPlans[planIndex] = normalizedUpdatedPlan;
+        } else {
+          existingPlans.push(normalizedUpdatedPlan);
+        }
+      } else {
         console.log('💾 保存计划到数据库', {
           name: newPlan.name,
           isPrimary: newPlan.isPrimary,
           milestones: newPlan.milestones?.length || 0,
         });
-        
+
         const response = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -387,6 +560,7 @@ export default function GoalSetting() {
             id: newPlan.id, // 保留本地生成的ID
             name: newPlan.name,
             description: newPlan.focusBranch,
+            focusDetail: newPlan.focusDetail,
             icon: newPlan.icon,
             dailyGoalMinutes: newPlan.dailyGoalMinutes,
             targetDate: formData.targetDate || null,
@@ -401,21 +575,20 @@ export default function GoalSetting() {
             })),
           }),
         });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('✅ 计划已保存到数据库', data.project.id);
-          
-          // 更新本地数据为数据库返回的数据（包含数据库生成的ID）
-          newPlan.id = data.project.id;
-          if (newPlan.milestones) {
-            newPlan.milestones = data.project.milestones;
-          }
-        } else {
-          console.error('❌ 保存计划失败', response.status);
+
+        if (!response.ok) {
+          throw new Error(`创建计划失败: ${response.status}`);
         }
-      } catch (error) {
-        console.error('❌ 保存计划网络错误', error);
+
+        const data = await response.json();
+        console.log('✅ 计划已保存到数据库', data.project.id);
+
+        // 更新本地数据为数据库返回的数据（包含数据库生成的ID）
+        newPlan.id = data.project.id;
+        newPlan.focusDetail = data.project.focusDetail || newPlan.focusDetail;
+        if (newPlan.milestones) {
+          newPlan.milestones = data.project.milestones;
+        }
       }
       
       // 保存到用户隔离的localStorage（缓存）
@@ -487,9 +660,6 @@ export default function GoalSetting() {
 
   // 渲染分支选择页面
   const renderBranch = () => {
-    // 从 interestConfig 中读取当前兴趣域下的 5 个方向（Category）
-    const branchCategories: InterestCategory[] = interestDomain?.categories ?? [];
-
     // 非规则但仍保持平衡的布局：左3右2，带有横纵双向位移
     const bubbleLayouts = [
       { index: 0, side: 'left', offsetX: -35, offsetY: -110 }, // 左上外扩
@@ -513,7 +683,7 @@ export default function GoalSetting() {
           {/* 左侧3个泡泡 - 非规则排列 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {leftBubbles.map((layout) => {
-              const category = branchCategories[layout.index];
+              const category = branchSuggestions[layout.index];
               const suggestion = category?.label || '';
               // 只有当从泡泡选择且值匹配时才高亮
               const isSelected =
@@ -580,7 +750,7 @@ export default function GoalSetting() {
           {/* 右侧2个泡泡 - 非规则排列 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {rightBubbles.map((layout) => {
-              const category = branchCategories[layout.index];
+              const category = branchSuggestions[layout.index];
               const suggestion = category?.label || '';
               // 只有当从泡泡选择且值匹配时才高亮
               const isSelected =
@@ -636,9 +806,9 @@ export default function GoalSetting() {
         {/* 移动端布局 */}
         <div className="md:hidden w-full flex flex-col items-center">
           {/* 移动端选项列表 */}
-          {branchCategories.length > 0 && (
+          {branchSuggestions.length > 0 && (
             <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {branchCategories.map((category, i) => {
+              {branchSuggestions.map((category, i) => {
                 const suggestion = category.label;
                 // 只有当从泡泡选择且值匹配时才高亮
                 const isSelected =
@@ -696,15 +866,7 @@ export default function GoalSetting() {
 
   // 渲染详细分支选择页面 (页面B)
   const renderDetailBranch = () => {
-    // 在已选方向下，从 interestConfig 中读取 5 个具体分支（Item）
-    // 如果用户手动输入了分支（没有从泡泡选择），则使用通用建议
-    const detailItems: InterestItem[] = selectedCategory?.items ?? [];
-    const isUsingGenericSuggestions = detailItems.length === 0;
-    
-    // 如果没有配置的分支，使用通用建议
-    const displaySuggestions = isUsingGenericSuggestions 
-      ? GENERIC_DETAIL_SUGGESTIONS 
-      : detailItems.map(item => item.name);
+    const displaySuggestions = detailBubbleSuggestions.suggestions;
 
     // 复用气泡布局
     const bubbleLayouts = [
@@ -729,21 +891,22 @@ export default function GoalSetting() {
           {/* 左侧3个泡泡 - 使用配置的具体分支或通用建议 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {leftBubbles.map((layout) => {
-              const item = detailItems[layout.index];
-              const suggestion = displaySuggestions[layout.index] || '';
-              const label = isUsingGenericSuggestions ? suggestion : (item?.name || '');
-              const isSelected = !isUsingGenericSuggestions && !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
+              const suggestion = displaySuggestions[layout.index];
+              const label = suggestion?.label || '';
+              const isSelected =
+                selectedDetailFromBubble &&
+                (suggestion?.itemId
+                  ? selectedDetailItemId === suggestion.itemId
+                  : formData.focusDetail === label);
 
               return (
                 <button
                   key={layout.index}
                   onClick={() => {
-                    if (isUsingGenericSuggestions && suggestion) {
-                      // 使用通用建议
-                      setFormData(prev => ({ ...prev, focusDetail: suggestion }));
-                    } else if (item) {
-                      handleDetailSelectFromBubble(item);
-                    }
+                    if (!suggestion?.label) return;
+                    setFormData(prev => ({ ...prev, focusDetail: suggestion.label }));
+                    setSelectedDetailFromBubble(true);
+                    setSelectedDetailItemId(suggestion.itemId);
                   }}
                   disabled={!label}
                   style={{
@@ -791,21 +954,22 @@ export default function GoalSetting() {
           {/* 右侧2个泡泡 - 使用配置的具体分支或通用建议 */}
           <div className="relative flex-shrink-0 w-32 lg:w-36 h-[440px] flex items-center justify-center">
             {rightBubbles.map((layout) => {
-              const item = detailItems[layout.index];
-              const suggestion = displaySuggestions[layout.index] || '';
-              const label = isUsingGenericSuggestions ? suggestion : (item?.name || '');
-              const isSelected = !isUsingGenericSuggestions && !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
+              const suggestion = displaySuggestions[layout.index];
+              const label = suggestion?.label || '';
+              const isSelected =
+                selectedDetailFromBubble &&
+                (suggestion?.itemId
+                  ? selectedDetailItemId === suggestion.itemId
+                  : formData.focusDetail === label);
 
               return (
                 <button
                   key={layout.index}
                   onClick={() => {
-                    if (isUsingGenericSuggestions && suggestion) {
-                      // 使用通用建议
-                      setFormData(prev => ({ ...prev, focusDetail: suggestion }));
-                    } else if (item) {
-                      handleDetailSelectFromBubble(item);
-                    }
+                    if (!suggestion?.label) return;
+                    setFormData(prev => ({ ...prev, focusDetail: suggestion.label }));
+                    setSelectedDetailFromBubble(true);
+                    setSelectedDetailItemId(suggestion.itemId);
                   }}
                   disabled={!label}
                   style={{
@@ -844,18 +1008,20 @@ export default function GoalSetting() {
           {/* 移动端：显示泡泡建议（配置的或通用的） */}
           {displaySuggestions.length > 0 && (
             <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {displaySuggestions.map((suggestionText, i) => {
-                const item = isUsingGenericSuggestions ? null : detailItems[i];
-                const isSelected = !isUsingGenericSuggestions && !!item && selectedDetailFromBubble && selectedDetailItemId === item.id;
+              {displaySuggestions.map((suggestion, i) => {
+                const suggestionText = suggestion.label;
+                const isSelected =
+                  selectedDetailFromBubble &&
+                  (suggestion.itemId
+                    ? selectedDetailItemId === suggestion.itemId
+                    : formData.focusDetail === suggestionText);
                 return (
                   <button
-                    key={item?.id || `generic-${i}`}
+                    key={`detail-${i}-${suggestionText}`}
                     onClick={() => {
-                      if (isUsingGenericSuggestions) {
-                        setFormData(prev => ({ ...prev, focusDetail: suggestionText }));
-                      } else if (item) {
-                        handleDetailSelectFromBubble(item);
-                      }
+                      setFormData(prev => ({ ...prev, focusDetail: suggestionText }));
+                      setSelectedDetailFromBubble(true);
+                      setSelectedDetailItemId(suggestion.itemId);
                     }}
                     style={{
                       animationDelay: `${i * 0.1}s`,
@@ -904,7 +1070,7 @@ export default function GoalSetting() {
     return (
       <div className="relative w-full max-w-5xl mx-auto flex flex-col items-center">
         <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
-          让我们来设置第一个里程碑吧！
+          让我们来设置第一个小目标吧！（可跳过）
         </h2>
 
         <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 min-h-[300px]">
@@ -1123,9 +1289,9 @@ export default function GoalSetting() {
       case FormStep.Branch:
         return formData.focusBranch.trim().length > 0;
       case FormStep.DetailBranch:
-        return formData.focusDetail.trim().length > 0;
+        return true; // 该步骤可跳过
       case FormStep.Milestone:
-        return formData.firstMilestone.trim().length > 0;
+        return true; // 该步骤可跳过
       case FormStep.Name:
         return formData.projectName.trim().length > 0;
       case FormStep.Time:

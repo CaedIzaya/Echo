@@ -1,16 +1,15 @@
 import { db } from "~/server/db";
 import type { WeeklyReport } from "@prisma/client";
-import { LevelManager } from "~/lib/LevelSystem";
-import { expToNextLevel } from "~/lib/HeartTreeExpSystem";
 
-const WEEKLY_REPORT_TTL_DAYS = 84; // 12 周（保留更长时间确保对比数据不丢失）
+const WEEKLY_REPORT_TTL_DAYS = 84; // 12 周
 const ANCHORED_REPORT_DAYS = 7;
 
-export type DailyPoint = {
-  date: string; // YYYY-MM-DD
-  minutes: number;
-  flowIndex: number | null;
-  note: string | null;
+type TimeBucket = "清晨" | "上午" | "下午" | "夜晚";
+
+type WeeklySnippet = {
+  id: string;
+  content: string;
+  dateLabel?: string;
 };
 
 export type WeeklyReportPayload = {
@@ -24,29 +23,20 @@ export type WeeklyReportPayload = {
     name?: string | null;
     image?: string | null;
   };
-  totals: {
-    minutes: number;
-    prevWeekMinutes: number;
-    wowChange: number | null;
-    streakDays: number;
-    prevWeekStreakDays: number;
-    isNewStreakRecord: boolean;
-    flowAvg: number | null;
-    flowDelta: number | null;
-    expTotal: number;
-    treeExp: number | null;
-    selfExp: number | null;
-    userLevelUp: number;
-    heartTreeLevelUp: number;
+  cover: {
+    rhythmTitle: string;
+    subtitle: string;
   };
-  bestDay?: {
-    date: string;
-    minutes: number;
-    note: string | null;
+  presence: {
+    daysPresent: number;
+    totalMinutes: number;
+    totalHours: number;
+    peakTime: TimeBucket;
+    narrativeDayLabel: string | null;
+    narrative: string;
   };
-  daily: DailyPoint[];
-  summaries: { date: string; text: string }[];
-  completedMilestones: { title: string; projectName: string; completedAt: string }[];
+  snippets: WeeklySnippet[];
+  closingNote: string;
   generatedAt: string;
 };
 
@@ -121,14 +111,9 @@ export async function computeWeeklyReport(
     ? getAnchoredWeekRange(options.periodStart)
     : getWeekRange(referenceDate);
 
-  const prevStart = new Date(weekStart);
-  prevStart.setDate(prevStart.getDate() - 7);
-  const prevEnd = new Date(weekStart);
-  prevEnd.setMilliseconds(-1);
-
   const weekDates = getWeekDates(weekStart);
 
-  const [user, sessions, prevSessions, summaries, lastSummaries, completedMilestones] =
+  const [user, sessions] =
     await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
       db.focusSession.findMany({
@@ -136,48 +121,15 @@ export async function computeWeeklyReport(
         select: {
           startTime: true,
           duration: true,
-          flowIndex: true,
-          rating: true,
-          expEarned: true,
+          hadDistraction: true,
+          hadTabHide: true,
+          hadIdle: true,
+          hadRapidSwitch: true,
+          resumeCount: true,
+          timeBucket: true,
+          startHourBucket: true,
+          sessionLengthBucket: true,
         },
-      }),
-      db.focusSession.findMany({
-        where: { userId, startTime: { gte: prevStart, lte: prevEnd } },
-        select: {
-          startTime: true,
-          duration: true,
-          flowIndex: true,
-          rating: true,
-          expEarned: true,
-        },
-      }),
-      db.dailySummary.findMany({
-        where: { userId, date: { in: weekDates } },
-        select: { date: true, text: true },
-      }),
-      db.dailySummary.findMany({
-        where: { userId },
-        orderBy: { date: "desc" },
-        take: 10,  // 🔥 增加到10条，确保上周数据能完整保存
-        select: { date: true, text: true },
-      }),
-      // 🔥 查询本周完成的小目标
-      db.milestone.findMany({
-        where: {
-          project: { userId },
-          isCompleted: true,
-          updatedAt: { gte: weekStart, lte: weekEnd },
-        },
-        select: {
-          title: true,
-          updatedAt: true,
-          project: {
-            select: {
-              name: true,
-            },
-          },
-        },
-        orderBy: { updatedAt: 'desc' },
       }),
     ]);
 
@@ -202,77 +154,43 @@ export async function computeWeeklyReport(
     }
   }
 
-  // 🔥 详细的数据验证日志（包括日期区间）
-  console.log(`[computeWeeklyReport] ==================== 周报数据生成 ====================`);
-  console.log(`[computeWeeklyReport] 用户ID: ${userId}`);
-  console.log(`[computeWeeklyReport] 📅 周期范围（用户本地时区）:`);
-  console.log(`[computeWeeklyReport]    开始: ${formatDateKey(weekStart)} (周一)`);
-  console.log(`[computeWeeklyReport]    结束: ${formatDateKey(weekEnd)} (周日)`);
-  console.log(`[computeWeeklyReport]    标签: ${formatLabel(weekStart, weekEnd)}`);
-  console.log(`[computeWeeklyReport] 📊 数据统计:`);
-  console.log(`[computeWeeklyReport]    本周专注记录: ${sessions.length} 条`);
-  console.log(`[computeWeeklyReport]    上周专注记录: ${prevSessions.length} 条`);
-  console.log(`[computeWeeklyReport]    每日小结: ${summaries.length} 条`);
-  console.log(`[computeWeeklyReport] 📆 7天日期列表:`, weekDates);
-
-  const summaryMap = new Map<string, string>();
-  summaries.forEach((s) => summaryMap.set(s.date, s.text));
-
   const daily = weekDates.map((date) => {
-    const daySessions = sessions.filter(
-      (s) => formatDateKey(s.startTime) === date,
-    );
-    const minutes = daySessions.reduce((sum, s) => sum + (s.duration ?? 0), 0);
-    const flowAvg =
-      daySessions.length > 0
-        ? Math.round(
-            daySessions.reduce(
-              (sum, s) => sum + (s.flowIndex ?? s.rating ?? 0),
-              0,
-            ) / daySessions.length,
-          )
-        : null;
-    
-    // 🔥 每日数据日志
-    if (minutes > 0 || flowAvg !== null) {
-      console.log(`[computeWeeklyReport]    ${date}: ${minutes}分钟, 心流${flowAvg || 'N/A'}`);
-    }
-    
+    const daySessions = sessions.filter((s) => formatDateKey(s.startTime) === date);
     return {
       date,
-      minutes,
-      flowIndex: flowAvg ?? null,
-      note: summaryMap.get(date) ?? null,
+      sessionCount: daySessions.length,
+      minutes: daySessions.reduce((sum, s) => sum + (s.duration ?? 0), 0),
+      resumeCount: daySessions.reduce((sum, s) => sum + (s.resumeCount ?? 0), 0),
     };
   });
-  
-  console.log(`[computeWeeklyReport] ========================================================`);
 
-  const totals = calcTotals(sessions);
-  const prevTotals = calcTotals(prevSessions);
-  const prevWeekMinutes = prevTotals.minutes;
-  const wowChange =
-    prevTotals.minutes > 0
-      ? (totals.minutes - prevTotals.minutes) / prevTotals.minutes
-      : undefined;
-  const flowDelta =
-    prevTotals.flowAvg && totals.flowAvg
-      ? totals.flowAvg - prevTotals.flowAvg
-      : undefined;
-
-  const bestDay = daily.reduce(
-    (acc, cur) => (cur.minutes > (acc?.minutes ?? 0) ? cur : acc),
-    undefined as DailyPoint | undefined,
+  const totalMinutes = daily.reduce((sum, d) => sum + d.minutes, 0);
+  const daysPresent = daily.filter((d) => d.minutes > 0).length;
+  const totalResumeCount = sessions.reduce((sum, s) => sum + (s.resumeCount ?? 0), 0);
+  const distractionCount = sessions.reduce(
+    (sum, s) => sum + ((s.hadDistraction || s.hadTabHide || s.hadIdle || s.hadRapidSwitch) ? 1 : 0),
+    0,
   );
-
-  const streakDays = calcStreak(daily);
-  const prevWeekDaily = buildDailyFromSessions(prevSessions, prevStart);
-  const prevWeekStreakDays = calcStreak(prevWeekDaily);
-  const isNewStreakRecord =
-    streakDays > 0 && streakDays > prevWeekStreakDays;
-  const { treeExp, selfExp } = splitExp(totals.expTotal ?? 0);
-  const userLevelUp = calcUserLevelUpFromWeeklyExp(selfExp);
-  const heartTreeLevelUp = calcHeartTreeLevelUpFromWeeklyExp(treeExp);
+  const peakTime = getPeakTimeBucket(sessions);
+  const rhythmTitle = deriveRhythmTitle({
+    daysPresent,
+    totalMinutes,
+    peakTime,
+    totalResumeCount,
+    sessionCount: sessions.length,
+  });
+  const rhythmSubtitle = buildCoverSubtitle(daysPresent, totalMinutes);
+  const narrativeDay = pickNarrativeDay(daily, peakTime);
+  const snippets = buildSnippets({
+    sessions,
+    daily,
+    daysPresent,
+    totalMinutes,
+    peakTime,
+    totalResumeCount,
+    distractionCount,
+  });
+  const closingNote = buildClosingNote(daysPresent, totalMinutes);
 
   const payload: WeeklyReportPayload = {
     period: {
@@ -285,36 +203,22 @@ export async function computeWeeklyReport(
       name: user?.name ?? null,
       image: user?.image ?? null,
     },
-    totals: {
-      minutes: totals.minutes,
-      prevWeekMinutes,
-      wowChange: wowChange ?? null,
-      streakDays,
-      prevWeekStreakDays,
-      isNewStreakRecord,
-      flowAvg: totals.flowAvg ?? null,
-      flowDelta: flowDelta ?? null,
-      expTotal: totals.expTotal ?? 0,
-      treeExp,
-      selfExp,
-      userLevelUp,
-      heartTreeLevelUp,
+    cover: {
+      rhythmTitle,
+      subtitle: rhythmSubtitle,
     },
-    bestDay:
-      bestDay && bestDay.minutes > 0
-        ? {
-            date: bestDay.date,
-            minutes: bestDay.minutes,
-            note: bestDay.note ?? null,
-          }
-        : undefined,
-    daily,
-    summaries: lastSummaries.map((s) => ({ date: s.date, text: s.text })),
-    completedMilestones: completedMilestones.map((m) => ({
-      title: m.title,
-      projectName: m.project.name,
-      completedAt: m.updatedAt.toISOString(),
-    })),
+    presence: {
+      daysPresent,
+      totalMinutes,
+      totalHours: roundTo1(totalMinutes / 60),
+      peakTime,
+      narrativeDayLabel: narrativeDay?.label ?? null,
+      narrative:
+        narrativeDay?.sentence ??
+        "这一周你在自己的节奏里出现过几次，Echo 都记得。",
+    },
+    snippets,
+    closingNote,
     generatedAt: new Date().toISOString(),
   };
 
@@ -323,53 +227,6 @@ export async function computeWeeklyReport(
   }
 
   return payload;
-}
-
-function buildDailyFromSessions(
-  sessions: { startTime: Date; duration: number | null; flowIndex: number | null; rating: number | null }[],
-  weekStart: Date,
-): DailyPoint[] {
-  const weekDates = getWeekDates(weekStart);
-  return weekDates.map((date) => {
-    const daySessions = sessions.filter((s) => formatDateKey(s.startTime) === date);
-    const minutes = daySessions.reduce((sum, s) => sum + (s.duration ?? 0), 0);
-    const flowAvg =
-      daySessions.length > 0
-        ? Math.round(
-            daySessions.reduce(
-              (sum, s) => sum + (s.flowIndex ?? s.rating ?? 0),
-              0,
-            ) / daySessions.length,
-          )
-        : null;
-    return { date, minutes, flowIndex: flowAvg ?? null, note: null };
-  });
-}
-
-function calcUserLevelUpFromWeeklyExp(exp: number | null) {
-  const total = exp ?? 0;
-  if (total <= 0) return 0;
-  // SSR 侧无法可靠获取“历史总 EXP”，这里用保守规则：按 Lv1 的经验门槛估算本周可提升的等级数
-  const perLevel = LevelManager.getExpRequiredForLevel(1);
-  return Math.max(0, Math.floor(total / perLevel));
-}
-
-function calcHeartTreeLevelUpFromWeeklyExp(exp: number | null) {
-  const total = exp ?? 0;
-  if (total <= 0) return 0;
-  // 同理：以 Lv1 开始逐级扣除，估算本周心树提升等级数（V1 心树等级上限较低，估算结果直观）
-  let level = 1;
-  let remaining = total;
-  let ups = 0;
-  while (level < 10) {
-    const need = expToNextLevel(level);
-    if (!Number.isFinite(need)) break;
-    if (remaining < need) break;
-    remaining -= need;
-    level += 1;
-    ups += 1;
-  }
-  return ups;
 }
 
 async function persistWeekly(
@@ -388,14 +245,14 @@ async function persistWeekly(
       where: { userId_weekStart: { userId, weekStart } },
       update: {
         weekEnd,
-        totalMinutes: payload.totals.minutes,
-        wowChange: payload.totals.wowChange,
-        streakDays: payload.totals.streakDays,
-        bestDay: payload.bestDay ? new Date(payload.bestDay.date) : null,
-        bestDayNote: payload.bestDay?.note,
-        flowAvg: payload.totals.flowAvg,
-        flowDelta: payload.totals.flowDelta,
-        expTotal: payload.totals.expTotal,
+        totalMinutes: payload.presence.totalMinutes,
+        wowChange: null,
+        streakDays: payload.presence.daysPresent,
+        bestDay: null,
+        bestDayNote: payload.presence.narrative,
+        flowAvg: null,
+        flowDelta: null,
+        expTotal: null,
         payloadJson: payload,
         expiresAt,
         updatedAt: new Date(),
@@ -404,14 +261,14 @@ async function persistWeekly(
         userId,
         weekStart,
         weekEnd,
-        totalMinutes: payload.totals.minutes,
-        wowChange: payload.totals.wowChange,
-        streakDays: payload.totals.streakDays,
-        bestDay: payload.bestDay ? new Date(payload.bestDay.date) : null,
-        bestDayNote: payload.bestDay?.note,
-        flowAvg: payload.totals.flowAvg,
-        flowDelta: payload.totals.flowDelta,
-        expTotal: payload.totals.expTotal,
+        totalMinutes: payload.presence.totalMinutes,
+        wowChange: null,
+        streakDays: payload.presence.daysPresent,
+        bestDay: null,
+        bestDayNote: payload.presence.narrative,
+        flowAvg: null,
+        flowDelta: null,
+        expTotal: null,
         payloadJson: payload,
         expiresAt,
       },
@@ -430,47 +287,170 @@ async function persistWeekly(
   }
 }
 
-function calcTotals(
-  sessions: {
-    duration: number | null;
-    flowIndex: number | null;
-    rating: number | null;
-    expEarned: number | null;
-  }[],
-) {
-  const minutes = sessions.reduce((sum, s) => sum + (s.duration ?? 0), 0);
-  const flowSum = sessions.reduce(
-    (sum, s) => sum + (s.flowIndex ?? s.rating ?? 0),
-    0,
-  );
-  const flowAvg =
-    sessions.length > 0 ? Math.round(flowSum / sessions.length) : null;
-  const expTotal = sessions.reduce((sum, s) => sum + (s.expEarned ?? 0), 0);
-  return { minutes, flowAvg, expTotal };
-}
-
-function calcStreak(daily: DailyPoint[]) {
-  let streak = 0;
-  daily.forEach((d) => {
-    if (d.minutes > 0) {
-      streak += 1;
-    } else {
-      streak = 0;
-    }
-  });
-  return streak;
-}
-
-function splitExp(total: number) {
-  const treeExp = Math.round(total * 0.6);
-  const selfExp = total - treeExp;
-  return { treeExp, selfExp };
-}
-
 function formatLabel(start: Date, end: Date) {
   const fmt = (d: Date) =>
     `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
   return `${fmt(start)} - ${fmt(end)}`;
+}
+
+function getTimeBucketByHour(hour: number): TimeBucket {
+  if (hour >= 5 && hour < 9) return "清晨";
+  if (hour >= 9 && hour < 14) return "上午";
+  if (hour >= 14 && hour < 20) return "下午";
+  return "夜晚";
+}
+
+function getPeakTimeBucket(
+  sessions: Array<{ startTime: Date; duration: number | null; timeBucket: string | null }>,
+): TimeBucket {
+  const bucketMinutes: Record<TimeBucket, number> = {
+    清晨: 0,
+    上午: 0,
+    下午: 0,
+    夜晚: 0,
+  };
+  sessions.forEach((s) => {
+    const fallback = getTimeBucketByHour(s.startTime.getHours());
+    const bucket = normalizeTimeBucket(s.timeBucket) ?? fallback;
+    bucketMinutes[bucket] += s.duration ?? 0;
+  });
+  return (Object.entries(bucketMinutes).sort((a, b) => b[1] - a[1])[0]?.[0] as TimeBucket) || "夜晚";
+}
+
+function normalizeTimeBucket(value: string | null): TimeBucket | null {
+  if (!value) return null;
+  if (value === "清晨" || value === "上午" || value === "下午" || value === "夜晚") return value;
+  return null;
+}
+
+function roundTo1(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function deriveRhythmTitle(input: {
+  daysPresent: number;
+  totalMinutes: number;
+  peakTime: TimeBucket;
+  totalResumeCount: number;
+  sessionCount: number;
+}) {
+  const { daysPresent, totalMinutes, peakTime, totalResumeCount, sessionCount } = input;
+  if (sessionCount <= 1) return "在场型节奏";
+  if (peakTime === "清晨") return "晨光型节奏";
+  if (peakTime === "夜晚") return "夜航型节奏";
+  if (totalResumeCount >= 3 && totalMinutes > 0) return "回流型节奏";
+  if (daysPresent >= 4) return "稳步型节奏";
+  return "在场型节奏";
+}
+
+function buildCoverSubtitle(daysPresent: number, totalMinutes: number) {
+  if (daysPresent <= 0) return "这一周很安静，也没关系。";
+  if (totalMinutes >= 240) return "你在属于自己的时段，留下了几段扎实的投入。";
+  if (totalMinutes >= 120) return "你在这一周里多次回来，节奏很真实。";
+  return "你出现过，哪怕片刻，也很珍贵。";
+}
+
+function pickNarrativeDay(
+  daily: Array<{ date: string; sessionCount: number; minutes: number }>,
+  peakTime: TimeBucket,
+) {
+  const candidate = [...daily].sort((a, b) => b.minutes - a.minutes)[0];
+  if (!candidate || candidate.minutes <= 0) return null;
+  return {
+    label: formatDateLabel(candidate.date),
+    sentence: `${formatDateLabel(candidate.date)}你在${peakTime}出现了${candidate.sessionCount}次，留下了约${formatMinutes(candidate.minutes)}的专注片段。`,
+  };
+}
+
+function buildSnippets(input: {
+  sessions: Array<{
+    startTime: Date;
+    duration: number | null;
+    hadDistraction: boolean | null;
+    hadTabHide: boolean | null;
+    hadIdle: boolean | null;
+    hadRapidSwitch: boolean | null;
+    resumeCount: number | null;
+  }>;
+  daily: Array<{ date: string; sessionCount: number; minutes: number; resumeCount: number }>;
+  daysPresent: number;
+  totalMinutes: number;
+  peakTime: TimeBucket;
+  totalResumeCount: number;
+  distractionCount: number;
+}): WeeklySnippet[] {
+  const { sessions, daily, daysPresent, totalMinutes, peakTime, totalResumeCount, distractionCount } = input;
+  const snippets: WeeklySnippet[] = [];
+
+  if (daysPresent > 0) {
+    snippets.push({
+      id: "presence",
+      content: `这一周你在 ${daysPresent} 天里出现过，共留下了 ${formatMinutes(totalMinutes)}。`,
+    });
+  }
+
+  if (totalResumeCount > 0) {
+    snippets.push({
+      id: "resume",
+      content: `有 ${totalResumeCount} 次，你在停顿后又回到了当下。`,
+    });
+  }
+
+  const longest = sessions.reduce((max, s) => Math.max(max, s.duration ?? 0), 0);
+  if (longest >= 25) {
+    snippets.push({
+      id: "longest",
+      content: `这周你留下一段约 ${formatMinutes(longest)} 的完整专注。`,
+    });
+  }
+
+  if (distractionCount > 0) {
+    snippets.push({
+      id: "distraction",
+      content: `外界有几次打断，但你仍然把注意力带回了自己。`,
+    });
+  }
+
+  const topDay = [...daily].sort((a, b) => b.minutes - a.minutes)[0];
+  if (topDay && topDay.minutes > 0) {
+    snippets.push({
+      id: "top-day",
+      dateLabel: formatDateLabel(topDay.date),
+      content: `${formatDateLabel(topDay.date)}的${peakTime}，是这周较常出现的一段。`,
+    });
+  }
+
+  if (snippets.length === 0) {
+    snippets.push({
+      id: "fallback",
+      content: "这周你偶尔来过，Echo 会继续在这里等你。",
+    });
+  }
+
+  return snippets.slice(0, 3);
+}
+
+function buildClosingNote(daysPresent: number, totalMinutes: number) {
+  if (daysPresent <= 0) {
+    return "谢谢你来翻开这一页。下周我们再慢慢来。";
+  }
+  if (totalMinutes >= 180) {
+    return "谢谢你把这一周交给 Echo。你已经在自己的节奏里前进。";
+  }
+  return "这一周已经走完了，Echo 会继续陪你走下一段。";
+}
+
+function formatMinutes(minutes: number) {
+  if (minutes >= 60) {
+    return `${roundTo1(minutes / 60)} 小时`;
+  }
+  return `${minutes} 分钟`;
+}
+
+function formatDateLabel(date: string) {
+  const d = new Date(date);
+  const days = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  return `${d.getMonth() + 1}/${d.getDate()} ${days[d.getDay()]}`;
 }
 
 function pad(num: number) {

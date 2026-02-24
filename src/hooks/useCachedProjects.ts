@@ -11,6 +11,7 @@ interface Project {
   id: string;
   name: string;
   focusBranch?: string;
+  focusDetail?: string;
   description?: string;
   icon: string;
   dailyGoalMinutes: number;

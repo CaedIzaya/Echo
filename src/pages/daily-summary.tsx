@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 import SummaryShareCard from '../components/SummaryShareCard';
 import localforage from 'localforage';
 import { getRandomQuote } from '../lib/quoteLibrary';
+import { trackEvent } from '~/lib/analytics';
 
 export default function DailySummaryPage() {
   const router = useRouter();
@@ -27,6 +28,13 @@ export default function DailySummaryPage() {
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    trackEvent({
+      name: 'summary_open',
+      feature: 'daily_summary',
+      page: '/daily-summary',
+      action: 'open',
+    });
+
     // Load local avatar
     const loadAvatar = async () => {
         try {
@@ -206,6 +214,16 @@ export default function DailySummaryPage() {
       const data = await res.json();
       if (data.todaySummary) {
         setSummaryId(data.todaySummary.id);
+        trackEvent({
+          name: 'summary_save',
+          feature: 'daily_summary',
+          page: '/daily-summary',
+          action: 'save',
+          properties: {
+            summaryId: data.todaySummary.id,
+            totalFocusMinutes: focusDuration,
+          },
+        });
       }
     } catch (err) {
       console.error('Failed to save summary', err);
@@ -538,4 +556,3 @@ export default function DailySummaryPage() {
     </div>
   );
 }
-

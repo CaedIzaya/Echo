@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
                   <li><strong>安全信息</strong>：您在“账号安全”里设置的密保问题与答案摘要（答案会做规范化与加盐哈希处理）。</li>
                   <li><strong>会话与认证信息</strong>：用于保持登录状态的会话记录，以及必要的认证 Cookie（由认证系统生成与管理）。</li>
                   <li><strong>专注与成长数据</strong>：专注会话（开始/结束时间、时长、心流评分/指标等）、连续天数、累计专注时长、经验值/等级、心树经验/等级、浇水/施肥次数等。</li>
-                  <li><strong>计划与里程碑数据</strong>：计划（项目）信息、里程碑（小目标）内容与完成状态、是否为主要计划等。</li>
+                  <li><strong>计划与小目标数据</strong>：计划（项目）信息、小目标内容与完成状态、是否为主要计划等。</li>
                   <li><strong>内容与记录</strong>：日小结、周报（以结构化数据形式存储）、分享链接（用于您主动分享时生成的 token 及其有效期）。</li>
                   <li><strong>成就与商店</strong>：已解锁的成就、商店购买记录、主题/徽章等偏好。</li>
                   <li><strong>站内信</strong>：包括欢迎邮件等站内消息。欢迎邮件会以“永久站内信”的形式随账号长期保存（除非您注销账号）。</li>
@@ -65,7 +65,7 @@ export default function PrivacyPolicy() {
               <div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">二、我们如何使用这些信息</h3>
                 <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                  <li><strong>提供核心功能</strong>：创建/管理计划与里程碑、记录专注、计算心流与统计、等级与心树成长、成就、商店与主题等。</li>
+                  <li><strong>提供核心功能</strong>：创建/管理计划与小目标、记录专注、计算心流与统计、等级与心树成长、成就、商店与主题等。</li>
                   <li><strong>账号与安全</strong>：登录认证、会话管理、密保验证与密码重置。</li>
                   <li><strong>体验与一致性</strong>：跨设备同步关键数据（以数据库为准），并在本地做必要缓存减少闪烁和加载等待。</li>
                   <li><strong>生成内容</strong>：根据您的历史记录生成周报/站内信等内容展示（在应用内呈现）。</li>

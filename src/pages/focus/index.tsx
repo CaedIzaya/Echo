@@ -5,6 +5,7 @@ import Head from 'next/head';
 import BottomNavigation from '../dashboard/BottomNavigation';
 import InterruptedSessionAlert from './InterruptedSessionAlert';
 import EchoSpirit from '../dashboard/EchoSpirit';
+import { trackEvent } from '~/lib/analytics';
 
 // Wake Lock API 类型定义
 interface WakeLockSentinel extends EventTarget {
@@ -536,6 +537,11 @@ export default function Focus() {
       })), 
     ...customGoals
   ];
+
+  const getSelectedPlan = () =>
+    selectedPlanId !== 'free'
+      ? availablePlans.find(p => p.id === selectedPlanId)
+      : null;
 
   // 当前选中的目标信息
   const selectedGoalInfo = allGoals.find(g => g.id === selectedGoal);
@@ -1152,6 +1158,23 @@ export default function Focus() {
       customDuration: plannedMinutes
     });
 
+    const selectedPlan = getSelectedPlan();
+    const goalMinutes =
+      selectedPlanId !== 'free'
+        ? (selectedPlan?.dailyGoalMinutes ?? plannedMinutes)
+        : 30;
+    trackEvent({
+      name: 'focus_start',
+      feature: 'focus',
+      page: '/focus',
+      action: 'start',
+      properties: {
+        projectId: selectedPlanId !== 'free' ? selectedPlanId : null,
+        plannedMinutes,
+        goalMinutes,
+      },
+    });
+
     // 如果是选择计划（非自由时间），将自定义小目标添加到计划中
     if (selectedPlanId !== 'free' && customGoals.length > 0) {
       const savedPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
@@ -1478,6 +1501,12 @@ export default function Focus() {
       // 获取用户评分（如果有，且仅"本次完成"时）- 保留用于心流指数计算
       const rating = completedForStats ? localStorage.getItem('lastFocusRating') : null;
       const numericRating = rating ? parseFloat(rating) : undefined;
+      const selectedPlan = getSelectedPlan();
+      const goalMinutes =
+        selectedPlanId !== 'free'
+          ? (selectedPlan?.dailyGoalMinutes ?? plannedMinutes)
+          : 30;
+      const isMinMet = minutes >= goalMinutes;
       
       // 🔥 保存到数据库（用于周报统计）
       if (session?.user?.id && sessionRef.current?.startTime) {
@@ -1503,6 +1532,8 @@ export default function Focus() {
             rating: numericRating,
             flowIndex: numericRating,
             projectId: selectedPlanId !== 'free' ? selectedPlanId : null, // ✅ 修复：使用计划ID而不是小目标ID
+            goalMinutes,
+            isMinMet,
           }),
         }).then(response => {
           if (response.ok) {
@@ -1514,6 +1545,21 @@ export default function Focus() {
           console.error('❌ 保存专注会话网络错误', error);
         });
       }
+
+      trackEvent({
+        name: completedForStats ? 'focus_complete' : 'focus_interrupt',
+        feature: 'focus',
+        page: '/focus',
+        action: completedForStats ? 'complete' : 'interrupt',
+        properties: {
+          projectId: selectedPlanId !== 'free' ? selectedPlanId : null,
+          durationMinutes: minutes,
+          goalMinutes,
+          isMinMet,
+          rating: numericRating,
+          completedForStats,
+        },
+      });
       
       // 调用dashboard的回调函数更新统计数据
       if (typeof window !== 'undefined' && (window as any).reportFocusSessionComplete) {

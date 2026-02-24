@@ -51,18 +51,18 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
     setIsCreating(false);
     
     // 🎉 显示设置成功提示
-    alert('✅ 里程碑已设定！');
+    alert('✅ 终极目标已设定！');
     
     // 关闭弹窗
     onClose();
 
-    // 触发成就：设置新里程碑（如果是第一次，会由系统判断）
+    // 触发成就：设置新终极目标（如果是第一次，会由系统判断）
     const manager = getAchievementManager();
     manager.checkFirstTimeAchievements('milestone_created');
   };
 
   const handleDelete = () => {
-    if (confirm('确定要放弃这个里程碑吗？')) {
+    if (confirm('确定要放弃这个终极目标吗？')) {
       setMilestone(undefined);
       onSave(undefined);
     }
@@ -94,7 +94,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
         setMilestone(completedGoal);
         onSave(completedGoal);
         
-        // 触发成就：完成第一个里程碑
+        // 触发成就：完成第一个终极目标
         const manager = getAchievementManager();
         manager.checkFirstTimeAchievements('milestone_completed');
     }
@@ -134,7 +134,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
         {/* 标题 */}
         <div className="text-center mb-6 mt-2">
           <span className="text-4xl mb-2 block">🚩</span>
-          <h2 className="text-xl font-bold text-gray-900">里程碑管理</h2>
+          <h2 className="text-xl font-bold text-gray-900">终极目标管理</h2>
           {planName && <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{planName}</p>}
           <p className="text-sm text-gray-500 mt-1">设立一个值得征服的目标</p>
         </div>
@@ -146,7 +146,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
               <span className="text-4xl">✨</span>
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-bold text-gray-900">新里程碑已成功创建！</h3>
+              <h3 className="text-xl font-bold text-gray-900">新终极目标已成功创建！</h3>
               <p className="text-gray-500">所有的伟大旅程，都始于足下。</p>
             </div>
             <button
@@ -162,7 +162,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
               <span className="text-3xl">🤔</span>
             </div>
             <div className="space-y-2">
-              <h3 className="text-lg font-bold text-gray-900">确认完成里程碑？</h3>
+              <h3 className="text-lg font-bold text-gray-900">确认完成终极目标？</h3>
               <p className="text-gray-500 px-4">这也意味着一段旅程的结束。确定要标记为完成吗？</p>
             </div>
             <div className="flex gap-3 pt-2">
@@ -183,7 +183,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
         ) : showCompletionPrompt ? (
           <div className="text-center py-4 space-y-6">
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-green-600">🎉 恭喜达成里程碑！</h3>
+              <h3 className="text-lg font-semibold text-green-600">🎉 恭喜达成终极目标！</h3>
               <p className="text-gray-600">这片领土已被你征服。准备好开始新的征程了吗？</p>
             </div>
             <div className="flex gap-3">
@@ -207,7 +207,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
             {!milestone || isCreating ? (
               <div className="space-y-4">
                 <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 text-sm text-yellow-800">
-                  <p className="mb-2 font-semibold">建议设立什么样的里程碑？</p>
+                  <p className="mb-2 font-semibold">建议设立什么样的终极目标？</p>
                   <ul className="list-disc list-inside space-y-1 opacity-90">
                     <li>具有挑战性但可实现的阶段性目标</li>
                     <li>完成后能带来强烈成就感的任务</li>
@@ -216,7 +216,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">里程碑内容</label>
+                  <label className="block text-sm font-medium text-gray-700">终极目标内容</label>
                   <textarea
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
@@ -244,7 +244,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
                     disabled={!inputValue.trim()}
                     className="flex-1 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl font-medium shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    设立里程碑
+                    设立终极目标
                   </button>
                 </div>
               </div>
@@ -254,7 +254,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <span className="text-6xl">🚩</span>
                   </div>
-                  <h3 className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">CURRENT MILESTONE</h3>
+                  <h3 className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">CURRENT GOAL</h3>
                   <p className="text-xl font-bold text-gray-800 leading-relaxed">
                     {milestone.content}
                   </p>
@@ -277,7 +277,7 @@ export default function MilestoneManager({ isOpen, onClose, onSave, initialGoal,
                             onClick={handleComplete}
                             className="flex-1 py-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-xl font-medium shadow-lg shadow-green-500/30 hover:shadow-green-500/40 transition-all transform hover:-translate-y-0.5"
                         >
-                            完成里程碑
+                            完成终极目标
                         </button>
                     </>
                   ) : (

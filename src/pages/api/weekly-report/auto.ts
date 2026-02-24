@@ -91,13 +91,13 @@ export default async function handler(
     const mailRecord = await db.mail.upsert({
       where: { id: mailId },
       update: {
-        title: `本周专注周报 · ${report.period.label}`,
+        title: `本周节奏回顾 · ${report.period.label}`,
         content:
-          "您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。",
+          "你的本周节奏回顾已生成。点击查看本周出现过的片段与收尾卡片。",
         date: formatDateKey(new Date()),
         isRead: false,
         type: "report",
-        sender: "Echo 周报",
+        sender: "Echo 周回顾",
         actionUrl: `/reports/weekly?weekStart=${weekStartStr}`,
         actionLabel: "查看周报",
         expiresAt: addDays(periodEnd, 84),
@@ -105,13 +105,13 @@ export default async function handler(
       create: {
         id: mailId,
         userId,
-        title: `本周专注周报 · ${report.period.label}`,
+        title: `本周节奏回顾 · ${report.period.label}`,
         content:
-          "您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。",
+          "你的本周节奏回顾已生成。点击查看本周出现过的片段与收尾卡片。",
         date: formatDateKey(new Date()),
         isRead: false,
         type: "report",
-        sender: "Echo 周报",
+        sender: "Echo 周回顾",
         actionUrl: `/reports/weekly?weekStart=${weekStartStr}`,
         actionLabel: "查看周报",
         expiresAt: addDays(periodEnd, 84),
@@ -138,9 +138,9 @@ export default async function handler(
       period: { start: weekStartStr, end: weekEndStr },
       mail,
       reportSummary: {
-        totalMinutes: report.totals.minutes,
-        streakDays: report.totals.streakDays,
-        flowAvg: report.totals.flowAvg,
+        totalMinutes: report.presence.totalMinutes,
+        daysPresent: report.presence.daysPresent,
+        rhythmTitle: report.cover.rhythmTitle,
       },
     });
   } catch (error: any) {

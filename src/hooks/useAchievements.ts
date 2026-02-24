@@ -27,7 +27,20 @@ export function useAchievements() {
       const response = await fetch('/api/achievements');
       if (response.ok) {
         const data = await response.json() as { achievements: Array<{ id: string; category: string; unlockedAt: string }> };
-        const ids = new Set<string>(data.achievements.map((a) => a.id));
+        const dbIds = data.achievements.map((a) => a.id);
+        const stored = getUserStorage(STORAGE_KEY);
+        let localIds: string[] = [];
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored) as unknown;
+            if (Array.isArray(parsed)) {
+              localIds = parsed.filter((id): id is string => typeof id === 'string');
+            }
+          } catch {
+            localIds = [];
+          }
+        }
+        const ids = new Set<string>([...localIds, ...dbIds]);
         
         // 更新状态和 localStorage
         setAchievedIds(ids);

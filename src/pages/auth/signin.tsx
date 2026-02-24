@@ -122,7 +122,6 @@ export default function SignIn() {
             'userExp', 'userExpSynced', 'userExpSyncedAt',
             'heartTreeExpState', 'heartTreeExpSynced',
             'heartTreeNameV1', 'heartTreeNameSynced',
-            'achievedAchievements', 'achievementsSynced', 'achievementsSyncedAt',
             'userPlans', 'userPlansSynced', 'projectsSyncedAt',
             'todayStats', 'weeklyStats', 'dashboardStats',
             'totalFocusMinutes', 'focusSession', 'flowMetrics',

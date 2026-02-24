@@ -49,7 +49,7 @@ export default function TermsOfService() {
               <div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">一、服务说明</h3>
                 <p className="text-gray-700 leading-relaxed">
-                  Echo 是一个帮助用户管理注意力、进行自我觉察与成长的工具类应用。我们提供计划与里程碑管理、专注计时、心流与统计、成长系统（等级/心树/成就/商店）、站内信与周报等功能。您在使用 Echo 的过程中，应遵守相关法律法规及本协议条款。
+                  Echo 是一个帮助用户管理注意力、进行自我觉察与成长的工具类应用。我们提供计划与小目标管理、专注计时、心流与统计、成长系统（等级/心树/成就/商店）、站内信与周报等功能。您在使用 Echo 的过程中，应遵守相关法律法规及本协议条款。
                 </p>
               </div>
 

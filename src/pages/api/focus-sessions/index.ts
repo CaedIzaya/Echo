@@ -13,6 +13,8 @@ type FocusPayload = {
   projectId?: string;
   flowIndex?: number;
   expEarned?: number;
+  goalMinutes?: number;
+  isMinMet?: boolean;
 };
 
 export default async function handler(
@@ -123,6 +125,23 @@ export default async function handler(
     const flowIndex = clamp(body.flowIndex ?? body.rating ?? 70, 0, 100);
     const expEarned = body.expEarned ?? Math.max(0, Math.round(duration / 5));
 
+    let goalMinutes = body.goalMinutes;
+    if (!goalMinutes && body.projectId) {
+      const project = await db.project.findUnique({
+        where: { id: body.projectId },
+        select: { dailyGoalMinutes: true },
+      });
+      goalMinutes = project?.dailyGoalMinutes ?? undefined;
+    }
+    if (!goalMinutes && !body.projectId) {
+      goalMinutes = 30;
+    }
+    const isMinMet = typeof body.isMinMet === 'boolean'
+      ? body.isMinMet
+      : typeof goalMinutes === 'number'
+        ? duration >= goalMinutes
+        : false;
+
     console.log("[focus-sessions] 开始保存专注会话", {
       userId: session.user.id,
       duration,
@@ -143,6 +162,8 @@ export default async function handler(
           flowIndex,
           expEarned,
           projectId: body.projectId,
+          goalMinutes: typeof goalMinutes === 'number' ? goalMinutes : null,
+          isMinMet,
         },
       });
 
@@ -241,5 +262,3 @@ async function refreshDailySummary(userId: string, date: Date) {
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
-
-

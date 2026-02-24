@@ -63,12 +63,12 @@ export default async function handler(
     const mailRecord = await db.mail.upsert({
       where: { id: mailId },
       update: {
-        title: `本周专注周报 · ${report.period.label}`,
-        content: `您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。`,
+        title: `本周节奏回顾 · ${report.period.label}`,
+        content: `你的本周节奏回顾已生成。点击查看本周出现过的片段与收尾卡片。`,
         date: formatDateKey(new Date()),
         isRead: false,
         type: 'report',
-        sender: 'Echo 周报',
+        sender: 'Echo 周回顾',
         actionUrl: `/reports/weekly?weekStart=${weekStartStr}`,
         actionLabel: '查看周报',
         expiresAt: new Date(Date.now() + 84 * 24 * 60 * 60 * 1000),
@@ -76,12 +76,12 @@ export default async function handler(
       create: {
         id: mailId,
         userId: session.user.id,
-        title: `本周专注周报 · ${report.period.label}`,
-        content: `您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。`,
+        title: `本周节奏回顾 · ${report.period.label}`,
+        content: `你的本周节奏回顾已生成。点击查看本周出现过的片段与收尾卡片。`,
         date: formatDateKey(new Date()),
         isRead: false,
         type: 'report',
-        sender: 'Echo 周报',
+        sender: 'Echo 周回顾',
         actionUrl: `/reports/weekly?weekStart=${weekStartStr}`,
         actionLabel: '查看周报',
         expiresAt: new Date(Date.now() + 84 * 24 * 60 * 60 * 1000),
@@ -91,9 +91,9 @@ export default async function handler(
     // 返回邮件信息（格式符合 MailSystem.Mail 接口）
     const mail = {
       id: `weekly_report_${weekStartStr}`,
-      sender: 'Echo 周报',
-      title: `本周专注周报 · ${report.period.label}`,
-      content: `您的本周专注周报已生成~ 点击下方按钮查看详情。\n\n回顾这一周的专注时光，看看自己的成长与变化。`,
+      sender: 'Echo 周回顾',
+      title: `本周节奏回顾 · ${report.period.label}`,
+      content: `你的本周节奏回顾已生成。点击查看本周出现过的片段与收尾卡片。`,
       date: formatDateKey(new Date()), // 今天的日期（邮件发送日期）
       isRead: false,
       type: 'report' as const,
@@ -107,15 +107,17 @@ export default async function handler(
     console.log(`[generate-weekly-mail]    邮件ID: ${mail.id}`);
     console.log(`[generate-weekly-mail]    标题: ${mail.title}`);
     console.log(`[generate-weekly-mail]    周期: ${weekStartStr} 至 ${weekEndStr}`);
-    console.log(`[generate-weekly-mail]    数据: ${report.totals.minutes}分钟, ${report.totals.streakDays}天连续, 心流${report.totals.flowAvg || 'N/A'}`);
+    console.log(
+      `[generate-weekly-mail]    数据: ${report.presence.totalMinutes}分钟, ${report.presence.daysPresent}天出现, ${report.cover.rhythmTitle}`,
+    );
 
     return res.status(200).json({ 
       success: true,
       mail,
       reportSummary: {
-        totalMinutes: report.totals.minutes,
-        streakDays: report.totals.streakDays,
-        flowAvg: report.totals.flowAvg,
+        totalMinutes: report.presence.totalMinutes,
+        daysPresent: report.presence.daysPresent,
+        rhythmTitle: report.cover.rhythmTitle,
       }
     });
   } catch (error: any) {

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { db } from '~/server/db';
+import { encodeProjectDescription, enrichProjectForClient } from '~/lib/projectMeta';
 
 /**
  * 用户计划 API（完整数据库实现）
@@ -33,12 +34,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log('[projects] 找到', projects.length, '个计划');
 
-      return res.status(200).json({ projects });
+      return res.status(200).json({ projects: projects.map(enrichProjectForClient) });
     }
 
     // POST: 创建新计划
     if (req.method === 'POST') {
-      const { id, name, description, icon, color, dailyGoalMinutes, targetDate, isActive, isPrimary, isCompleted, milestones } = req.body;
+      const {
+        id,
+        name,
+        description,
+        focusDetail,
+        icon,
+        color,
+        dailyGoalMinutes,
+        targetDate,
+        isActive,
+        isPrimary,
+        isCompleted,
+        milestones
+      } = req.body;
 
       if (!name) {
         return res.status(400).json({ error: '计划名称不能为空' });
@@ -76,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // 创建计划（保留原ID如果有的话，用于迁移）
       const createData: any = {
         name,
-        description,
+        description: encodeProjectDescription(description, focusDetail),
         icon: icon || '📋',
         color,
         dailyGoalMinutes: dailyGoalMinutes || 25,
@@ -111,7 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log('[projects] 创建成功:', newProject.id);
 
-      return res.status(201).json({ project: newProject });
+      return res.status(201).json({ project: enrichProjectForClient(newProject) });
     }
 
     return res.status(405).json({ error: '方法不允许' });

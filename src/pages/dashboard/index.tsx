@@ -17,6 +17,7 @@ import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import StartupMotivation from './StartupMotivation';
 import ShopModal from '~/components/shop/ShopModal';
 import CalendarCard from '~/components/calendar/CalendarCard';
+import GoalInputModal from '~/components/goals/GoalInputModal';
 import { getCurrentTheme, getThemeConfig } from '~/lib/themeSystem';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import type { Achievement } from '~/lib/AchievementSystem';
@@ -385,7 +386,7 @@ export default function Dashboard() {
       // 🧹 清理全局 localStorage key（防止数据污染）
       if (typeof window !== 'undefined') {
         const globalKeys = [
-          'userExp', 'heartTreeExpState', 'achievedAchievements', 'userPlans',
+          'userExp', 'heartTreeExpState', 'userPlans',
           'todayStats', 'weeklyStats', 'totalFocusMinutes', 'focusSession'
         ];
         globalKeys.forEach(key => {
@@ -955,6 +956,7 @@ export default function Dashboard() {
   
   // 启动激励相关状态
   const [showStartupMotivation, setShowStartupMotivation] = useState(false);
+  const [showGoalInputModal, setShowGoalInputModal] = useState(false);
   const [selectedGoalMilestoneId, setSelectedGoalMilestoneId] = useState<string | null>(() => {
     // 从 localStorage 读取今日选中的小目标
     if (typeof window !== 'undefined') {
@@ -1026,16 +1028,13 @@ export default function Dashboard() {
     // 保存到数据库
     if (primaryPlan && session?.user?.id) {
       const updatedMilestones = [...(primaryPlan.milestones || []), newMilestone];
-      
-      updateMilestonesToDB(primaryPlan.id, updatedMilestones).then(success => {
-        if (success) {
-          console.log('✅ 小目标已同步到数据库');
-          // 刷新计划数据
-          refreshProjects();
-        } else {
-          console.error('❌ 同步小目标失败');
-        }
-      });
+      const success = await updateMilestonesToDB(primaryPlan.id, updatedMilestones);
+      if (success) {
+        console.log('✅ 小目标已同步到数据库');
+        await refreshProjects();
+      } else {
+        console.error('❌ 同步小目标失败');
+      }
     }
   };
 
@@ -2714,7 +2713,7 @@ export default function Dashboard() {
 
         <div className="space-y-3">
           {activeMilestones.length === 0 && planMilestones.length === 0 && (
-            <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
+            <p className="text-sm text-zinc-500">还没有小目标，去添加一个小目标吧。</p>
           )}
           {activeMilestones.length === 0 && planMilestones.length > 0 && (
             <p className="text-sm text-emerald-600 font-medium">🎉 所有小目标已完成！</p>
@@ -2809,34 +2808,27 @@ export default function Dashboard() {
         )}
 
         <div className="mt-6 pt-4 border-t border-zinc-200 space-y-3">
-          {/* 快速启动按钮 - 仅在有选中目标且今天还没专注时显示 */}
-          {selectedGoalMilestoneId && todayStats.minutes === 0 && (
-            <button 
-              onClick={handleQuickStartFromMotivation}
-              className="w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 text-white rounded-xl hover:from-amber-600 hover:to-yellow-700 font-medium transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 animate-pulse-gentle"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              快速启动（{primaryPlan?.dailyGoalMinutes || 15}分钟）
-            </button>
-          )}
-          
-          {/* 两个并排按钮：快速开始 和 添加小目标 */}
+          {/* 两个并排按钮：快速开始/快速启动 和 添加小目标 */}
           <div className="flex gap-3">
             <button
               onClick={handleQuickStartFromMotivation}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-medium transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+              className={`flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-medium transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 ${
+                selectedGoalMilestoneId && todayStats.minutes === 0
+                  ? 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 animate-pulse-gentle'
+                  : 'bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600'
+              }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              快速开始
+              {selectedGoalMilestoneId && todayStats.minutes === 0
+                ? `快速启动（${primaryPlan?.dailyGoalMinutes || 15}分钟）`
+                : '快速开始'}
             </button>
             <button
               onClick={() => {
                 if (primaryPlan) {
-                  setShowStartupMotivation(true);
+                  setShowGoalInputModal(true);
                 } else {
                   router.push('/plans');
                 }
@@ -3024,10 +3016,10 @@ export default function Dashboard() {
               今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
             </p>
             
-            <div className="flex gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={handleStartFocus}
-                className="flex-1 px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30"
+                className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30"
               >
                 开始专注
               </button>
@@ -3035,7 +3027,7 @@ export default function Dashboard() {
               {/* 🌟 节奏设定按钮 - 与开始专注按钮大小一致 */}
               <button
                 onClick={() => setShowStartupMotivation(true)}
-                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30"
+                className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30"
                 title="节奏设定"
               >
                 节奏设定
@@ -3061,7 +3053,7 @@ export default function Dashboard() {
               <>
                 <div className="space-y-3 mb-4">
                   {activeMilestones.length === 0 && planMilestones.length === 0 && (
-                    <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
+                    <p className="text-sm text-zinc-500">还没有小目标，去添加一个小目标吧。</p>
                   )}
                   {activeMilestones.length === 0 && planMilestones.length > 0 && (
                     <p className="text-sm text-emerald-600 font-medium">🎉 所有小目标已完成！</p>
@@ -3220,10 +3212,10 @@ export default function Dashboard() {
                 <p className="text-sm text-zinc-500">
                   今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
                 </p>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={handleStartFocus}
-                    className="px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
+                    className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
                   >
                     开始专注
                   </button>
@@ -3231,7 +3223,7 @@ export default function Dashboard() {
                   {/* 🌟 节奏设定按钮 - 与开始专注按钮大小一致 */}
                   <button
                     onClick={() => setShowStartupMotivation(true)}
-                    className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
+                    className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
                     title="节奏设定"
                   >
                     节奏设定
@@ -3419,6 +3411,7 @@ export default function Dashboard() {
       {showStartupMotivation && (
         <StartupMotivation
           primaryPlan={primaryPlan}
+          userId={session?.user?.id}
           dailyGoalMinutes={primaryPlan?.dailyGoalMinutes || 30}
           onClose={() => setShowStartupMotivation(false)}
           onConfirmGoal={handleConfirmGoal}
@@ -3426,6 +3419,15 @@ export default function Dashboard() {
           onAddMilestone={handleAddMilestoneFromMotivation}
         />
       )}
+
+      <GoalInputModal
+        visible={showGoalInputModal}
+        userId={session?.user?.id}
+        title="添加小目标"
+        placeholder="输入小目标"
+        onClose={() => setShowGoalInputModal(false)}
+        onConfirm={handleAddMilestoneFromMotivation}
+      />
 
       {/* 商城弹窗 */}
       <ShopModal 

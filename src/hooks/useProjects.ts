@@ -21,6 +21,7 @@ export interface Project {
   id: string;
   name: string;
   description?: string | null;
+  focusDetail?: string | null;
   icon: string;
   color?: string | null;
   dailyGoalMinutes: number;

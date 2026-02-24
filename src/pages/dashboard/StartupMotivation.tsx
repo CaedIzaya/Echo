@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import GoalInputModal from '~/components/goals/GoalInputModal';
 
 interface Milestone {
   id: string;
@@ -18,14 +19,9 @@ interface Project {
   isPrimary?: boolean;
 }
 
-interface CustomGoal {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
 interface StartupMotivationProps {
   primaryPlan: Project | null;
+  userId?: string;
   dailyGoalMinutes: number;
   onClose: () => void;
   onConfirmGoal: (milestoneId: string) => void;
@@ -35,6 +31,7 @@ interface StartupMotivationProps {
 
 export default function StartupMotivation({
   primaryPlan,
+  userId,
   dailyGoalMinutes,
   onClose,
   onConfirmGoal,
@@ -44,23 +41,17 @@ export default function StartupMotivation({
   const router = useRouter();
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
-  const [showAddGoal, setShowAddGoal] = useState(false);
-  const [newGoalTitle, setNewGoalTitle] = useState('');
-  const [customGoals, setCustomGoals] = useState<CustomGoal[]>([]);
+  const [showGoalInputModal, setShowGoalInputModal] = useState(false);
 
   // 获取未完成的小目标
   const planMilestones = primaryPlan?.milestones.filter(m => !m.isCompleted) || [];
   
-  // 合并计划小目标和自定义小目标
-  const allGoals = [
-    ...planMilestones.map(m => ({ 
-      id: m.id, 
-      title: m.title, 
-      completed: false,
-      isPlanGoal: true // 标记为计划小目标
-    })),
-    ...customGoals.map(g => ({ ...g, isPlanGoal: false })) // 标记为自定义小目标
-  ];
+  const allGoals = planMilestones.map((m) => ({
+    id: m.id,
+    title: m.title,
+    completed: false,
+    isPlanGoal: true,
+  }));
   
   // 默认选中第一个小目标
   useEffect(() => {
@@ -69,37 +60,6 @@ export default function StartupMotivation({
     }
   }, [allGoals.length]); // 只依赖长度，避免循环
   
-  // 添加自定义小目标
-  const handleAddGoal = async () => {
-    if (!newGoalTitle.trim()) return;
-    
-    const newGoal: CustomGoal = {
-      id: `custom-${Date.now()}`,
-      title: newGoalTitle.trim(),
-      completed: false
-    };
-    
-    // 如果有计划且提供了添加回调，则添加到计划中
-    if (primaryPlan && onAddMilestone) {
-      try {
-        await onAddMilestone(newGoalTitle.trim());
-        // 添加成功后，不需要手动更新 customGoals，因为会从计划中重新获取
-      } catch (error) {
-        console.error('添加小目标到计划失败:', error);
-        // 失败时添加为自定义小目标
-        setCustomGoals([...customGoals, newGoal]);
-      }
-    } else {
-      // 没有计划或没有回调，添加为自定义小目标
-      setCustomGoals([...customGoals, newGoal]);
-    }
-    
-    // 自动选中新添加的小目标
-    setSelectedMilestoneId(newGoal.id);
-    setNewGoalTitle('');
-    setShowAddGoal(false);
-  };
-
   // 处理关闭动画
   const handleClose = () => {
     setIsClosing(true);
@@ -212,50 +172,17 @@ export default function StartupMotivation({
                   ))}
                 </div>
                 
-                {/* 添加自定义小目标按钮 */}
-                {!showAddGoal && (
-                  <button
-                    onClick={() => setShowAddGoal(true)}
-                    className="w-full rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200/60 p-3 flex items-center justify-center gap-2 text-teal-600 transition-all duration-300 transform hover:scale-[1.01]"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="text-sm font-semibold">
-                      {primaryPlan ? '添加自定义小目标（将加入计划）' : '设置自定义小目标'}
-                    </span>
-                  </button>
-                )}
-                
-                {/* 添加目标输入框 */}
-                {showAddGoal && (
-                  <div className="flex gap-2 animate-fade-in">
-                    <input
-                      type="text"
-                      value={newGoalTitle}
-                      onChange={(e) => setNewGoalTitle(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddGoal()}
-                      placeholder="输入小目标..."
-                      className="flex-1 rounded-xl border-2 border-emerald-200/60 bg-white/80 backdrop-blur-sm px-4 py-2.5 text-teal-900 placeholder:text-teal-400/50 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300/50 transition-all"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleAddGoal}
-                      className="rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-4 py-2.5 hover:shadow-lg shadow-teal-300/50 transition-all transform hover:scale-105 font-medium"
-                    >
-                      添加
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowAddGoal(false);
-                        setNewGoalTitle('');
-                      }}
-                      className="rounded-xl bg-white/80 border border-emerald-200/60 text-teal-600 px-4 py-2.5 hover:bg-emerald-50 transition-all font-medium"
-                    >
-                      取消
-                    </button>
-                  </div>
-                )}
+                <button
+                  onClick={() => setShowGoalInputModal(true)}
+                  className="w-full rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200/60 p-3 flex items-center justify-center gap-2 text-teal-600 transition-all duration-300 transform hover:scale-[1.01]"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span className="text-sm font-semibold">
+                    {primaryPlan ? '添加小目标（将加入计划）' : '设置小目标'}
+                  </span>
+                </button>
 
                 {/* 确认小目标按钮 */}
                 <button
@@ -279,7 +206,7 @@ export default function StartupMotivation({
                 {primaryPlan ? (
                   // 有计划但没有小目标，显示添加按钮
                   <button
-                    onClick={() => setShowAddGoal(true)}
+                    onClick={() => setShowGoalInputModal(true)}
                     className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-xl hover:from-teal-600 hover:to-cyan-700 font-medium transition-all shadow-lg hover:shadow-xl flex items-center gap-2 mx-auto"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,36 +225,6 @@ export default function StartupMotivation({
                   >
                     开始自由专注（15分钟）
                   </button>
-                )}
-                
-                {/* 添加目标输入框（没有小目标时） */}
-                {showAddGoal && (
-                  <div className="flex gap-2 animate-fade-in max-w-md mx-auto">
-                    <input
-                      type="text"
-                      value={newGoalTitle}
-                      onChange={(e) => setNewGoalTitle(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddGoal()}
-                      placeholder="输入小目标..."
-                      className="flex-1 rounded-xl border-2 border-emerald-200/60 bg-white/80 backdrop-blur-sm px-4 py-2.5 text-teal-900 placeholder:text-teal-400/50 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300/50 transition-all"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleAddGoal}
-                      className="rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-4 py-2.5 hover:shadow-lg shadow-teal-300/50 transition-all transform hover:scale-105 font-medium"
-                    >
-                      添加
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowAddGoal(false);
-                        setNewGoalTitle('');
-                      }}
-                      className="rounded-xl bg-white/80 border border-emerald-200/60 text-teal-600 px-4 py-2.5 hover:bg-emerald-50 transition-all font-medium"
-                    >
-                      取消
-                    </button>
-                  </div>
                 )}
               </div>
             )}
@@ -360,6 +257,19 @@ export default function StartupMotivation({
           </div>
         </div>
       </div>
+
+      <GoalInputModal
+        visible={showGoalInputModal}
+        userId={userId}
+        title="添加小目标"
+        placeholder="输入小目标"
+        onClose={() => setShowGoalInputModal(false)}
+        onConfirm={async (goalTitle) => {
+          if (onAddMilestone) {
+            await onAddMilestone(goalTitle);
+          }
+        }}
+      />
 
       <style jsx>{`
         @keyframes bounce-gentle {

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { db } from '~/server/db';
+import { decodeProjectDescription, encodeProjectDescription, enrichProjectForClient } from '~/lib/projectMeta';
 
 /**
  * 单个计划操作 API
@@ -42,12 +43,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: '计划不存在' });
       }
 
-      return res.status(200).json({ project });
+      return res.status(200).json({ project: enrichProjectForClient(project) });
     }
 
     // PUT: 更新计划
     if (req.method === 'PUT') {
-      const { name, description, icon, color, dailyGoalMinutes, targetDate, isActive, isCompleted, isPrimary } = req.body;
+      const { name, description, focusDetail, icon, color, dailyGoalMinutes, targetDate, isActive, isCompleted, isPrimary } = req.body;
 
       console.log('[projects] 更新计划:', id);
 
@@ -112,12 +113,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      const currentMeta = decodeProjectDescription(existingProject.description);
+      const nextFocusBranch =
+        description !== undefined ? String(description || '') : currentMeta.focusBranch;
+      const nextFocusDetail =
+        focusDetail !== undefined ? String(focusDetail || '') : currentMeta.focusDetail;
+
       // 更新计划
       const updatedProject = await db.project.update({
         where: { id },
         data: {
           name: name !== undefined ? name : undefined,
-          description: description !== undefined ? description : undefined,
+          description:
+            description !== undefined || focusDetail !== undefined
+              ? encodeProjectDescription(nextFocusBranch, nextFocusDetail)
+              : undefined,
           icon: icon !== undefined ? icon : undefined,
           color: color !== undefined ? color : undefined,
           dailyGoalMinutes: dailyGoalMinutes !== undefined ? dailyGoalMinutes : undefined,
@@ -135,7 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log('[projects] 更新成功:', updatedProject.id);
 
-      return res.status(200).json({ project: updatedProject });
+      return res.status(200).json({ project: enrichProjectForClient(updatedProject) });
     }
 
     // DELETE: 删除计划

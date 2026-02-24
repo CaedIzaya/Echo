@@ -53,7 +53,23 @@ export function useDataSync() {
         setUserStorage('userExpSynced', 'true');
         
         // 2. 成就数据
-        setUserStorage('achievedAchievements', JSON.stringify(data.achievements));
+        const safeAchievementIds = Array.isArray(data.achievements)
+          ? data.achievements.filter((id: unknown): id is string => typeof id === 'string')
+          : [];
+        const existingRaw = getUserStorage('achievedAchievements');
+        let existingIds: string[] = [];
+        if (existingRaw) {
+          try {
+            const parsed = JSON.parse(existingRaw);
+            if (Array.isArray(parsed)) {
+              existingIds = parsed.filter((id: unknown): id is string => typeof id === 'string');
+            }
+          } catch {
+            existingIds = [];
+          }
+        }
+        const mergedIds = Array.from(new Set([...existingIds, ...safeAchievementIds]));
+        setUserStorage('achievedAchievements', JSON.stringify(mergedIds));
         
         // 3. 心树数据
         if (data.heartTreeName) {
@@ -81,7 +97,7 @@ export function useDataSync() {
         
         console.log('[useDataSync] ✅ 数据同步完成', {
           userExp: data.userExp,
-          achievements: data.achievements.length,
+          achievements: mergedIds.length,
           totalMinutes: data.totalStats.totalMinutes,
           isNewUser: data.isReallyNewUser,
         });

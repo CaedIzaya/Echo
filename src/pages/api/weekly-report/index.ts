@@ -28,7 +28,9 @@ export default async function handler(
       persist: !preview,
     });
     
-    console.log(`[weekly-report] 周报生成成功: userId=${session.user.id}, totalMinutes=${report.totals.minutes}`);
+    console.log(
+      `[weekly-report] 周报生成成功: userId=${session.user.id}, totalMinutes=${report.presence.totalMinutes}`,
+    );
     return res.status(200).json({ report });
   } catch (error: any) {
     console.error("[weekly-report] 获取周报失败:", {

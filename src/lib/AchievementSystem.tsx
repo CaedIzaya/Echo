@@ -1,3 +1,5 @@
+import { getUserStorage, setUserStorage } from '~/lib/userStorage';
+
 export interface Achievement {
   id: string;
   name: string;
@@ -17,6 +19,49 @@ export class AchievementManager {
     console.log('[AchievementSystem] 初始化成就系统（等待数据库同步）');
   }
 
+  private getCachedAchievementIds(): string[] {
+    if (typeof window === 'undefined') return [];
+
+    const parseIds = (raw: string | null): string[] => {
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const scopedIds = parseIds(getUserStorage('achievedAchievements'));
+    const globalIds = parseIds(localStorage.getItem('achievedAchievements'));
+    const allValidIds = new Set(this.getAllAchievements().map((a) => a.id));
+
+    const merged = [...scopedIds, ...globalIds].filter((id) => allValidIds.has(id));
+    const unique = Array.from(new Set(merged));
+
+    if (unique.length > 0) {
+      setUserStorage('achievedAchievements', JSON.stringify(unique));
+    }
+
+    return unique;
+  }
+
+  private syncMissingAchievementsToDatabase(missingIds: string[]) {
+    if (typeof window === 'undefined' || missingIds.length === 0) return;
+
+    const allAchievements = this.getAllAchievements();
+    void Promise.allSettled(
+      missingIds.map((achievementId) => {
+        const category = allAchievements.find((a) => a.id === achievementId)?.category ?? 'first';
+        return fetch('/api/achievements/unlock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ achievementId, category }),
+        });
+      })
+    );
+  }
+
   private loadAchievedAchievements() {
     // 已废弃，保留空方法避免错误
   }
@@ -34,32 +79,50 @@ export class AchievementManager {
     
     try {
       const response = await fetch('/api/achievements');
+      const cachedIds = this.getCachedAchievementIds();
+      const cachedSet = new Set<string>(cachedIds);
+
       if (response.ok) {
         const data = await response.json();
         
         console.log('[AchievementSystem] 数据库返回:', data);
         
-        // 🔥 完全使用数据库数据，忽略localStorage
+        // 优先数据库，同时兼容本地缓存回填（防止历史数据丢失）
         const achievements = data.achievements || [];
-        const dbAchievements = new Set<string>(achievements.map((a: any) => a.id as string));
-        this.achievedAchievements = dbAchievements;
+        const dbIds = achievements.map((a: any) => a.id as string);
+        const dbAchievements = new Set<string>(dbIds);
+        const mergedAchievements = new Set<string>([...dbAchievements, ...cachedSet]);
+
+        this.achievedAchievements = mergedAchievements;
         this.databaseSynced = true;
         
-        console.log('[AchievementSystem] ✅ 从数据库加载成就:', this.achievedAchievements.size, '个');
-        
-        // 不再保存到localStorage，完全依赖数据库
+        const missingInDb = cachedIds.filter((id) => !dbAchievements.has(id));
+        if (missingInDb.length > 0) {
+          console.warn('[AchievementSystem] 检测到本地成就未入库，回填数据库:', missingInDb.length, '个');
+          this.syncMissingAchievementsToDatabase(missingInDb);
+        }
+
+        setUserStorage('achievedAchievements', JSON.stringify(Array.from(mergedAchievements)));
+        console.log('[AchievementSystem] ✅ 成就同步完成:', this.achievedAchievements.size, '个');
       } else {
         console.error('[AchievementSystem] 数据库加载失败:', response.status);
+        this.achievedAchievements = cachedSet;
+        this.databaseSynced = true;
+        console.warn('[AchievementSystem] 使用本地缓存成就:', this.achievedAchievements.size, '个');
       }
     } catch (error) {
       console.error('[AchievementSystem] 数据库同步失败:', error);
+      const cachedIds = this.getCachedAchievementIds();
+      this.achievedAchievements = new Set(cachedIds);
+      this.databaseSynced = true;
+      console.warn('[AchievementSystem] 使用本地缓存成就:', this.achievedAchievements.size, '个');
     } finally {
       this.isSyncing = false;
     }
   }
 
   private saveAchievedAchievements() {
-    // 已废弃，不再使用localStorage
+    setUserStorage('achievedAchievements', JSON.stringify(Array.from(this.achievedAchievements)));
   }
 
   private unlockAchievement(achievementId: string): Achievement | null {
@@ -71,6 +134,7 @@ export class AchievementManager {
     
     if (!this.achievedAchievements.has(achievementId)) {
       this.achievedAchievements.add(achievementId);
+      this.saveAchievedAchievements();
       console.log('[AchievementSystem] ✅ 解锁新成就:', achievementId);
       
       // Return the achievement object

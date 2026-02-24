@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, useMailSystem } from '~/lib/MailSystem';
+import { trackEvent } from '~/lib/analytics';
 
 interface MailPanelProps {
   onClose: () => void;
@@ -10,6 +11,15 @@ export default function MailPanel({ onClose }: MailPanelProps) {
   const [selectedMail, setSelectedMail] = useState<Mail | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+
+  useEffect(() => {
+    trackEvent({
+      name: 'mail_open',
+      feature: 'mail',
+      page: '/dashboard',
+      action: 'open',
+    });
+  }, []);
 
   const totalPages = Math.ceil(mails.length / itemsPerPage);
   const currentMails = mails.slice(
@@ -203,7 +213,6 @@ export default function MailPanel({ onClose }: MailPanelProps) {
     </div>
   );
 }
-
 
 
 

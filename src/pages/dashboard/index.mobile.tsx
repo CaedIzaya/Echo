@@ -1702,7 +1702,7 @@ export default function Dashboard() {
     );
   };
 
-  // 里程碑卡片组件
+  // 终极目标卡片组件
   const MilestoneCard = () => {
     const finalGoal = primaryPlan?.finalGoal;
     
@@ -1716,7 +1716,7 @@ export default function Dashboard() {
         </div>
         
         <div className="flex items-center justify-between mb-4">
-          <p className="text-xs uppercase tracking-[0.4em] text-[#4f2a07]/70 font-medium">里程碑</p>
+          <p className="text-xs uppercase tracking-[0.4em] text-[#4f2a07]/70 font-medium">终极目标</p>
         </div>
         
         <div className="space-y-3 relative z-10">
@@ -1734,7 +1734,7 @@ export default function Dashboard() {
           ) : (
             <>
               <div className="flex items-baseline gap-2">
-                <p className="text-lg font-bold">这片领土还没有里程碑要征服</p>
+                <p className="text-lg font-bold">这片领土还没有终极目标要征服</p>
               </div>
               <button className="mt-2 px-4 py-2 bg-white/30 backdrop-blur-sm rounded-lg text-sm font-semibold hover:bg-white/50 transition-colors">
                 去设置
@@ -1779,7 +1779,7 @@ export default function Dashboard() {
 
         <div className="space-y-3">
           {activeMilestones.length === 0 && planMilestones.length === 0 && (
-            <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
+            <p className="text-sm text-zinc-500">还没有小目标，去添加一个小目标吧。</p>
           )}
           {activeMilestones.length === 0 && planMilestones.length > 0 && (
             <p className="text-sm text-emerald-600 font-medium">🎉 所有小目标已完成！</p>
@@ -2046,7 +2046,7 @@ export default function Dashboard() {
                 <>
                   <div className="space-y-3 mb-4">
                     {activeMilestones.length === 0 && planMilestones.length === 0 && (
-                      <p className="text-sm text-zinc-500">还没有小目标，去添加一些 milestone 吧。</p>
+                      <p className="text-sm text-zinc-500">还没有小目标，去添加一个小目标吧。</p>
                     )}
                     {activeMilestones.length === 0 && planMilestones.length > 0 && (
                       <p className="text-sm text-emerald-600 font-medium">🎉 所有小目标已完成！</p>
@@ -2102,12 +2102,12 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* 移动端显示的里程碑信息 */}
+                  {/* 移动端显示的终极目标信息 */}
                   {primaryPlan.finalGoal && (
                     <div className="mt-4 pt-4 border-t border-zinc-100">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-lg">🏔️</span>
-                        <p className="text-xs uppercase tracking-[0.2em] text-amber-600/70 font-medium">里程碑</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-amber-600/70 font-medium">终极目标</p>
                       </div>
                       <p className="text-sm font-medium text-zinc-800 line-clamp-2">
                         {primaryPlan.finalGoal.content}
