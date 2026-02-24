@@ -230,7 +230,8 @@ export default function JournalPage() {
                   </div>
                 ) : (
                   visibleStars.map((day) => {
-                    const dayOfMonth = new Date(day.date).getDate();
+                    const d = new Date(day.date);
+                    const monthDayLabel = `${d.getMonth() + 1}.${d.getDate()}`;
                     return (
                       <button
                         key={day.date}
@@ -244,7 +245,7 @@ export default function JournalPage() {
                           <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
                         </div>
                         <div className="text-[11px] font-light text-white/70">
-                          {dayOfMonth}
+                          {monthDayLabel}
                         </div>
                       </button>
                     );

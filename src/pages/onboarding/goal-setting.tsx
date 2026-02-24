@@ -31,6 +31,9 @@ const INTEREST_NAME_TO_DOMAIN_KEY: Record<string, string> = {
   学术: 'academic',
   观影: 'movie',
   写作: 'writing',
+  学习: 'academic',
+  工作: 'career',
+  烹饪: 'food',
 };
 
 enum FormStep {

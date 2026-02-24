@@ -32,6 +32,10 @@ type FocusState =
 interface FocusSession {
   sessionId: string;
   plannedDuration: number;  // 计划时长（分钟）
+  goalMinutes: number;      // 判定达标/超额的最小专注时长（分钟）
+  goalSource: 'primary' | 'selected' | 'free';
+  targetMilestoneId: string | null;
+  projectId: string | null; // 本次专注绑定的计划（自由时间为 null）
   elapsedTime: number;      // 已专注时长（秒）- 基于时间戳计算
   status: FocusState;
   startTime: string;        // 开始时间戳（ISO格式）
@@ -39,6 +43,14 @@ interface FocusSession {
   totalPauseTime: number;   // 累计暂停时间（秒）
   pauseCount: number;
   customDuration: number;   // 用户自定义时长（分钟）
+}
+
+interface PlanOption {
+  id: string;
+  name: string;
+  isPrimary: boolean;
+  dailyGoalMinutes: number;
+  milestones?: Array<{ id: string; title: string; isCompleted?: boolean; order?: number }>;
 }
 
 const FOCUS_PAUSE_MESSAGE = '休息一下吧，我一直在。';
@@ -75,6 +87,7 @@ export default function Focus() {
   const [countdown, setCountdown] = useState(3);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [plannedMinutes, setPlannedMinutes] = useState(30);
+  const [sessionGoalMinutes, setSessionGoalMinutes] = useState(30);
   const [customDuration, setCustomDuration] = useState(30);
   const [pauseCount, setPauseCount] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -519,7 +532,7 @@ export default function Focus() {
   };
   
   // 加载主要计划作为默认
-  const [availablePlans, setAvailablePlans] = useState<Array<{id:string; name:string; isPrimary:boolean; dailyGoalMinutes:number}>>([]);
+  const [availablePlans, setAvailablePlans] = useState<PlanOption[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | 'free'>('free');
   const mockPlans = {
     name: '自由时间',
@@ -542,6 +555,63 @@ export default function Focus() {
     selectedPlanId !== 'free'
       ? availablePlans.find(p => p.id === selectedPlanId)
       : null;
+
+  const resolveGoalMinutes = (planId: string | 'free'): number => {
+    if (planId === 'free') return 30;
+    const plan = availablePlans.find(p => p.id === planId);
+    return plan?.dailyGoalMinutes || 30;
+  };
+
+  const getGoalMinutesFromDb = async (planId: string, fallback: number): Promise<number> => {
+    try {
+      const response = await fetch(`/api/projects/${planId}`);
+      if (!response.ok) return fallback;
+      const data = await response.json();
+      return data?.project?.dailyGoalMinutes || fallback;
+    } catch (error) {
+      console.warn('读取计划最小时长失败，使用本地值兜底', error);
+      return fallback;
+    }
+  };
+
+  const resolveGoalSource = (planId: string | 'free'): 'primary' | 'selected' | 'free' => {
+    if (planId === 'free') return 'free';
+    const plan = availablePlans.find(p => p.id === planId);
+    return plan?.isPrimary ? 'primary' : 'selected';
+  };
+
+  const appendCustomGoalsToPlan = async (planId: string, goals: Array<{ id: string; title: string }>) => {
+    if (!goals.length) return;
+    try {
+      const projectRes = await fetch(`/api/projects/${planId}`);
+      if (!projectRes.ok) return;
+      const projectData = await projectRes.json();
+      const projectMilestones = Array.isArray(projectData?.project?.milestones)
+        ? projectData.project.milestones
+        : [];
+      const maxOrder = projectMilestones.length > 0
+        ? Math.max(...projectMilestones.map((m: any) => Number(m.order) || 0))
+        : 0;
+
+      const mergedMilestones = [
+        ...projectMilestones,
+        ...goals.map((goal, index) => ({
+          id: goal.id,
+          title: goal.title,
+          isCompleted: false,
+          order: maxOrder + index + 1,
+        })),
+      ];
+
+      await fetch(`/api/projects/${planId}/milestones`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestones: mergedMilestones }),
+      });
+    } catch (error) {
+      console.warn('同步自定义小目标到数据库失败', error);
+    }
+  };
 
   // 当前选中的目标信息
   const selectedGoalInfo = allGoals.find(g => g.id === selectedGoal);
@@ -571,28 +641,28 @@ export default function Focus() {
     if (value === 'free') {
       setSessionName(mockPlans.name);
       setPlannedMinutes(30);
-    setCustomDuration(30);
+      setCustomDuration(30);
+      setSessionGoalMinutes(30);
       // 自由时间：清空计划小目标，只显示自定义
       setPlanMilestones([]);
       setCustomGoals([]);
     } else {
       const plan = availablePlans.find(p => p.id === value);
       if (plan) {
+        const goalMinutes = plan.dailyGoalMinutes || 30;
         setSessionName(plan.name);
-        setPlannedMinutes(plan.dailyGoalMinutes || 30);
-      setCustomDuration(plan.dailyGoalMinutes || 30);
-        
-        // 从localStorage加载计划的小目标 - 只加载未完成的
-        const savedPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
-        const selectedPlan = savedPlans.find((p: any) => p.id === value);
-        if (selectedPlan && selectedPlan.milestones) {
-          // 过滤掉已完成的小目标
-          const uncompleted = selectedPlan.milestones.filter((m: any) => !m.isCompleted);
-          console.log('📋 切换计划，加载未完成小目标:', uncompleted.length);
-          setPlanMilestones(uncompleted);
-        } else {
-          setPlanMilestones([]);
-        }
+        setPlannedMinutes(goalMinutes);
+        setCustomDuration(goalMinutes);
+        setSessionGoalMinutes(goalMinutes);
+        const uncompleted = (plan.milestones || [])
+          .filter((m) => !m.isCompleted)
+          .map((m, index) => ({
+            id: m.id,
+            title: m.title,
+            completed: false,
+            order: typeof m.order === 'number' ? m.order : index,
+          }));
+        setPlanMilestones(uncompleted);
         setCustomGoals([]);
       }
     }
@@ -610,167 +680,111 @@ export default function Focus() {
     localStorage.setItem('focusSession', JSON.stringify(updatedSession));
   };
 
-  // 初始化：加载计划与默认值 - 实时同步
+  // 初始化：从数据库加载计划与默认值
   useEffect(() => {
-    const loadPlans = (shouldResetSelection: boolean = false) => {
-      console.log('🔄 重新加载计划数据...', { shouldResetSelection });
-      // 加载可用计划 - 过滤掉已完成的计划
-      const allPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
-      const activePlans = allPlans.filter((p: any) => !p.isCompleted);
-      setAvailablePlans(activePlans);
-      const primary = activePlans.find((p:any) => p.isPrimary);
-      
-      // 只有在初始加载或shouldResetSelection为true时才重置计划选择
-      if (shouldResetSelection || isInitialLoadRef.current) {
-        // 🌟 检查是否是快速启动模式
-        const urlParams = new URLSearchParams(window.location.search);
-        const isQuickStart = urlParams.get('quickStart') === 'true';
-        const durationParam = urlParams.get('duration');
-        
-        if (primary) {
-          setSelectedPlanId(primary.id);
-          setSessionName(primary.name);
-          const targetDuration = durationParam ? parseInt(durationParam) : (primary.dailyGoalMinutes || 30);
-          setPlannedMinutes(targetDuration);
-          setCustomDuration(targetDuration);
-          // 加载主要计划的小目标 - 过滤已完成的目标
-          if (primary.milestones) {
-            console.log('📋 加载小目标，总数:', primary.milestones.length);
-            const uncompleted = primary.milestones.filter((m: any) => !m.isCompleted);
-            console.log('✅ 未完成的小目标:', uncompleted.length);
+    const loadPlans = async (shouldResetSelection: boolean = false) => {
+      try {
+        const response = await fetch('/api/projects');
+        if (!response.ok) return false;
+        const data = await response.json();
+        const allPlans: PlanOption[] = Array.isArray(data?.projects) ? data.projects : [];
+        const activePlans = allPlans.filter((p: any) => !p.isCompleted);
+        setAvailablePlans(activePlans);
+        const primary = activePlans.find((p) => p.isPrimary);
+
+        if (shouldResetSelection || isInitialLoadRef.current) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const isQuickStart = urlParams.get('quickStart') === 'true';
+          const durationParam = urlParams.get('duration');
+
+          if (primary) {
+            setSelectedPlanId(primary.id);
+            setSessionName(primary.name);
+            const targetDuration = durationParam ? parseInt(durationParam, 10) : (primary.dailyGoalMinutes || 30);
+            const goalMinutes = primary.dailyGoalMinutes || 30;
+            setPlannedMinutes(targetDuration);
+            setCustomDuration(targetDuration);
+            setSessionGoalMinutes(goalMinutes);
+            const uncompleted = (primary.milestones || [])
+              .filter((m) => !m.isCompleted)
+              .map((m, index) => ({
+                id: m.id,
+                title: m.title,
+                completed: false,
+                order: typeof m.order === 'number' ? m.order : index,
+              }));
             setPlanMilestones(uncompleted);
-          }
-          
-          // 🌟 如果是快速启动，自动选中今日目标（如果有）
-          if (isQuickStart) {
-            const todayGoalId = localStorage.getItem('todaySelectedGoalId');
-            const todayGoalDate = localStorage.getItem('todaySelectedGoalDate');
-            const today = new Date().toLocaleDateString('zh-CN', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit'
-            }).replace(/\//g, '-');
-            
-            if (todayGoalId && todayGoalDate === today && primary.milestones) {
-              const todayGoal = primary.milestones.find((m: any) => m.id === todayGoalId);
-              if (todayGoal && !todayGoal.isCompleted) {
-                setSelectedGoal(todayGoalId);
-                console.log('📌 快速启动，自动选中今日目标:', todayGoal.title);
+
+            if (isQuickStart) {
+              const todayGoalId = localStorage.getItem('todaySelectedGoalId');
+              const todayGoalDate = localStorage.getItem('todaySelectedGoalDate');
+              const today = new Date().toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+              }).replace(/\//g, '-');
+              if (todayGoalId && todayGoalDate === today) {
+                const todayGoal = (primary.milestones || []).find((m) => m.id === todayGoalId && !m.isCompleted);
+                if (todayGoal) setSelectedGoal(todayGoalId);
               }
             }
+          } else {
+            setSelectedPlanId('free');
+            setSessionName(mockPlans.name);
+            const targetDuration = durationParam ? parseInt(durationParam, 10) : 15;
+            setPlannedMinutes(targetDuration);
+            setCustomDuration(targetDuration);
+            setSessionGoalMinutes(30);
+            setPlanMilestones([]);
           }
-        } else {
-          setSelectedPlanId('free');
-          setSessionName(mockPlans.name);
-          const targetDuration = durationParam ? parseInt(durationParam) : 15;
-          setPlannedMinutes(targetDuration);
-          setCustomDuration(targetDuration);
-          setPlanMilestones([]);
+          isInitialLoadRef.current = false;
+          return isQuickStart;
         }
-        isInitialLoadRef.current = false; // 标记已完成初始加载
+      } catch (error) {
+        console.warn('加载计划失败', error);
       }
-      
-      // 🌟 返回是否是快速启动模式
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get('quickStart') === 'true';
+      return false;
     };
 
-    // 初始加载
-    const isQuickStart = loadPlans();
-    
-    // 🌟 如果是快速启动，延迟后自动开始倒计时
-    if (isQuickStart) {
-      console.log('⚡ 快速启动模式，准备自动开始...');
-      const timer = setTimeout(() => {
-        if (state === 'preparing' && sessionRef.current) {
-          console.log('⚡ 快速启动 - 自动开始倒计时');
-          startFocus();
-        }
-      }, 800); // 延迟800ms确保数据加载完成
-      
-      return () => clearTimeout(timer);
-    }
-    
-    // 如果不在专注状态，清理旧的状态
+    let quickStartTimer: NodeJS.Timeout | null = null;
+    void (async () => {
+      const isQuickStart = await loadPlans();
+      if (isQuickStart) {
+        quickStartTimer = setTimeout(() => {
+          if (state === 'preparing' && sessionRef.current) {
+            void startFocus();
+          }
+        }, 800);
+      }
+    })();
+
     if (state === 'preparing') {
-      // 清理可能存在的完成/中断状态
       const saved = localStorage.getItem('focusSession');
       if (saved) {
-        const session: FocusSession = JSON.parse(saved);
-        if (session.status === 'completed' || session.status === 'interrupted') {
+        const savedSession: FocusSession = JSON.parse(saved);
+        if (savedSession.status === 'completed' || savedSession.status === 'interrupted') {
           localStorage.removeItem('focusSession');
           setElapsedTime(0);
         }
       }
     }
 
-    // 监听localStorage变化以实时同步计划数据
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'userPlans') {
-        console.log('🔔 检测到计划数据变化，重新加载...');
-        loadPlans(false); // 不重置选择，只更新计划列表
-      }
-    };
-
-    // 监听页面可见性变化（从dashboard返回时重新加载）
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // 检查是否有意外中断的会话需要恢复
-        const autoInterruptedAt = localStorage.getItem(autoInterruptedAtKey);
-        if (autoInterruptedAt && sessionRef.current && (sessionRef.current.status === 'running' || sessionRef.current.status === 'paused')) {
-          console.log('🔔 检测到意外中断的会话，准备恢复...');
-          // 会在恢复逻辑中处理
-        }
-        
-        // 如果页面变为可见且不在运行状态，重新加载计划数据
         if (state === 'preparing') {
-          console.log('🔔 页面可见，重新加载计划数据...');
-          loadPlans(false); // 不重置选择，只更新计划列表
-        } else if (state !== 'running' && state !== 'paused') {
-          // 如果页面从隐藏变为可见且不在运行状态，重置到准备状态
-          console.log('🔄 检测到页面状态变化，重置会话');
-          localStorage.removeItem('focusSession');
-          setElapsedTime(0);
-          setState('preparing');
-          setShowEndOptions(false);
-          // 重新初始化
-          const newSession: FocusSession = {
-            sessionId: `focus_${Date.now()}`,
-            plannedDuration: plannedMinutes,
-            elapsedTime: 0,
-            status: 'preparing',
-            startTime: new Date().toISOString(),
-            pauseCount: 0,
-            totalPauseTime: 0,
-            customDuration: plannedMinutes
-          };
-          sessionRef.current = newSession;
-          // 重新加载计划数据（需要重置选择）
-          loadPlans(true);
+          void loadPlans(false);
         }
       } else if (document.visibilityState === 'hidden') {
-        // 页面隐藏时，如果正在专注，标记为意外中断
         if (state === 'running' || state === 'paused') {
-          console.log('💾 页面隐藏，标记意外中断时间');
           localStorage.setItem(autoInterruptedAtKey, new Date().toISOString());
         }
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // 每2秒检查一次计划数据是否有变化（备用机制）
-    const interval = setInterval(() => {
-      if (state === 'preparing') {
-        loadPlans(false); // 不重置用户的选择，只更新计划列表
-      }
-    }, 2000);
-
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(interval);
+      if (quickStartTimer) clearTimeout(quickStartTimer);
     };
   }, [state, mockPlans.date]);
 
@@ -813,6 +827,7 @@ export default function Focus() {
           sessionRef.current = session;
           setElapsedTime(session.elapsedTime); // 使用保存的固定时间
           setPlannedMinutes(session.plannedDuration);
+          setSessionGoalMinutes(session.goalMinutes ?? session.plannedDuration ?? 30);
           setCustomDuration(session.customDuration);
           setPauseCount(session.pauseCount);
           setState(session.status);
@@ -835,7 +850,12 @@ export default function Focus() {
             try {
               // 优先调用 dashboard 回调（如果存在）
               if (typeof window !== 'undefined' && (window as any).reportFocusSessionComplete) {
-                (window as any).reportFocusSessionComplete(recordedMinutes, undefined, false, session.plannedDuration);
+                (window as any).reportFocusSessionComplete(
+                  recordedMinutes,
+                  undefined,
+                  false,
+                  session.goalMinutes ?? session.plannedDuration,
+                );
               } else {
                 // 兜底：直接写入本地累计
                 const today = new Date().toISOString().split('T')[0];
@@ -899,6 +919,7 @@ export default function Focus() {
           setElapsedTime(restoredElapsedTime);
           setTotalPauseTime(totalPauseTime);
           setPlannedMinutes(session.plannedDuration);
+          setSessionGoalMinutes(session.goalMinutes ?? session.plannedDuration ?? 30);
           setCustomDuration(session.customDuration);
           setPauseCount(session.pauseCount);
           
@@ -918,7 +939,12 @@ export default function Focus() {
               console.log('📊 记录意外退出的专注时长', { minutes: recordedMinutes });
               
               // 记录到dashboard
-              (window as any).reportFocusSessionComplete(recordedMinutes, undefined, false);
+              (window as any).reportFocusSessionComplete(
+                recordedMinutes,
+                undefined,
+                false,
+                session.goalMinutes ?? session.plannedDuration,
+              );
               
               // 显示意外结束提示
               setInterruptedSessionData({
@@ -998,6 +1024,10 @@ export default function Focus() {
       const newSession: FocusSession = {
         sessionId: `focus_${Date.now()}`,
         plannedDuration: plannedMinutes,
+        goalMinutes: sessionGoalMinutes,
+        goalSource: resolveGoalSource(selectedPlanId),
+        targetMilestoneId: selectedGoal,
+        projectId: selectedPlanId !== 'free' ? selectedPlanId : null,
         elapsedTime: 0,
         status: 'preparing',
         startTime: new Date().toISOString(),
@@ -1030,13 +1060,15 @@ export default function Focus() {
 
   // 监听专注时长变化，检测是否达到目标时长并播放提示音
   useEffect(() => {
-    if (state === 'running' && plannedMinutes > 0 && sessionRef.current) {
+    if (state === 'running' && sessionRef.current) {
+      const effectiveGoalMinutes = sessionRef.current.goalMinutes || sessionGoalMinutes;
+      if (effectiveGoalMinutes <= 0) return;
       const currentElapsed = calculateElapsedTime(
         sessionRef.current.startTime,
         sessionRef.current.totalPauseTime || 0,
         false
       );
-      const totalSeconds = plannedMinutes * 60;
+      const totalSeconds = effectiveGoalMinutes * 60;
       const isOverTime = currentElapsed >= totalSeconds; // 使用 >= 确保精确触发
       
       // 检测是否刚达到目标时长（从未达到变为达到）
@@ -1054,7 +1086,7 @@ export default function Focus() {
       // 不在运行状态时，重置标记
       hasPlayedGoalSoundRef.current = false;
     }
-  }, [elapsedTime, state, plannedMinutes]);
+  }, [elapsedTime, state, sessionGoalMinutes]);
 
 
   // 清理计时器
@@ -1140,7 +1172,7 @@ export default function Focus() {
   };
 
   // 开始专注流程
-  const startFocus = () => {
+  const startFocus = async () => {
     if (!sessionRef.current) return;
     
     // 记录本次开始前的"今日累计专注分钟"，用于累计达标判断
@@ -1150,58 +1182,47 @@ export default function Focus() {
     hasPlayedGoalSoundRef.current = false;
     hasPlayedTadaSoundRef.current = false;
     
-    // 以用户当前设置为准更新计划时长
+    const sessionProjectId = selectedPlanId !== 'free' ? selectedPlanId : null;
+    let goalMinutes = resolveGoalMinutes(selectedPlanId);
+    const goalSource = resolveGoalSource(selectedPlanId);
+    if (sessionProjectId) {
+      goalMinutes = await getGoalMinutesFromDb(sessionProjectId, goalMinutes);
+    }
+    setSessionGoalMinutes(goalMinutes);
+
+    // 以用户当前设置为准更新会话信息
     sessionRef.current.plannedDuration = plannedMinutes;
+    sessionRef.current.goalMinutes = goalMinutes;
+    sessionRef.current.goalSource = goalSource;
+    sessionRef.current.targetMilestoneId = selectedGoal;
+    sessionRef.current.projectId = sessionProjectId;
     sessionRef.current.customDuration = plannedMinutes;
     saveState({
       plannedDuration: plannedMinutes,
+      goalMinutes,
+      goalSource,
+      targetMilestoneId: selectedGoal,
+      projectId: sessionProjectId,
       customDuration: plannedMinutes
     });
 
-    const selectedPlan = getSelectedPlan();
-    const goalMinutes =
-      selectedPlanId !== 'free'
-        ? (selectedPlan?.dailyGoalMinutes ?? plannedMinutes)
-        : 30;
     trackEvent({
       name: 'focus_start',
       feature: 'focus',
       page: '/focus',
       action: 'start',
       properties: {
-        projectId: selectedPlanId !== 'free' ? selectedPlanId : null,
+        projectId: sessionProjectId,
         plannedMinutes,
         goalMinutes,
+        goalSource,
+        targetMilestoneId: selectedGoal,
       },
     });
 
-    // 如果是选择计划（非自由时间），将自定义小目标添加到计划中
+    // 如果是选择计划（非自由时间），将自定义小目标同步到数据库
     if (selectedPlanId !== 'free' && customGoals.length > 0) {
-      const savedPlans = JSON.parse(localStorage.getItem('userPlans') || '[]');
-      const updatedPlans = savedPlans.map((p: any) => {
-        if (p.id === selectedPlanId) {
-          // 找到当前小目标的最大order值
-          const maxOrder = p.milestones.length > 0 
-            ? Math.max(...p.milestones.map((m: any) => m.order))
-            : 0;
-          
-          // 将自定义小目标添加为新的milestones
-          const newMilestones = customGoals.map((goal, index) => ({
-            id: goal.id,
-            title: goal.title,
-            isCompleted: false,
-            order: maxOrder + index + 1
-          }));
-          
-          return {
-            ...p,
-            milestones: [...p.milestones, ...newMilestones]
-          };
-        }
-        return p;
-      });
-      
-      localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      await appendCustomGoalsToPlan(selectedPlanId, customGoals);
     }
     
     // 预生成「今日专注文案」，供 Dashboard / 小结页预填使用
@@ -1286,13 +1307,14 @@ export default function Focus() {
         setElapsedTime(calculatedTime);
         saveState({ elapsedTime: calculatedTime });
         
-        // 检查是否达到本次设定的目标时长（触发金色背景）
-        if (calculatedTime >= plannedMinutes * 60 && !goldActivatedThisSessionRef.current) {
+        const effectiveGoalMinutes = sessionRef.current.goalMinutes || sessionGoalMinutes;
+        // 检查是否达到本次行动目标的最小时长（触发金色背景）
+        if (calculatedTime >= effectiveGoalMinutes * 60 && !goldActivatedThisSessionRef.current) {
           // 本次专注达到设定时长，激活金色背景
           goldActivatedThisSessionRef.current = true;
           
           // 播放温柔的提示音（仅播放一次）
-          if (!hasPlayedGoalSoundRef.current && plannedMinutes > 0) {
+          if (!hasPlayedGoalSoundRef.current && effectiveGoalMinutes > 0) {
             hasPlayedGoalSoundRef.current = true;
             playGoalAchievementSound();
           }
@@ -1360,7 +1382,12 @@ export default function Focus() {
           
           // 归档旧会话到旧日期
           if (oldMinutes > 0 && typeof window !== 'undefined' && (window as any).reportFocusSessionComplete) {
-            (window as any).reportFocusSessionComplete(oldMinutes, undefined, false, sessionRef.current.plannedDuration);
+            (window as any).reportFocusSessionComplete(
+              oldMinutes,
+              undefined,
+              false,
+              sessionRef.current.goalMinutes || sessionRef.current.plannedDuration,
+            );
           }
           
           // 清理旧会话
@@ -1371,6 +1398,10 @@ export default function Focus() {
           const newSession: FocusSession = {
             sessionId: `focus_${Date.now()}`,
             plannedDuration: plannedMinutes,
+            goalMinutes: sessionRef.current.goalMinutes || sessionGoalMinutes,
+            goalSource: sessionRef.current.goalSource || resolveGoalSource(selectedPlanId),
+            targetMilestoneId: sessionRef.current.targetMilestoneId || selectedGoal,
+            projectId: sessionRef.current.projectId || null,
             elapsedTime: 0,
             status: 'running',
             startTime: nowIso,
@@ -1501,11 +1532,8 @@ export default function Focus() {
       // 获取用户评分（如果有，且仅"本次完成"时）- 保留用于心流指数计算
       const rating = completedForStats ? localStorage.getItem('lastFocusRating') : null;
       const numericRating = rating ? parseFloat(rating) : undefined;
-      const selectedPlan = getSelectedPlan();
-      const goalMinutes =
-        selectedPlanId !== 'free'
-          ? (selectedPlan?.dailyGoalMinutes ?? plannedMinutes)
-          : 30;
+      const sessionProjectId = sessionRef.current.projectId;
+      const goalMinutes = sessionRef.current.goalMinutes || sessionGoalMinutes;
       const isMinMet = minutes >= goalMinutes;
       
       // 🔥 保存到数据库（用于周报统计）
@@ -1531,9 +1559,11 @@ export default function Focus() {
             note: sessionName || null,
             rating: numericRating,
             flowIndex: numericRating,
-            projectId: selectedPlanId !== 'free' ? selectedPlanId : null, // ✅ 修复：使用计划ID而不是小目标ID
+            projectId: sessionProjectId,
             goalMinutes,
             isMinMet,
+            goalSource: sessionRef.current.goalSource,
+            targetMilestoneId: sessionRef.current.targetMilestoneId,
           }),
         }).then(response => {
           if (response.ok) {
@@ -1552,7 +1582,7 @@ export default function Focus() {
         page: '/focus',
         action: completedForStats ? 'complete' : 'interrupt',
         properties: {
-          projectId: selectedPlanId !== 'free' ? selectedPlanId : null,
+          projectId: sessionProjectId,
           durationMinutes: minutes,
           goalMinutes,
           isMinMet,
@@ -1568,7 +1598,7 @@ export default function Focus() {
           completed: completedForStats,
           numericRating 
         });
-        (window as any).reportFocusSessionComplete(minutes, numericRating, completedForStats, plannedMinutes);
+        (window as any).reportFocusSessionComplete(minutes, numericRating, completedForStats, goalMinutes);
       } else {
         console.warn('⚠️ reportFocusSessionComplete 函数不存在，使用备用方案');
         
@@ -1672,6 +1702,10 @@ export default function Focus() {
     const newSession: FocusSession = {
       sessionId: `focus_${Date.now()}`,
       plannedDuration: plannedMinutes,
+      goalMinutes: sessionGoalMinutes,
+      goalSource: resolveGoalSource(selectedPlanId),
+      targetMilestoneId: selectedGoal,
+      projectId: selectedPlanId !== 'free' ? selectedPlanId : null,
       elapsedTime: 0,
       status: 'preparing',
       startTime: new Date().toISOString(),
@@ -1699,6 +1733,12 @@ export default function Focus() {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getCompletionFlags = (currentElapsed: number, totalSeconds: number, isDailyGoalMet: boolean, isGolden: boolean) => {
+    const sessionCompleted = currentElapsed >= totalSeconds;
+    const dailyCompleted = isDailyGoalMet && !isGolden;
+    return { sessionCompleted, dailyCompleted };
   };
 
   // 处理页面关闭/刷新 - 保存当前状态和累计时间
@@ -2070,17 +2110,15 @@ export default function Focus() {
         )
       : elapsedTime;
     
-    const totalSeconds = plannedMinutes * 60;
+    const effectiveGoalMinutes = sessionRef.current?.goalMinutes || sessionGoalMinutes || 30;
+    const totalSeconds = effectiveGoalMinutes * 60;
     const progress = Math.min(currentElapsed / totalSeconds, 1);
 
     // 金色背景：仅在本次专注达到本次设定时长时显示
     const isGolden = goldActivatedThisSessionRef.current;
     
-    // 每日最小专注目标：优先使用当前计划的 dailyGoalMinutes（与本次专注时长解耦）
-    const selectedPlan = selectedPlanId !== 'free'
-      ? availablePlans.find(p => p.id === selectedPlanId)
-      : null;
-    const dailyGoalMinutes = selectedPlan?.dailyGoalMinutes ?? plannedMinutes;
+    // 每日最小专注目标：跟随本次会话绑定的行动目标
+    const dailyGoalMinutes = effectiveGoalMinutes;
     
     // 检查今日累计是否达标（用于显示"今日已达标"标识）
     const todayTotalMinutes = todayMinutesBeforeStartRef.current + Math.floor(currentElapsed / 60);
@@ -2130,7 +2168,7 @@ export default function Focus() {
             <p className={`text-lg font-medium mb-2 ${
               isGolden ? 'text-yellow-900/90' : 'text-white/80'
             }`}>
-              目标: {plannedMinutes} 分钟 · {Math.floor(progress * 100)}% 完成
+              最小目标: {effectiveGoalMinutes} 分钟 · {Math.floor(progress * 100)}% 完成
             </p>
             {isGolden && (
               <div className="text-yellow-50 text-xl animate-pulse mt-2 font-semibold">
@@ -2190,8 +2228,7 @@ export default function Focus() {
             </button>
             <button
               onClick={() => {
-                const sessionCompleted = currentElapsed >= totalSeconds;
-                const dailyCompleted = isDailyGoalMet && !isGolden;
+                const { sessionCompleted } = getCompletionFlags(currentElapsed, totalSeconds, isDailyGoalMet, isGolden);
                 setPendingEndCompleted(sessionCompleted);
                 setShowEndConfirm(true);
               }}
@@ -2300,8 +2337,7 @@ export default function Focus() {
                 <button
                   onClick={() => {
                     setShowEndConfirm(false);
-                    const sessionCompleted = currentElapsed >= totalSeconds;
-                    const dailyCompleted = isDailyGoalMet && !isGolden;
+                    const { sessionCompleted, dailyCompleted } = getCompletionFlags(currentElapsed, totalSeconds, isDailyGoalMet, isGolden);
                     endFocus(sessionCompleted, dailyCompleted);
                   }}
                   className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:shadow-lg transition-all"
@@ -2329,7 +2365,7 @@ export default function Focus() {
         )
       : elapsedTime;
     
-    const totalSeconds = plannedMinutes * 60;
+    const totalSeconds = (sessionRef.current?.goalMinutes || sessionGoalMinutes || 30) * 60;
     const progress = Math.min(currentElapsed / totalSeconds, 1);
     
     // 计算当前暂停时长
@@ -2469,8 +2505,8 @@ export default function Focus() {
     const completed = state === 'completed';
     const minutes = Math.floor(elapsedTime / 60);
     const seconds = elapsedTime % 60;
-    const plannedDurationMinutes = sessionRef.current?.plannedDuration ?? plannedMinutes;
-    const exceededTarget = completed && plannedDurationMinutes > 0 && elapsedTime >= plannedDurationMinutes * 60;
+    const goalDurationMinutes = sessionRef.current?.goalMinutes ?? sessionGoalMinutes;
+    const exceededTarget = completed && goalDurationMinutes > 0 && elapsedTime >= goalDurationMinutes * 60;
 
     return (
       <>
@@ -2608,8 +2644,8 @@ export default function Focus() {
             </h1>
             <p className="text-white/90 text-xl mb-8">
               {completed
-                ? exceededTarget && plannedDurationMinutes
-                  ? `你超额完成了目标 ${plannedDurationMinutes} 分钟 · 实际 ${minutes} 分 ${seconds} 秒`
+                ? exceededTarget && goalDurationMinutes
+                  ? `你超额完成了目标 ${goalDurationMinutes} 分钟 · 实际 ${minutes} 分 ${seconds} 秒`
                   : `你本次专注共持续了 ${minutes} 分 ${seconds} 秒`
                 : `你已专注 ${minutes} 分 ${seconds} 秒`}
             </p>

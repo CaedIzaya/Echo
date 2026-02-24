@@ -10,6 +10,7 @@ interface Interest {
 
 interface InterestGridProps {
   onSelectionChange: (selectedIds: string[], selectedObjects?: Interest[]) => void;
+  onNeedInspiration?: () => void;
 }
 
 // 精选的3x4兴趣网格 - 在组件内部定义
@@ -41,7 +42,7 @@ export const PLAN_ICONS = INTERESTS.map(interest => ({
 }));
 
 
-export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
+export default function InterestGrid({ onSelectionChange, onNeedInspiration }: InterestGridProps) {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInterest, setCustomInterest] = useState('');
@@ -152,9 +153,9 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
           );
         })}
 
-        {/* 自定义兴趣泡泡 - 手机端单独占一行，PC端正常排列 */}
+        {/* 自定义兴趣泡泡 */}
         {showCustomInput ? (
-          <div className="relative flex aspect-square w-16 sm:w-20 md:w-24 lg:w-28 flex-col items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md p-2 animate-fade-in col-span-4 md:col-span-1">
+          <div className="relative flex aspect-square w-16 sm:w-20 md:w-24 lg:w-28 flex-col items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md p-2 animate-fade-in col-span-2 md:col-span-1">
             <input
               type="text"
               value={customInterest}
@@ -183,7 +184,7 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
               bubble-tile relative flex aspect-square w-16 sm:w-20 md:w-24 lg:w-28 flex-col items-center justify-center rounded-full border border-dashed border-white/30 
               bg-white/5 text-white/60 transition-all hover:border-white/50 hover:text-white/90 hover:bg-white/10 backdrop-blur-sm
               ${selectedInterests.length >= maxSelection ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
-              col-span-4 md:col-span-1
+              col-span-2 md:col-span-1
             `}
             style={{
               boxShadow: '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
@@ -197,6 +198,25 @@ export default function InterestGrid({ onSelectionChange }: InterestGridProps) {
             <span className="text-xs">自定义</span>
           </button>
         )}
+
+        {/* 需要灵感泡泡 - 与自定义同等权重 */}
+        <button
+          onClick={onNeedInspiration}
+          className={`
+            bubble-tile relative flex aspect-square w-16 sm:w-20 md:w-24 lg:w-28 flex-col items-center justify-center rounded-full border border-dashed border-white/30
+            bg-white/5 text-white/60 transition-all hover:border-white/50 hover:text-white/90 hover:bg-white/10 backdrop-blur-sm
+            cursor-pointer col-span-2 md:col-span-1
+          `}
+          style={{
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
+          }}
+        >
+          <div className="absolute inset-0 rounded-full opacity-20" style={{
+            background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), transparent 60%)'
+          }} />
+          <span className="text-xl sm:text-2xl mb-1">💡</span>
+          <span className="text-xs">需要灵感？</span>
+        </button>
       </div>
 
       <style jsx>{`

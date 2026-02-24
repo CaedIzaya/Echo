@@ -188,6 +188,8 @@ model FocusSession {
   resumeCount Int @default(0)
   goalMinutes Int?
   isMinMet  Boolean  @default(false)
+  goalSource String?
+  targetMilestoneId String?
   projectId String?
   userId    String
   createdAt DateTime @default(now())

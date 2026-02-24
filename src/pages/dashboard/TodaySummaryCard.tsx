@@ -155,7 +155,7 @@ function TodaySummaryCard({ userId, hasFocusOverride }: TodaySummaryCardProps) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 h-48 flex items-center justify-center animate-pulse">
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 h-full flex items-center justify-center animate-pulse">
         <div className="h-4 w-24 bg-gray-200 rounded"></div>
       </div>
     );

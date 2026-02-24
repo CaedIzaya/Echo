@@ -15,6 +15,8 @@ type FocusPayload = {
   expEarned?: number;
   goalMinutes?: number;
   isMinMet?: boolean;
+  goalSource?: string;
+  targetMilestoneId?: string;
 };
 
 export default async function handler(
@@ -126,12 +128,19 @@ export default async function handler(
     const expEarned = body.expEarned ?? Math.max(0, Math.round(duration / 5));
 
     let goalMinutes = body.goalMinutes;
-    if (!goalMinutes && body.projectId) {
-      const project = await db.project.findUnique({
-        where: { id: body.projectId },
+    let safeProjectId = body.projectId;
+    if (body.projectId) {
+      const project = await db.project.findFirst({
+        where: { id: body.projectId, userId: session.user.id },
         select: { dailyGoalMinutes: true },
       });
-      goalMinutes = project?.dailyGoalMinutes ?? undefined;
+      if (!project) {
+        return res.status(400).json({ error: "无效的 projectId" });
+      }
+      if (!goalMinutes) {
+        goalMinutes = project.dailyGoalMinutes ?? undefined;
+      }
+      safeProjectId = body.projectId;
     }
     if (!goalMinutes && !body.projectId) {
       goalMinutes = 30;
@@ -161,9 +170,11 @@ export default async function handler(
           rating: body.rating ?? flowIndex,
           flowIndex,
           expEarned,
-          projectId: body.projectId,
+          projectId: safeProjectId,
           goalMinutes: typeof goalMinutes === 'number' ? goalMinutes : null,
           isMinMet,
+          goalSource: body.goalSource ?? null,
+          targetMilestoneId: body.targetMilestoneId ?? null,
         },
       });
 

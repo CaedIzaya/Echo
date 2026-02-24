@@ -1290,7 +1290,7 @@ export default function Dashboard() {
   };
 
   // 专注完成后更新统计数据（由focus页面调用）
-  const handleFocusSessionComplete = async (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
+  const handleFocusSessionComplete = async (minutes: number, rating?: number, completed: boolean = true, goalMinutes?: number) => {
     const status = completed ? '✅ 完成' : '⚠️ 中断';
     console.log('📈 Dashboard收到专注报告', { 
       status,
@@ -1459,9 +1459,9 @@ export default function Dashboard() {
     }, 3000); // 延迟3秒，确保数据库已写入
 
     // 更新行为得分（用于临时心流倍率）
-  const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
-  const completedDailyGoal = dailyGoalMinutes > 0 ? newTodayMinutes >= dailyGoalMinutes : false;
-  const exceededDailyGoal = dailyGoalMinutes > 0 ? newTodayMinutes >= dailyGoalMinutes * 1.2 : false;
+    const dailyGoalMinutes = goalMinutes || primaryPlan?.dailyGoalMinutes || 0;
+    const completedDailyGoal = dailyGoalMinutes > 0 ? newTodayMinutes >= dailyGoalMinutes : false;
+    const exceededDailyGoal = dailyGoalMinutes > 0 ? newTodayMinutes >= dailyGoalMinutes * 1.2 : false;
 
     updateDailyBehaviorRecord(today, {
       present: true,
@@ -1479,8 +1479,8 @@ export default function Dashboard() {
       streakDays: stats.streakDays
     });
 
-    // 更新等级经验值（传递 plannedMinutes 用于判断经验值类型）
-    await updateUserExpFromSession(minutes, rating, completed, plannedMinutes);
+    // 更新等级经验值（使用本次会话判定基准）
+    await updateUserExpFromSession(minutes, rating, completed, goalMinutes, newTodayMinutes);
     
     // 检查首次专注成就（在第一次完成专注时立即触发）
     if (completed && currentTotalMinutes === 0 && newTotalMinutes > 0) {
@@ -1575,24 +1575,30 @@ export default function Dashboard() {
   };
 
   // 更新用户经验值（优化后的经验值系统）
-  const updateUserExpFromSession = async (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
+  const updateUserExpFromSession = async (
+    minutes: number,
+    rating?: number,
+    completed: boolean = true,
+    goalMinutes?: number,
+    projectedTodayMinutes?: number,
+  ) => {
     const currentExp = userExp; // 使用 Hook 的值
     
     let sessionExp = 0;
     
     if (completed && minutes > 0) {
-      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || 0;
-      const todayMinutes = todayStats.minutes;
+      const dailyGoalMinutes = goalMinutes || primaryPlan?.dailyGoalMinutes || 0;
+      const todayMinutes = projectedTodayMinutes ?? todayStats.minutes;
       
       // 判断经验值类型
       if (dailyGoalMinutes > 0 && todayMinutes >= dailyGoalMinutes) {
         // 完成主要计划设置最小专注时长：高经验值
         sessionExp = LevelManager.calculatePrimaryGoalExp(minutes, dailyGoalMinutes, stats.streakDays);
         console.log('📈 经验值类型：完成主要计划目标（高）', { minutes, dailyGoalMinutes, streakDays: stats.streakDays, exp: sessionExp });
-      } else if (plannedMinutes && minutes >= plannedMinutes) {
+      } else if (goalMinutes && minutes >= goalMinutes) {
         // 完成自己设定的专注时长（但未达到主要计划最小时长）：中经验值
-        sessionExp = LevelManager.calculateCustomGoalExp(minutes, plannedMinutes, stats.streakDays);
-        console.log('📈 经验值类型：完成设定目标（中）', { minutes, plannedMinutes, streakDays: stats.streakDays, exp: sessionExp });
+        sessionExp = LevelManager.calculateCustomGoalExp(minutes, goalMinutes, stats.streakDays);
+        console.log('📈 经验值类型：完成设定目标（中）', { minutes, goalMinutes, streakDays: stats.streakDays, exp: sessionExp });
       } else {
         // 每日完成专注（未完成设定目标）：低经验值
         sessionExp = LevelManager.calculateDailyFocusExp(minutes);
@@ -1638,8 +1644,8 @@ export default function Dashboard() {
 
   // 暴露给 focus 页使用的函数
   if (typeof window !== 'undefined') {
-    (window as any).reportFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true, plannedMinutes?: number) => {
-      handleFocusSessionComplete(minutes, rating, completed, plannedMinutes);
+    (window as any).reportFocusSessionComplete = (minutes: number, rating?: number, completed: boolean = true, goalMinutes?: number) => {
+      handleFocusSessionComplete(minutes, rating, completed, goalMinutes);
     };
   }
 
@@ -2235,6 +2241,18 @@ export default function Dashboard() {
 
     return computeFlowIndex(metrics, weeklyBehavior);
   }, [stats.streakDays, todayStats.minutes, weeklyStats.totalMinutes, totalFocusMinutes]);
+
+  const flowScore = clamp(Math.round(flowIndex.score || 0), 0, 100);
+  const flowStage =
+    flowScore < 45
+      ? '萌芽'
+      : flowScore < 60
+        ? '扎根'
+        : flowScore < 75
+          ? '顺流'
+          : flowScore < 90
+            ? '深流'
+            : '澄明';
 
   // 初始化成就管理器 + 数据完整性检查
   useEffect(() => {
@@ -3256,7 +3274,7 @@ export default function Dashboard() {
             <div className="grid gap-5 grid-cols-4">
               {/* 1. 等级卡片 */}
               {userLevel && (
-                <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 rounded-[2rem] p-9 text-white shadow-2xl shadow-purple-500/30 flex flex-col justify-between hover:scale-[1.02] transition-all duration-300 hover:shadow-purple-500/50 cursor-pointer aspect-square">
+                <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 rounded-[2rem] p-8 text-white shadow-2xl shadow-purple-500/30 flex flex-col justify-between hover:scale-[1.02] transition-all duration-300 hover:shadow-purple-500/50 cursor-pointer aspect-square">
                   <div className="flex items-start justify-between">
                     <p className="text-xs uppercase tracking-[0.4em] text-white/70 font-medium">当前等级</p>
                     <span className="text-3xl animate-pulse">⭐</span>
@@ -3279,70 +3297,102 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* 2. 连续专注 */}
-              <div className="bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
+              {/* 2. 心流指数 */}
+              <div className="relative overflow-hidden rounded-[2rem] p-8 text-white shadow-2xl shadow-fuchsia-500/25 flex flex-col justify-between gap-3 hover:scale-[1.02] transition-all duration-300 cursor-pointer aspect-square bg-gradient-to-br from-[#312e81] via-[#7c3aed] to-[#ec4899]">
+                <div className="pointer-events-none absolute -top-16 -right-12 h-40 w-40 rounded-full bg-white/20 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-16 -left-8 h-36 w-36 rounded-full bg-cyan-200/25 blur-3xl" />
                 <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">连续专注</p>
+                  <p className="text-xs uppercase tracking-[0.4em] text-white/80 font-medium">心流指数</p>
                   <button
-                    onClick={() => setShowStreakInfo(!showStreakInfo)}
+                    onClick={() => setShowFlowInfo(!showFlowInfo)}
                     data-tooltip-trigger
-                    className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
+                    className="relative z-10 w-5 h-5 rounded-full bg-white/30 hover:bg-white/45 flex items-center justify-center transition-colors cursor-pointer"
                   >
-                    <span className="text-xs font-bold text-zinc-600">!</span>
+                    <span className="text-xs font-bold text-white">!</span>
                   </button>
                 </div>
-                {showStreakInfo && (
-                  <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
+                {showFlowInfo && (
+                  <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[220px]">
                     <p className="text-xs text-zinc-600 leading-relaxed">
-                      你在echo连续累计下来的专注时光
+                      心流指数由专注质量、时长与稳定性综合计算，分数越高代表状态越稳。
                     </p>
                     <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
                   </div>
                 )}
-                <div className="flex-1 flex items-center">
+                <div className="relative z-10 flex-1 flex items-center">
                   <div>
-                    <p className="text-4xl font-bold text-zinc-900 leading-none">{stats.streakDays}</p>
-                    <p className="text-sm text-zinc-500 mt-2">天</p>
+                    <p className="text-5xl font-bold leading-none">{flowScore}</p>
+                    <p className="text-sm text-white/85 mt-2">{flowStage}</p>
                   </div>
                 </div>
-                <div className="h-1 w-12 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full"></div>
+                <div className="relative z-10 h-1.5 w-full bg-white/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-200 via-fuchsia-100 to-white transition-all duration-700 ease-out"
+                    style={{ width: `${flowScore}%` }}
+                  />
+                </div>
               </div>
 
-              {/* 3. 本周专注 */}
-              <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] p-8 shadow-xl shadow-emerald-100/50 flex flex-col justify-between gap-3 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs uppercase tracking-[0.4em] text-teal-500 font-medium">本周专注</p>
-                  <button
-                    onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
-                    data-tooltip-trigger
-                    className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <span className="text-xs font-bold text-zinc-600">!</span>
-                  </button>
-                </div>
-                {showWeeklyInfo && (
-                  <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[200px]">
-                    <p className="text-xs text-zinc-600 leading-relaxed">
-                      本周专注时长按照时区每周一00:00刷新。
-                    </p>
-                    <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
-                  </div>
-                )}
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-4xl font-bold text-zinc-900 leading-tight">
-                      {weeklyHours}h{weeklyMinutesRemainder}m
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-400 text-center">本周累计专注时长</p>
+              {/* 3. 今日小结 */}
+              <div className="aspect-square [&>*]:h-full">
+                <TodaySummaryCard
+                  userId={session?.user?.id || ''}
+                  hasFocusOverride={todayStats.minutes > 0}
+                />
               </div>
 
-              {/* 4. 今日小结 */}
-              <TodaySummaryCard
-                userId={session?.user?.id || ''}
-                hasFocusOverride={todayStats.minutes > 0}
-              />
+              {/* 4. 数据卡片（本周专注 + 连续天数） */}
+              <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] px-6 py-5 shadow-xl shadow-emerald-100/50 flex flex-col gap-2 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer aspect-square">
+                <div className="space-y-1.5">
+                  <div className="flex items-start justify-between">
+                    <p className="text-xs uppercase tracking-[0.3em] text-teal-500 font-medium">本周专注</p>
+                    <button
+                      onClick={() => setShowWeeklyInfo(!showWeeklyInfo)}
+                      data-tooltip-trigger
+                      className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-zinc-600">!</span>
+                    </button>
+                  </div>
+                  {showWeeklyInfo && (
+                    <div data-tooltip-trigger className="absolute top-12 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[220px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        本周专注时长按照时区每周一00:00刷新。
+                      </p>
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+                    </div>
+                  )}
+                  <p className="text-3xl font-bold text-zinc-900 leading-tight">
+                    {weeklyHours}h<span className="text-lg text-zinc-500">{weeklyMinutesRemainder}m</span>
+                  </p>
+                </div>
+
+                <div className="h-px w-full bg-zinc-100 my-0.5" />
+
+                <div className="space-y-1.5">
+                  <div className="flex items-start justify-between">
+                    <p className="text-xs uppercase tracking-[0.3em] text-teal-500 font-medium">连续天数</p>
+                    <button
+                      onClick={() => setShowStreakInfo(!showStreakInfo)}
+                      data-tooltip-trigger
+                      className="w-5 h-5 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-zinc-600">!</span>
+                    </button>
+                  </div>
+                  {showStreakInfo && (
+                    <div data-tooltip-trigger className="absolute top-[58%] right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[220px]">
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        累计完成时长约定的天数。
+                      </p>
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
+                    </div>
+                  )}
+                  <p className="text-3xl font-bold text-zinc-900 leading-tight">
+                    {stats.streakDays}<span className="text-lg text-zinc-500 ml-1">天</span>
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* 底部：计划详情大卡片 */}

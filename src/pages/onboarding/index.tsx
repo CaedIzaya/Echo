@@ -118,6 +118,18 @@ export default function OnboardingPage() {
     router.push('/dashboard');
   };
 
+  const handleNeedInspiration = () => {
+    const queryParams: Record<string, string> = {};
+    if (allowReturn) {
+      queryParams.from = String(query.from || 'plans');
+      queryParams.allowReturn = '1';
+    }
+    router.push({
+      pathname: '/onboarding/idea',
+      query: queryParams,
+    });
+  };
+
   if (isCheckingSession) {
     return null; // 极简加载，或者保持空白
   }
@@ -161,7 +173,7 @@ export default function OnboardingPage() {
           
           {/* 中间是散落的泡泡 */}
           <div className="flex-1 flex items-center w-full">
-             <InterestGrid onSelectionChange={handleInterestsSelected} />
+             <InterestGrid onSelectionChange={handleInterestsSelected} onNeedInspiration={handleNeedInspiration} />
           </div>
 
           {/* 底部极简操作栏 */}
