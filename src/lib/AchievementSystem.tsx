@@ -5,7 +5,7 @@ export interface Achievement {
   name: string;
   description: string;
   icon: string;
-  category: 'flow' | 'time' | 'daily' | 'milestone' | 'first';
+  category: 'flow' | 'time' | 'daily' | 'milestone' | 'first' | 'special';
   requirement: number;
 }
 
@@ -381,6 +381,17 @@ export class AchievementManager {
       { id: 'tree_level_10', name: '茁壮成长', description: '心树等级达到10级', icon: '🌳', category: 'first', requirement: 10 },
       { id: 'tree_level_20', name: '参天之木', description: '心树等级达到20级', icon: '🌲', category: 'first', requirement: 20 },
       { id: 'tree_level_30', name: '生命古树', description: '心树等级达到30级', icon: '🎄', category: 'first', requirement: 30 },
+
+      // Special achievements
+      { id: 'night_owl', name: '夜猫子', description: '在22:30~次日3:00区间上线7次', icon: '🦉', category: 'special', requirement: 7 },
+      { id: 'night_walker', name: '深夜行者', description: '在22:30~次日3:00启动并完成一次达标专注', icon: '🌙', category: 'special', requirement: 1 },
+      { id: 'dawn_witness', name: '晨曦见证者', description: '在5:30~8:30区间上线7次', icon: '🌅', category: 'special', requirement: 7 },
+      { id: 'morning_walker', name: '清晨行者', description: '在5:30~8:30启动并完成一次达标专注', icon: '🌄', category: 'special', requirement: 1 },
+      { id: 'afternoon_tea', name: '下午茶', description: '在13:00~15:30期间完成一次烹饪类达标专注', icon: '☕', category: 'special', requirement: 1 },
+      { id: 'morning_exercise', name: '晨练者', description: '在6:30~9:30期间完成一次运动类达标专注', icon: '🏃', category: 'special', requirement: 1 },
+      { id: 'morning_reading', name: '晨读', description: '在6:30~9:30期间完成一次阅读类达标专注', icon: '📖', category: 'special', requirement: 1 },
+      { id: 'bedtime_reading', name: '睡前阅读', description: '在21:30~24:00期间完成一次阅读类达标专注', icon: '📚', category: 'special', requirement: 1 },
+      { id: 'hardcore_gamer', name: '爆肝选手', description: '在24:00~3:00期间完成一次游戏类达标专注', icon: '🎮', category: 'special', requirement: 1 },
     ];
   }
 
@@ -403,6 +414,94 @@ export class AchievementManager {
 
   isAchievementUnlocked(achievementId: string): boolean {
     return this.achievedAchievements.has(achievementId);
+  }
+
+  /**
+   * 判断时间是否在指定的小时区间内（支持跨午夜）
+   * startHour/endHour 用小数表示，如 22:30 → 22.5，3:00 → 3
+   */
+  private isInTimeWindow(date: Date, startHour: number, endHour: number): boolean {
+    const h = date.getHours() + date.getMinutes() / 60;
+    if (startHour <= endHour) {
+      return h >= startHour && h < endHour;
+    }
+    // 跨午夜：22:30~3:00 → h >= 22.5 || h < 3
+    return h >= startHour || h < endHour;
+  }
+
+  /**
+   * 检查并记录特殊时段上线，返回新解锁成就
+   * 在 Dashboard 加载时调用
+   */
+  checkSpecialVisitAchievements(): Achievement[] {
+    if (typeof window === 'undefined') return [];
+    const now = new Date();
+    const newAchievements: Achievement[] = [];
+
+    const visitConfigs: { id: string; key: string; startH: number; endH: number; target: number }[] = [
+      { id: 'night_owl', key: 'special_night_owl_visits', startH: 22.5, endH: 3, target: 7 },
+      { id: 'dawn_witness', key: 'special_dawn_witness_visits', startH: 5.5, endH: 8.5, target: 7 },
+    ];
+
+    for (const cfg of visitConfigs) {
+      if (this.achievedAchievements.has(cfg.id)) continue;
+      if (!this.isInTimeWindow(now, cfg.startH, cfg.endH)) continue;
+
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      let visits: string[] = [];
+      try {
+        const raw = getUserStorage(cfg.key);
+        if (raw) visits = JSON.parse(raw) as string[];
+      } catch { /* ignore */ }
+
+      if (!visits.includes(todayKey)) {
+        visits.push(todayKey);
+        setUserStorage(cfg.key, JSON.stringify(visits));
+      }
+
+      if (visits.length >= cfg.target) {
+        const a = this.unlockAchievement(cfg.id);
+        if (a) newAchievements.push(a);
+      }
+    }
+
+    return newAchievements;
+  }
+
+  /**
+   * 检查基于专注完成的特殊成就
+   * @param startTime   专注开始时间
+   * @param isMinMet    是否达到最小专注时长
+   * @param domainKey   计划所属的兴趣域 key（如 'game','reading','sports','food'）
+   */
+  checkSpecialFocusAchievements(
+    startTime: Date,
+    isMinMet: boolean,
+    domainKey?: string,
+  ): Achievement[] {
+    const newAchievements: Achievement[] = [];
+    if (!isMinMet) return newAchievements;
+
+    const focusChecks: { id: string; startH: number; endH: number; domain?: string }[] = [
+      { id: 'night_walker',     startH: 22.5, endH: 3 },
+      { id: 'morning_walker',   startH: 5.5,  endH: 8.5 },
+      { id: 'afternoon_tea',    startH: 13,   endH: 15.5,  domain: 'food' },
+      { id: 'morning_exercise', startH: 6.5,  endH: 9.5,   domain: 'sports' },
+      { id: 'morning_reading',  startH: 6.5,  endH: 9.5,   domain: 'reading' },
+      { id: 'bedtime_reading',  startH: 21.5, endH: 24,    domain: 'reading' },
+      { id: 'hardcore_gamer',   startH: 0,    endH: 3,     domain: 'game' },
+    ];
+
+    for (const chk of focusChecks) {
+      if (this.achievedAchievements.has(chk.id)) continue;
+      if (chk.domain && domainKey !== chk.domain) continue;
+      if (!this.isInTimeWindow(startTime, chk.startH, chk.endH)) continue;
+
+      const a = this.unlockAchievement(chk.id);
+      if (a) newAchievements.push(a);
+    }
+
+    return newAchievements;
   }
 }
 

@@ -13,6 +13,7 @@ interface SharePageProps {
   };
   user: {
     name: string | null;
+    echoCompanionDays: number;
   };
   isValid: boolean;
 }
@@ -26,7 +27,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       include: {
         summary: true,
         user: {
-          select: { name: true }
+          select: { name: true, echoCompanionDays: true }
         }
       }
     });
@@ -57,7 +58,8 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
             completedTaskCount: shareLink.summary.completedTaskCount
         },
         user: {
-            name: shareLink.user.name || 'Echo User'
+            name: shareLink.user.name || 'Echo User',
+            echoCompanionDays: shareLink.user.echoCompanionDays || 0,
         }
       }
     };
@@ -87,7 +89,7 @@ export default function SharePage({ summary, user, isValid }: SharePageProps) {
             completedTasks={[]} 
             summary={summary.text}
             userName={user.name || 'User'}
-            streakDays={1} 
+            streakDays={user.echoCompanionDays}
         />
       </div>
 

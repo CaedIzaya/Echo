@@ -6,6 +6,7 @@ import BottomNavigation from '../dashboard/BottomNavigation';
 import InterruptedSessionAlert from './InterruptedSessionAlert';
 import EchoSpirit from '../dashboard/EchoSpirit';
 import { trackEvent } from '~/lib/analytics';
+import { getAchievementManager } from '~/lib/AchievementSystem';
 
 // Wake Lock API 类型定义
 interface WakeLockSentinel extends EventTarget {
@@ -48,10 +49,29 @@ interface FocusSession {
 interface PlanOption {
   id: string;
   name: string;
+  description?: string;
   isPrimary: boolean;
   dailyGoalMinutes: number;
   milestones?: Array<{ id: string; title: string; isCompleted?: boolean; order?: number }>;
 }
+
+const PLAN_DESC_TO_DOMAIN_KEY: Record<string, string> = {
+  '游戏': 'game',
+  '阅读': 'reading',
+  '绘画': 'drawing',
+  '音乐': 'music',
+  '编程': 'coding',
+  '语言': 'language',
+  '运动': 'sports',
+  '美食': 'food',
+  '烹饪': 'food',
+  '职业': 'career',
+  '学术': 'academic',
+  '观影': 'movie',
+  '写作': 'writing',
+  '学习': 'academic',
+  '工作': 'career',
+};
 
 const FOCUS_PAUSE_MESSAGE = '休息一下吧，我一直在。';
 const FOCUS_AGITATION_MESSAGES = {
@@ -116,6 +136,19 @@ export default function Focus() {
   // 击掌功能相关状态
   const [highFivePhase, setHighFivePhase] = useState<'none' | 'ready' | 'success' | 'finished'>('none');
   const [highFiveText, setHighFiveText] = useState('');
+  const [xinCounterAnim, setXinCounterAnim] = useState<{
+    visible: boolean;
+    from: number;
+    to: number;
+    shouldAnimate: boolean;
+    key: number;
+  }>({
+    visible: false,
+    from: 0,
+    to: 0,
+    shouldAnimate: false,
+    key: 0,
+  });
   const highFiveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const focusLumiMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
   const focusLumiAnimationTokenRef = useRef(0);
@@ -514,6 +547,55 @@ export default function Focus() {
       console.warn('播放音效失败', e);
     }
   };
+
+  // 回心天数翻牌音效：先 tick，再清脆 ding
+  const playXinCounterFlipSound = () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const audioContext = audioContextRef.current;
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+      }
+
+      const baseTime = audioContext.currentTime + 0.02;
+
+      // tick：短促、偏低，像机械翻牌触发
+      const tickOsc = audioContext.createOscillator();
+      const tickGain = audioContext.createGain();
+      tickOsc.connect(tickGain);
+      tickGain.connect(audioContext.destination);
+      tickOsc.type = 'square';
+      tickOsc.frequency.value = 520;
+      tickGain.gain.setValueAtTime(0, baseTime);
+      tickGain.gain.linearRampToValueAtTime(0.06, baseTime + 0.01);
+      tickGain.gain.exponentialRampToValueAtTime(0.001, baseTime + 0.08);
+      tickOsc.start(baseTime);
+      tickOsc.stop(baseTime + 0.09);
+
+      // ding：清脆、可爱，数字落位反馈
+      const dingOsc = audioContext.createOscillator();
+      const dingGain = audioContext.createGain();
+      dingOsc.connect(dingGain);
+      dingGain.connect(audioContext.destination);
+      dingOsc.type = 'sine';
+      dingOsc.frequency.value = 987.77; // B5
+      const dingStart = baseTime + 0.24;
+      dingGain.gain.setValueAtTime(0, dingStart);
+      dingGain.gain.linearRampToValueAtTime(0.11, dingStart + 0.015);
+      dingGain.gain.exponentialRampToValueAtTime(0.001, dingStart + 0.22);
+      dingOsc.start(dingStart);
+      dingOsc.stop(dingStart + 0.24);
+    } catch (e) {
+      console.warn('播放回心翻牌音效失败', e);
+    }
+  };
+
+  useEffect(() => {
+    if (!xinCounterAnim.visible || !xinCounterAnim.shouldAnimate) return;
+    playXinCounterFlipSound();
+  }, [xinCounterAnim.key, xinCounterAnim.visible, xinCounterAnim.shouldAnimate]);
 
   // 处理击掌交互
   const handleHighFiveClick = () => {
@@ -1483,6 +1565,7 @@ export default function Focus() {
     
     // 保存最终状态 - 标记为完成或中断，时间被冻结
     const shouldCelebrate = completedForStats || celebrateDaily;
+    let endOptionsDelayMs = 1500;
     const finalState: FocusState = shouldCelebrate ? 'completed' : 'interrupted';
     const finalSession: FocusSession = {
       ...sessionRef.current,
@@ -1535,6 +1618,29 @@ export default function Focus() {
       const sessionProjectId = sessionRef.current.projectId;
       const goalMinutes = sessionRef.current.goalMinutes || sessionGoalMinutes;
       const isMinMet = minutes >= goalMinutes;
+      const today = new Date().toISOString().split('T')[0];
+      const streakUpdatedToday = localStorage.getItem(`streakUpdated_${today}`) === 'true';
+      const shouldAnimateXinIncrease = completedForStats && isMinMet && !streakUpdatedToday;
+
+      let currentXinDays = 0;
+      try {
+        const savedStats = localStorage.getItem('dashboardStats');
+        if (savedStats) {
+          const parsed = JSON.parse(savedStats);
+          currentXinDays = Number(parsed?.streakDays) || 0;
+        }
+      } catch (e) {
+        console.warn('读取回心天数失败，使用 0 兜底', e);
+      }
+
+      setXinCounterAnim({
+        visible: shouldCelebrate,
+        from: currentXinDays,
+        to: shouldAnimateXinIncrease ? currentXinDays + 1 : currentXinDays,
+        shouldAnimate: shouldAnimateXinIncrease,
+        key: Date.now(),
+      });
+      endOptionsDelayMs = shouldAnimateXinIncrease ? 2200 : 1500;
       
       // 🔥 保存到数据库（用于周报统计）
       if (session?.user?.id && sessionRef.current?.startTime) {
@@ -1568,6 +1674,36 @@ export default function Focus() {
         }).then(response => {
           if (response.ok) {
             console.log('✅ 专注会话已保存到数据库');
+
+            // 检查特殊专注成就（时段 + 计划分类）
+            try {
+              const plan = sessionProjectId
+                ? availablePlans.find(p => p.id === sessionProjectId)
+                : null;
+              const domainKey = plan?.description
+                ? PLAN_DESC_TO_DOMAIN_KEY[plan.description]
+                : undefined;
+
+              const manager = getAchievementManager();
+              const specialAchievements = manager.checkSpecialFocusAchievements(
+                startTime,
+                isMinMet,
+                domainKey,
+              );
+
+              if (specialAchievements.length > 0) {
+                console.log('[Focus] 解锁特殊成就:', specialAchievements.map(a => a.name));
+                specialAchievements.forEach(a => {
+                  fetch('/api/achievements/unlock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ achievementId: a.id, category: 'special' }),
+                  }).catch(() => {});
+                });
+              }
+            } catch (e) {
+              console.warn('[Focus] 特殊成就检查失败', e);
+            }
           } else {
             console.error('❌ 保存专注会话失败', response.status);
           }
@@ -1647,10 +1783,10 @@ export default function Focus() {
     
     console.log('🛑 专注计时器已停止', { finalElapsedTime, state: finalState });
     
-    // 延迟一下再显示选项，让用户看到结果
+    // 延迟展示选项：给回心天数翻牌留出完整时间
     setTimeout(() => {
       setShowEndOptions(true);
-    }, 1500);
+    }, endOptionsDelayMs);
   };
 
   // 当显示结算选项且是已完成状态时，初始化击掌交互
@@ -1673,6 +1809,7 @@ export default function Focus() {
     setState('preparing');
     setShowEndOptions(false);
     setShowConfetti(false);
+    setXinCounterAnim(prev => ({ ...prev, visible: false, shouldAnimate: false }));
     cleanupInterval(); // 确保停止所有计时器
     
     // 🔥 标记专注完成和需要刷新数据
@@ -1692,6 +1829,7 @@ export default function Focus() {
     setState('preparing');
     setShowEndOptions(false);
     setShowConfetti(false);
+    setXinCounterAnim(prev => ({ ...prev, visible: false, shouldAnimate: false }));
     setElapsedTime(0);
     // 清理所有标志和旧的会话
     localStorage.removeItem('focusSession');
@@ -2507,6 +2645,11 @@ export default function Focus() {
     const seconds = elapsedTime % 60;
     const goalDurationMinutes = sessionRef.current?.goalMinutes ?? sessionGoalMinutes;
     const exceededTarget = completed && goalDurationMinutes > 0 && elapsedTime >= goalDurationMinutes * 60;
+    const xinFrom = xinCounterAnim.from;
+    const xinTo = xinCounterAnim.to;
+    const xinDigits = Math.max(String(xinFrom).length, String(xinTo).length, 2);
+    const xinFromPadded = String(xinFrom).padStart(xinDigits, '0');
+    const xinToPadded = String(xinTo).padStart(xinDigits, '0');
 
     return (
       <>
@@ -2628,6 +2771,20 @@ export default function Focus() {
         .animate-fade-in {
           animation: fade-in 0.5s ease-out forwards;
         }
+        @keyframes xin-roll {
+          0% {
+            transform: translateY(0);
+            opacity: 0.92;
+          }
+          100% {
+            transform: translateY(calc(var(--xin-to-digit, 0) * -1.15em));
+            opacity: 1;
+          }
+        }
+        .xin-roll-digit {
+          animation: xin-roll 820ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          will-change: transform;
+        }
       `}</style>
       
       {/* 显示完成信息 */}
@@ -2649,6 +2806,48 @@ export default function Focus() {
                   : `你本次专注共持续了 ${minutes} 分 ${seconds} 秒`
                 : `你已专注 ${minutes} 分 ${seconds} 秒`}
             </p>
+            {completed && xinCounterAnim.visible && (
+              <div className="mb-8 mx-auto w-fit rounded-2xl border border-white/25 bg-white/12 px-5 py-4 backdrop-blur-sm shadow-lg">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-white/75 mb-2">回心天数</p>
+                <div className="flex items-end justify-center gap-3">
+                  <div className="flex items-center gap-1 text-4xl font-bold text-white">
+                    {xinFromPadded.split('').map((digit, idx) => (
+                      <span key={`from-${idx}`} className="inline-block w-7 text-center">
+                        {digit}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-white/80 text-2xl">→</span>
+                  <div className="flex items-center gap-1 text-4xl font-bold text-white">
+                    {xinToPadded.split('').map((toDigit, idx) => {
+                      const fromDigit = xinFromPadded[idx] ?? toDigit;
+                      const shouldRoll = xinCounterAnim.shouldAnimate && fromDigit !== toDigit;
+                      return (
+                        <span key={`to-${idx}`} className="relative inline-block h-[1.15em] w-7 overflow-hidden text-center align-bottom">
+                          {shouldRoll ? (
+                            <span
+                              className="absolute left-0 top-0 w-full xin-roll-digit"
+                              style={{ ['--xin-to-digit' as any]: Number(toDigit) }}
+                            >
+                              {Array.from({ length: 10 }).map((_, num) => (
+                                <span key={num} className="block h-[1.15em] leading-[1.15em]">
+                                  {num}
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="inline-block w-full">{toDigit}</span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+                {xinCounterAnim.shouldAnimate && (
+                  <p className="mt-2 text-xs text-white/75">今天的回心已被认真记下。</p>
+                )}
+              </div>
+            )}
             <div className="text-white/70">
               {completed 
                 ? exceededTarget

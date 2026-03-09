@@ -129,6 +129,7 @@ interface WeeklyStats {
 interface DashboardStats {
   yesterdayMinutes: number;  // 昨日专注时长（用于显示）
   streakDays: number;
+  echoCompanionDays: number;
   completedGoals: number;
 }
 
@@ -243,8 +244,8 @@ function AchievementsSection() {
     const sortedAchievements = [
       ...milestoneAchievements.slice(0, 2), // 至少显示2个里程碑成就
       ...otherAchievements.sort((a, b) => {
-        const order = { 'first': 0, 'flow': 1, 'time': 2, 'daily': 3, 'milestone': 4 };
-        return (order[a.category] || 5) - (order[b.category] || 5);
+        const order: Record<string, number> = { 'first': 0, 'flow': 1, 'time': 2, 'daily': 3, 'milestone': 4, 'special': 5 };
+        return (order[a.category] ?? 6) - (order[b.category] ?? 6);
       }),
       ...milestoneAchievements.slice(2) // 剩余的里程碑成就
     ];
@@ -646,6 +647,7 @@ export default function Dashboard() {
       const parsed = savedStats ? JSON.parse(savedStats) : {
         yesterdayMinutes: 0,
         streakDays: 0,
+        echoCompanionDays: 0,
         completedGoals: 0
       };
       
@@ -653,12 +655,16 @@ export default function Dashboard() {
       if (!dashboardDataLoading && dashboardData.streakDays >= 0) {
         parsed.streakDays = dashboardData.streakDays;
       }
+      if (!dashboardDataLoading && dashboardData.echoCompanionDays >= 0) {
+        parsed.echoCompanionDays = dashboardData.echoCompanionDays;
+      }
       
       return parsed;
     }
     return {
       yesterdayMinutes: 0,
       streakDays: dashboardData.streakDays || 0,
+      echoCompanionDays: dashboardData.echoCompanionDays || 0,
       completedGoals: 0
     };
   });
@@ -983,6 +989,80 @@ export default function Dashboard() {
     });
   };
 
+  // Echo陪伴：当天首次登录 Dashboard 记 1 天（累计，不要求连续）
+  useEffect(() => {
+    if (typeof window === 'undefined' || dashboardDataLoading) return;
+
+    const today = getTodayDate();
+    const loginCountedKey = `echoCompanionCounted_${today}`;
+    const syncPendingKey = `echoCompanionSyncPending_${today}`;
+    const alreadyCountedInDB = dashboardData.lastEchoCompanionDate === today;
+    const alreadyCountedLocal = localStorage.getItem(loginCountedKey) === 'true';
+    const pendingSync = localStorage.getItem(syncPendingKey) === 'true';
+
+    if (alreadyCountedInDB) {
+      // 跨设备幂等：数据库已记过今天，前端不再重复 +1
+      localStorage.setItem(loginCountedKey, 'true');
+      localStorage.removeItem(syncPendingKey);
+      setStats(prev => ({
+        ...prev,
+        echoCompanionDays: Math.max(prev.echoCompanionDays || 0, dashboardData.echoCompanionDays || 0),
+      }));
+      return;
+    }
+
+    if (alreadyCountedLocal && !pendingSync) return;
+
+    const savedStats = localStorage.getItem('dashboardStats');
+    const savedCompanionDays = savedStats ? (JSON.parse(savedStats).echoCompanionDays || 0) : 0;
+    let targetCompanionDays = Math.max(savedCompanionDays, dashboardData.echoCompanionDays || 0);
+
+    // 当天首次本地计数
+    if (!alreadyCountedLocal) {
+      targetCompanionDays += 1;
+      setStats(prev => {
+        const updated = { ...prev, echoCompanionDays: targetCompanionDays };
+        localStorage.setItem('dashboardStats', JSON.stringify(updated));
+        return updated;
+      });
+      localStorage.setItem('lastFocusDate', today);
+      localStorage.setItem(loginCountedKey, 'true');
+
+      try {
+        gainHeartTreeExp(EXP_STREAK_DAY);
+        if ([7, 14, 30].includes(targetCompanionDays)) {
+          const state = loadHeartTreeExpState();
+          grantFertilizerBuff(state);
+        }
+      } catch (e) {
+        console.error('Echo陪伴累计时更新心树奖励失败:', e);
+      }
+    }
+
+    localStorage.setItem(syncPendingKey, 'true');
+
+    // 同步到数据库，独立维护 Echo陪伴 天数
+    if (session?.user?.id) {
+      fetch('/api/user/stats/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          echoCompanionDays: targetCompanionDays,
+          lastEchoCompanionDate: today,
+        }),
+      }).then(res => {
+        if (res.ok) {
+          localStorage.removeItem(syncPendingKey);
+          console.log('✅ Echo陪伴天数已同步到数据库');
+        } else {
+          console.warn('⚠️ Echo陪伴天数同步失败');
+        }
+      }).catch(err => {
+        console.error('❌ Echo陪伴天数同步出错:', err);
+      });
+    }
+  }, [dashboardDataLoading, dashboardData.echoCompanionDays, dashboardData.lastEchoCompanionDate, session?.user?.id]);
+
   // 增加完成的小目标计数
   const incrementCompletedGoals = (count: number) => {
     updateStats({
@@ -1298,9 +1378,6 @@ export default function Dashboard() {
       rating
     });
     
-    // 🌟 性能优化标记：批量更新开始
-    const batchUpdates: any = {};
-    
     // 专注完成后，小精灵保持idle状态（不设置excited）
     // 用户点击时会随机播放happy或excited动画
     
@@ -1334,52 +1411,11 @@ export default function Dashboard() {
       // 更新昨日数据到主统计数据
       updateStats({ yesterdayMinutes });
       
-      // 🔥 修复：更新累计天数逻辑 - 基于主要计划的每日目标，而不是默认25分钟
-      // 判断昨天是否完成了每日目标
-      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || MIN_FOCUS_MINUTES;
-      const yesterdayCompletedGoal = yesterdayMinutes >= dailyGoalMinutes;
-      
-      // 🔥 连续天数在完成目标时已实时更新，这里只需检查昨天是否已更新
-      const yesterdayStreakUpdated = localStorage.getItem(`streakUpdated_${yesterdayDate}`) === 'true';
-      
-      console.log('🎯 连续天数检查', {
-        昨日日期: yesterdayDate,
-        昨日时长: yesterdayMinutes,
-        目标时长: dailyGoalMinutes,
-        昨日是否完成: yesterdayCompletedGoal,
-        昨日是否已更新: yesterdayStreakUpdated,
-        当前连续: stats.streakDays,
-        提示: yesterdayStreakUpdated ? '昨日已实时更新，无需重复处理' : '昨日未完成目标，连续天数不变'
+      console.log('🤝 Echo陪伴累计策略：按登录累计，不再按达标天补增', {
+        yesterdayDate,
+        yesterdayMinutes,
+        当前累计: stats.streakDays,
       });
-      
-      // 如果昨天完成了目标但没有实时更新（兼容旧逻辑），则在这里更新
-      if (yesterdayCompletedGoal && !yesterdayStreakUpdated) {
-        const newStreakDays = stats.streakDays + 1;
-        console.log('🔥 补充更新昨日连续天数 +1', {
-          原值: stats.streakDays,
-          新值: newStreakDays,
-          原因: '昨日完成目标但未实时更新'
-        });
-        updateStats({ streakDays: newStreakDays });
-        localStorage.setItem(`streakUpdated_${yesterdayDate}`, 'true');
-        
-        // 心树 EXP 奖励
-        if (typeof window !== 'undefined') {
-          try {
-            gainHeartTreeExp(EXP_STREAK_DAY);
-            console.log('🌳 心树 EXP +', EXP_STREAK_DAY, '（累计专注', newStreakDays, '天）');
-            
-            if ([7, 14, 30].includes(newStreakDays)) {
-              const state = loadHeartTreeExpState();
-              grantFertilizerBuff(state);
-              console.log('🌱 心树获得施肥 Buff！（累计', newStreakDays, '天）');
-            }
-          } catch (e) {
-            console.error('累计天数时更新心树 EXP 失败:', e);
-          }
-        }
-      }
-      // 如果昨天没完成目标，连续天数不变（不会减少）
       
       // 保存今日日期标记
       localStorage.setItem('lastFocusDate', today);
@@ -1504,60 +1540,26 @@ export default function Dashboard() {
             localStorage.setItem(`heartTreeDailyGoalReward_${today}`, 'true');
             console.log('🌳 心树每日目标达成奖励：浇水 + 施肥 各 +1');
           }
-          
-          // 🔥 连续天数更新：当天首次完成目标时，立即 +1
+
+          // 连胜天数（仅用于周报等真实统计）：当天首次达标时 +1
           const streakUpdatedToday = localStorage.getItem(`streakUpdated_${today}`) === 'true';
           if (!streakUpdatedToday) {
             const newStreakDays = stats.streakDays + 1;
-            console.log('🔥 连续专注天数 +1', {
-              原值: stats.streakDays,
-              新值: newStreakDays,
-              日期: today,
-              原因: '完成主要计划最小专注时长目标'
-            });
-            
-            // 更新前端状态
             setStats(prev => ({ ...prev, streakDays: newStreakDays }));
             updateStats({ streakDays: newStreakDays });
-            
-            // 标记今天已更新，防止重复
             localStorage.setItem(`streakUpdated_${today}`, 'true');
-            
-            // 🌟 优化：延迟同步到数据库（中频数据，每天最多一次）
+
             if (session?.user?.id) {
-              batchUpdates.streakDays = newStreakDays;
-              batchUpdates.lastStreakDate = today;
-              
-              // 延迟3秒同步，避免阻塞UI
-              setTimeout(() => {
-                fetch('/api/user/stats/update', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    streakDays: newStreakDays,
-                    lastStreakDate: today,
-                  }),
-                }).then(res => {
-                  if (res.ok) {
-                    console.log('✅ 连续天数已同步到数据库（延迟同步）');
-                  } else {
-                    console.warn('⚠️ 连续天数同步失败');
-                  }
-                }).catch(err => {
-                  console.error('❌ 连续天数同步出错:', err);
-                });
-              }, 3000);
-            }
-            
-            // 心树 EXP：累计天数奖励
-            gainHeartTreeExp(EXP_STREAK_DAY);
-            console.log('🌳 心树 EXP +', EXP_STREAK_DAY, '（累计专注', newStreakDays, '天）');
-            
-            // 关键节点：7 / 14 / 30 天 → 授予一次施肥 Buff（7天，+30% EXP）
-            if ([7, 14, 30].includes(newStreakDays)) {
-              const state = loadHeartTreeExpState();
-              grantFertilizerBuff(state);
-              console.log('🌱 心树获得施肥 Buff！（累计', newStreakDays, '天）');
+              fetch('/api/user/stats/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  streakDays: newStreakDays,
+                  lastStreakDate: today,
+                }),
+              }).catch(err => {
+                console.error('❌ 连胜天数同步出错:', err);
+              });
             }
           }
         }
@@ -1758,6 +1760,7 @@ export default function Dashboard() {
       weeklyMinutes: dashboardData.weeklyMinutes,
       totalMinutes: dashboardData.totalMinutes,
       streakDays: dashboardData.streakDays,
+      echoCompanionDays: dashboardData.echoCompanionDays,
     });
     
     // 更新今日统计
@@ -1775,10 +1778,11 @@ export default function Dashboard() {
     // 更新累计时长
     setTotalFocusMinutes(dashboardData.totalMinutes);
     
-    // 更新连续天数
+    // 更新天数：使用较大值，避免“本地已+1但数据库尚未刷新”被覆盖回退
     setStats(prev => ({
       ...prev,
-      streakDays: dashboardData.streakDays,
+      streakDays: Math.max(prev.streakDays || 0, dashboardData.streakDays || 0),
+      echoCompanionDays: Math.max(prev.echoCompanionDays || 0, dashboardData.echoCompanionDays || 0),
     }));
     
     // 同步到 localStorage 缓存
@@ -2307,6 +2311,9 @@ export default function Dashboard() {
     const firstPlanCreatedAchievement: Achievement[] = [];
     const firstMilestoneCreatedAchievement: Achievement[] = [];
     const firstPlanCompletedAchievement: Achievement[] = [];
+
+    // 特殊时段上线成就（夜猫子 / 晨曦见证者）
+    const specialVisitAchievements = manager.checkSpecialVisitAchievements();
     
     const allNew = [
       ...flowAchievements, 
@@ -2316,7 +2323,8 @@ export default function Dashboard() {
       ...firstFocusAchievement,
       ...firstPlanCreatedAchievement,
       ...firstMilestoneCreatedAchievement,
-      ...firstPlanCompletedAchievement
+      ...firstPlanCompletedAchievement,
+      ...specialVisitAchievements,
     ];
     
     if (allNew.length > 0) {
@@ -3176,14 +3184,14 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 第二行：连续 & 今日小结 */}
+            {/* 第二行：Echo陪伴 & 今日小结 */}
             <div className="flex gap-4">
               <div className="flex-[2] bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-5 shadow-lg flex flex-col justify-between aspect-[4/3]">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">连续</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">Echo陪伴</p>
                 </div>
                 <div className="flex-1 flex items-center justify-center">
-                  <p className="text-3xl font-bold text-zinc-900 leading-none">{stats.streakDays}<span className="text-sm text-zinc-500 ml-1">天</span></p>
+                  <p className="text-3xl font-bold text-zinc-900 leading-none">{stats.echoCompanionDays ?? 0}<span className="text-sm text-zinc-500 ml-1">天</span></p>
                 </div>
                 <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden mt-auto">
                   <div className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full w-1/2"></div>
@@ -3341,7 +3349,7 @@ export default function Dashboard() {
                 />
               </div>
 
-              {/* 4. 数据卡片（本周专注 + 连续天数） */}
+              {/* 4. 数据卡片（本周专注 + Echo陪伴） */}
               <div className="bg-white/90 backdrop-blur-sm border-2 border-white/80 rounded-[2rem] px-6 py-5 shadow-xl shadow-emerald-100/50 flex flex-col gap-2 relative hover:scale-[1.02] transition-all duration-300 cursor-pointer aspect-square">
                 <div className="space-y-1.5">
                   <div className="flex items-start justify-between">
@@ -3371,7 +3379,7 @@ export default function Dashboard() {
 
                 <div className="space-y-1.5">
                   <div className="flex items-start justify-between">
-                    <p className="text-xs uppercase tracking-[0.3em] text-teal-500 font-medium">连续天数</p>
+                    <p className="text-xs uppercase tracking-[0.3em] text-teal-500 font-medium">Echo陪伴</p>
                     <button
                       onClick={() => setShowStreakInfo(!showStreakInfo)}
                       data-tooltip-trigger
@@ -3383,13 +3391,13 @@ export default function Dashboard() {
                   {showStreakInfo && (
                     <div data-tooltip-trigger className="absolute top-[58%] right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 max-w-[220px]">
                       <p className="text-xs text-zinc-600 leading-relaxed">
-                        累计完成时长约定的天数。
+                        你在Echo停靠过的天数（累积+1）
                       </p>
                       <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-zinc-200 transform rotate-45"></div>
                     </div>
                   )}
                   <p className="text-3xl font-bold text-zinc-900 leading-tight">
-                    {stats.streakDays}<span className="text-lg text-zinc-500 ml-1">天</span>
+                    {stats.echoCompanionDays ?? 0}<span className="text-lg text-zinc-500 ml-1">天</span>
                   </p>
                 </div>
               </div>

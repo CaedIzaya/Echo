@@ -17,7 +17,7 @@ export default function DailySummaryPage() {
   const [dateStr, setDateStr] = useState('');
   const [step, setStep] = useState<1 | 2>(1);
   const [isSaving, setIsSaving] = useState(false);
-  const [streakDays, setStreakDays] = useState(1); // 新增状态
+  const [streakDays, setStreakDays] = useState(0);
   const [weekFocusDuration, setWeekFocusDuration] = useState(0);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [summaryId, setSummaryId] = useState<string | null>(null);
@@ -85,12 +85,33 @@ export default function DailySummaryPage() {
     };
     setWeekFocusDuration(calculateWeekFocus());
 
-    // Load streak data from localStorage
-    const savedStats = localStorage.getItem('dashboardStats');
-    if (savedStats) {
-      const stats = JSON.parse(savedStats);
-      setStreakDays(Math.max(1, stats.streakDays || 1));
-    }
+    // Echo陪伴天数：与 Dashboard 同口径（数据库优先，本地兜底，取最大值）
+    const loadCompanionDays = async () => {
+      let localStreakDays = 0;
+      const savedStats = localStorage.getItem('dashboardStats');
+      if (savedStats) {
+        try {
+          const stats = JSON.parse(savedStats);
+          localStreakDays = stats.echoCompanionDays || 0;
+        } catch {
+          localStreakDays = 0;
+        }
+      }
+
+      let dbStreakDays = 0;
+      try {
+        const res = await fetch('/api/user/stats');
+        if (res.ok) {
+          const data = await res.json();
+          dbStreakDays = data?.stats?.echoCompanionDays || 0;
+        }
+      } catch (error) {
+        console.warn('[DailySummary] 读取数据库 Echo陪伴天数失败，回退本地值:', error);
+      }
+
+      setStreakDays(Math.max(localStreakDays, dbStreakDays));
+    };
+    void loadCompanionDays();
 
     // 🔥 修复：优先从数据库加载今日专注时长
     const loadTodayData = async () => {
@@ -135,7 +156,7 @@ export default function DailySummaryPage() {
       }
     };
     loadTodayData();
-  }, [router.query]);
+  }, [router.query, session?.user?.id]);
 
   const handleSummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
@@ -372,9 +393,9 @@ export default function DailySummaryPage() {
                   </div>
                 </div>
 
-                {/* Streak */}
+                {/* Echo陪伴 */}
                 <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100/50 flex flex-col justify-between">
-                  <div className="text-orange-600/70 text-xs font-bold uppercase tracking-wider">连续专注</div>
+                  <div className="text-orange-600/70 text-xs font-bold uppercase tracking-wider">Echo陪伴</div>
                   <div className="text-3xl font-bold text-orange-800 mt-2">{streakDays} <span className="text-sm font-normal text-orange-600">天</span></div>
                 </div>
 

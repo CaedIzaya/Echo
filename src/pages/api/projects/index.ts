@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { db } from '~/server/db';
 import { encodeProjectDescription, enrichProjectForClient } from '~/lib/projectMeta';
+import { trackMicroGoalUsageBatch } from '~/lib/microGoalHistory';
 
 /**
  * 用户计划 API（完整数据库实现）
@@ -124,6 +125,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       console.log('[projects] 创建成功:', newProject.id);
+
+      const createdMilestoneTitles = (newProject.milestones || [])
+        .map((item) => String(item.title || '').trim())
+        .filter(Boolean);
+      if (createdMilestoneTitles.length > 0) {
+        try {
+          await trackMicroGoalUsageBatch(session.user.id, createdMilestoneTitles);
+        } catch (historyError) {
+          console.warn('[projects] 写入小目标历史失败(计划创建):', historyError);
+        }
+      }
 
       return res.status(201).json({ project: enrichProjectForClient(newProject) });
     }

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { db } from '~/server/db';
+import { trackMicroGoalUsage, trackMicroGoalUsageBatch } from '~/lib/microGoalHistory';
 
 /**
  * 里程碑操作 API
@@ -55,6 +56,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log('[milestones] 创建成功:', milestone.id);
 
+      // 历史库写入失败时不阻断主流程
+      try {
+        await trackMicroGoalUsage(session.user.id, title);
+      } catch (historyError) {
+        console.warn('[milestones] 写入小目标历史失败(创建):', historyError);
+      }
+
       return res.status(201).json({ milestone });
     }
 
@@ -67,6 +75,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       console.log('[milestones] 批量更新里程碑:', { projectId, count: milestones.length });
+
+      const existingMilestones = await db.milestone.findMany({
+        where: { projectId },
+        select: {
+          id: true,
+          title: true,
+          isCompleted: true,
+        },
+      });
+      const existingMap = new Map(existingMilestones.map((item) => [item.id, item]));
+      const completedNowTitles = milestones
+        .filter((m: any) => {
+          if (!m?.id || !m?.isCompleted) return false;
+          const previous = existingMap.get(m.id);
+          return !!previous && !previous.isCompleted;
+        })
+        .map((m: any) => String(m.title || '').trim())
+        .filter(Boolean);
+      const createdNowTitles = milestones
+        .filter((m: any) => {
+          if (!m?.title) return false;
+          if (!m?.id) return true;
+          return !existingMap.has(m.id);
+        })
+        .map((m: any) => String(m.title || '').trim())
+        .filter(Boolean);
 
       // 删除旧的里程碑
       await db.milestone.deleteMany({
@@ -89,6 +123,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       console.log('[milestones] 批量更新成功:', created.length);
+
+      const usageTitles = Array.from(new Set([...createdNowTitles, ...completedNowTitles]));
+      if (usageTitles.length > 0) {
+        try {
+          await trackMicroGoalUsageBatch(session.user.id, usageTitles);
+        } catch (historyError) {
+          console.warn('[milestones] 写入小目标历史失败(创建/完成):', historyError);
+        }
+      }
 
       return res.status(200).json({ milestones: created });
     }

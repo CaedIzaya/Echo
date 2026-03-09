@@ -1,222 +1,89 @@
-# 🏆 成就系统说明
+# 成就系统技术文档
 
-## 功能概述
+## 架构总览
 
-成就系统是一个完整的用户激励系统，通过追踪用户的专注行为，提供多种类型的成就来鼓励用户持续专注和学习。
+```
+AchievementTypes.ts     定义成就枚举、数据结构、ALL_ACHIEVEMENTS 静态列表
+AchievementSystem.tsx   AchievementManager 单例：检查 / 解锁 / 同步 / 特殊成就判定
+useAchievements.ts      React Hook：前端状态管理 + 数据库双向同步
+AchievementPanel.tsx    成就展示面板 UI（分类筛选 + 进度条）
+API /achievements       GET 获取已解锁列表 / POST 解锁并写入数据库
+```
 
-## 成就类型
+## 存储策略
 
-### 1. 🎯 心流指数成就
-基于单次专注的心流指数得分：
-- 60分：心流入门 🌊 (进阶)
-- 80分：心流掌控 🌌 (稀有)
-- 90分：心流大师 🌀 (史诗)
-- 95分：心流宗师 💎 (传说)
-- 100分：心流之神 ✨ (神话)
+- **主存储**：数据库 `achievements_unlocked` 表（`userId + achievementId` 唯一）
+- **缓存**：用户隔离的 localStorage（`achievedAchievements` key）
+- **同步**：启动时 `syncFromDatabase()` 执行数据库 → 本地合并；本地有而数据库缺失时自动回填
 
-**特性**：每次专注都可以重新获得，可重复
+## 成就类别
 
-### 2. 📝 小结相关成就
+| 类别 | category 值 | 数量 | 检查方法 |
+|------|-------------|------|----------|
+| 心流指数 | `flow` | 4 | `checkFlowIndexAchievements(score)` |
+| 累计时长 | `time` | 5 | `checkTotalTimeAchievements(hours)` |
+| 单日时长 | `daily` | 4 | `checkDailyTimeAchievements(hours)` |
+| 小目标 | `milestone` | 4 | `checkMilestoneAchievements(count)` |
+| 初体验 | `first` | 13 | `checkFirstTimeAchievements(type)` + 心树系列 |
+| 特殊 | `special` | 9 | `checkSpecialVisitAchievements()` + `checkSpecialFocusAchievements()` |
 
-#### 累计小结数量
-- 10次：记录新手 📝 (基础)
-- 50次：反思者 📖 (进阶)
-- 100次：思考者 🧠 (稀有)
-- 250次：哲学家 📚 (史诗)
-- 500次：智慧长者 🎓 (传说)
+## 特殊成就
 
-**特性**：一次性，升级制
+### 上线时段成就
 
-#### 连续小结天数
-- 3天：连续记录 🔥 (基础)
-- 7天：周记录者 🌟 (进阶)
-- 14天：双周记录 💫 (稀有)
-- 30天：月记录者 🌙 (史诗)
-- 90天：季度记录 ☀️ (传说)
-- 365天：年度记录 🎊 (神话)
+在 Dashboard 加载时自动调用 `checkSpecialVisitAchievements()`。
 
-**特性**：每年可重复获得
+| 成就 | 时间窗口 | 条件 |
+|------|----------|------|
+| 🦉 夜猫子 | 22:30 ~ 3:00 | 在此窗口上线 7 次（不同日期） |
+| 🌅 晨曦见证者 | 5:30 ~ 8:30 | 在此窗口上线 7 次（不同日期） |
 
-### 3. ⏱️ 专注时长成就
+上线日期记录在 localStorage：`special_night_owl_visits` / `special_dawn_witness_visits`。
 
-#### 总专注时长（小时）
-- 10小时：时间投资者 ⏳ (基础)
-- 50小时：时间管理者 ⌛ (进阶)
-- 100小时：时间大师 💎 (稀有)
-- 250小时：时间领主 👑 (史诗)
-- 500小时：时间掌控者 🕰️ (传说)
-- 1000小时：时间之神 ✨ (神话)
+### 专注行为成就
 
-**特性**：一次性，升级制
+在 `focus/index.tsx` 中，`POST /api/focus-sessions` 成功后调用 `checkSpecialFocusAchievements(startTime, isMinMet, domainKey)`。
 
-#### 单日专注时长（小时）
-- 2小时：深度工作 🏊 (进阶)
-- 4小时：高效达人 🚀 (稀有)
-- 6小时：专注狂人 🔥 (史诗)
-- 8小时：时间管理大师 🦸 (传说)
+| 成就 | 时间窗口 | 所需计划域 |
+|------|----------|-----------|
+| 🌙 深夜行者 | 22:30 ~ 3:00 | 不限 |
+| 🌄 清晨行者 | 5:30 ~ 8:30 | 不限 |
+| ☕ 下午茶 | 13:00 ~ 15:30 | `food` |
+| 🏃 晨练者 | 6:30 ~ 9:30 | `sports` |
+| 📖 晨读 | 6:30 ~ 9:30 | `reading` |
+| 📚 睡前阅读 | 21:30 ~ 24:00 | `reading` |
+| 🎮 爆肝选手 | 0:00 ~ 3:00 | `game` |
 
-**特性**：每日可重新获得
+域映射通过 `PLAN_DESC_TO_DOMAIN_KEY` 将 `Project.description`（focusBranch）映射到域 key。
 
-### 4. 🔥 连续专注成就
-- 3天：三日行者 🔥 (基础)
-- 7天：周专注者 💪 (进阶)
-- 14天：双周战士 🛡️ (稀有)
-- 30天：月辉修行者 🌙 (史诗)
-- 90天：季度坚持 ☀️ (传说)
-- 180天：半年专注 🌟 (神话)
-- 365天：年度专注 🎯 (神话)
+## 检测时机
 
-**特性**：每年可重复获得
+| 时机 | 检查内容 |
+|------|----------|
+| Dashboard 加载 | flow / time / daily / milestone / first / **special visit** |
+| 专注完成保存后 | **special focus**（时段 + 域） |
+| 里程碑完成 | milestone |
+| 计划创建 / 完成 | first |
+| 心树浇水 / 施肥 / 升级 | heart tree 系列 |
 
-### 5. 🎯 小目标完成成就
-
-#### 累计小目标数量
-- 10个：目标达成者 🎯 (基础)
-- 25个：目标猎人 🏹 (进阶)
-- 50个：目标大师 ⭐ (稀有)
-- 100个：目标征服者 🌠 (史诗)
-- 250个：目标传奇 🏆 (传说)
-- 500个：目标之神 🌌 (神话)
-
-**特性**：一次性，升级制
-
-#### 单日小目标完成
-- 3个：高效一日 ⚡ (进阶)
-- 5个：超级高效 🚀 (稀有)
-- 8个：目标狂人 🔥 (史诗)
-- 10个：极限挑战 🦸 (传说)
-
-**特性**：每日可重新获得
-
-## 成就等级体系
-
-### 颜色编码
-- **灰色 (基础)**: #9CA3AF - 易于获得
-- **绿色 (进阶)**: #10B981 - 需要一定努力
-- **蓝色 (稀有)**: #3B82F6 - 需要持续投入
-- **紫色 (史诗)**: #8B5CF6 - 需要专业技能
-- **金色 (传说)**: #F59E0B - 需要极致专注
-- **彩虹色 (神话)**: 渐变色彩 - 近乎不可能
-
-## 使用方法
-
-### 在代码中集成
+## 代码示例
 
 ```typescript
-import { getAchievementManager } from './AchievementSystem';
-import { AchievementType } from './AchievementTypes';
+import { getAchievementManager } from '~/lib/AchievementSystem';
 
-// 获取成就管理器
 const manager = getAchievementManager();
 
-// 检查特定的成就类型
-const achievements = manager.checkFlowIndexAchievements(85); // 检查心流指数成就
+// 上线时段检查（Dashboard 中调用）
+const visitAchievements = manager.checkSpecialVisitAchievements();
 
-// 获取成就统计
+// 专注完成后检查
+const focusAchievements = manager.checkSpecialFocusAchievements(
+  new Date(startTime),  // 专注开始时间
+  isMinMet,             // 是否达标
+  'reading',            // 计划域 key（可选）
+);
+
+// 获取统计
 const stats = manager.getAchievementStats();
-console.log(`已获得 ${stats.achieved} / ${stats.total} 个成就`);
+// { total: 39, achieved: 12, progress: 31 }
 ```
-
-### 自动检测
-
-系统会在以下时机自动检测成就：
-1. 页面加载时
-2. 心流指数更新时
-3. 专注时长更新时
-4. 小目标完成时
-
-### 成就通知
-
-当用户获得新成就时，系统会显示通知：
-- 通知显示3秒后自动消失
-- 显示成就图标、名称和描述
-- 支持多个成就同时显示
-
-## 数据结构
-
-### Achievement 接口
-
-```typescript
-interface Achievement {
-  id: string;              // 成就ID
-  name: string;             // 成就名称
-  description: string;      // 成就描述
-  icon: string;             // 图标emoji
-  rarity: AchievementRarity;// 稀有度
-  type: AchievementType;    // 成就类型
-  target: number;           // 目标值
-  achieved: boolean;        // 是否已获得
-  achievedAt?: string;      // 获得时间
-  currentProgress: number;  // 当前进度
-  repeatable: boolean;      // 是否可重复
-}
-```
-
-## 存储
-
-成就数据存储在 `localStorage` 中：
-- Key: `achievements`
-- Value: Achievement[] 数组的JSON字符串
-
-## 未来扩展
-
-可以添加的成就类型：
-- 项目完成成就
-- 质量专注成就（高评分连续）
-- 特殊时段成就（早晨专注、深夜专注）
-- 强度专注成就（单次长时间专注）
-
-## 注意事项
-
-1. 成就进度在本地存储，刷新页面不会丢失
-2. 某些成就是可重复的，某些是一次性的
-3. 成就检测会实时更新进度条
-4. 获得成就时会自动显示通知
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

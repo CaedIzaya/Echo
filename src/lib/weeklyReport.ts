@@ -1,5 +1,7 @@
 import { db } from "~/server/db";
 import type { WeeklyReport } from "@prisma/client";
+import { findDailyFocusStatsByRange, type DailyFocusStatsRecord } from "~/lib/dailyFocusStats";
+import { computeSessionFlowIndex } from "~/lib/flowEngine";
 
 const WEEKLY_REPORT_TTL_DAYS = 84; // 12 周
 const ANCHORED_REPORT_DAYS = 7;
@@ -11,6 +13,9 @@ type WeeklySnippet = {
   content: string;
   dateLabel?: string;
 };
+
+type TrendDirection = "up" | "down" | "flat" | "new" | "none";
+type AverageComparison = "above" | "equal" | "below" | "none";
 
 export type WeeklyReportPayload = {
   period: {
@@ -29,11 +34,50 @@ export type WeeklyReportPayload = {
   };
   presence: {
     daysPresent: number;
+    companionDays: number;
+    qualifiedDays: number;
     totalMinutes: number;
     totalHours: number;
+    flowScore: number;
     peakTime: TimeBucket;
     narrativeDayLabel: string | null;
     narrative: string;
+    indicators: {
+      flow: {
+        value: number;
+        deltaPercent: number | null;
+        direction: TrendDirection;
+      };
+      focusDuration: {
+        valueMinutes: number;
+        deltaPercent: number | null;
+        direction: TrendDirection;
+      };
+      daysPresent: {
+        value: number;
+        deltaDays: number | null;
+        direction: TrendDirection;
+      };
+      streak: {
+        value: number;
+        deltaDays: number | null;
+        direction: TrendDirection;
+      };
+    };
+    benchmarks: {
+      focusMinutes: {
+        highest: number;
+        average: number;
+        isNewRecord: boolean;
+        vsAverage: AverageComparison;
+      };
+      flowScore: {
+        highest: number | null;
+        average: number | null;
+        isNewRecord: boolean;
+        vsAverage: AverageComparison;
+      };
+    };
   };
   snippets: WeeklySnippet[];
   closingNote: string;
@@ -113,7 +157,10 @@ export async function computeWeeklyReport(
 
   const weekDates = getWeekDates(weekStart);
 
-  const [user, sessions] =
+  const weekStartKey = formatDateKey(weekStart);
+  const weekEndKey = formatDateKey(weekEnd);
+
+  const [user, sessions, dailyActivities, dailyFocusStats] =
     await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
       db.focusSession.findMany({
@@ -121,16 +168,36 @@ export async function computeWeeklyReport(
         select: {
           startTime: true,
           duration: true,
+          flowIndex: true,
+          rating: true,
           hadDistraction: true,
           hadTabHide: true,
           hadIdle: true,
           hadRapidSwitch: true,
           resumeCount: true,
+          goalMinutes: true,
+          isMinMet: true,
+          targetMilestoneId: true,
           timeBucket: true,
           startHourBucket: true,
           sessionLengthBucket: true,
         },
       }),
+      db.dailyUserActivity.findMany({
+        where: {
+          userId,
+          dateKey: {
+            gte: weekStartKey,
+            lte: weekEndKey,
+          },
+        },
+        select: {
+          dateKey: true,
+          active: true,
+          qualityActive: true,
+        },
+      }),
+      findDailyFocusStatsByRange(db, userId, weekStartKey, weekEndKey),
     ]);
 
   // 用户验证
@@ -154,24 +221,136 @@ export async function computeWeeklyReport(
     }
   }
 
+  const sessionsWithDerivedFlow = sessions.map((session) => ({
+    ...session,
+    derivedFlowIndex: computeSessionFlowIndex({
+      sessionMinutes: session.duration ?? 0,
+      rating: session.rating,
+      goalMinutes: session.goalMinutes,
+      isMinMet: session.isMinMet,
+      hadDistraction: session.hadDistraction,
+      hadTabHide: session.hadTabHide,
+      hadIdle: session.hadIdle,
+      hadRapidSwitch: session.hadRapidSwitch,
+      resumeCount: session.resumeCount,
+    }),
+  }));
+  const dailyFocusStatsMap = new Map<string, DailyFocusStatsRecord>(
+    dailyFocusStats.map((item: DailyFocusStatsRecord) => [item.dateKey, item]),
+  );
+
   const daily = weekDates.map((date) => {
-    const daySessions = sessions.filter((s) => formatDateKey(s.startTime) === date);
+    const daySessions = sessionsWithDerivedFlow.filter((s) => formatDateKey(s.startTime) === date);
+    const activity = dailyActivities.find((item) => item.dateKey === date);
+    const storedDailyStats = dailyFocusStatsMap.get(date);
+    const fallbackFocusMinutes = daySessions.reduce(
+      (sum: number, s) => sum + (s.duration ?? 0),
+      0,
+    );
+    const fallbackSessionCount = daySessions.length;
+    const fallbackQualified = daySessions.some((s) => s.isMinMet) || !!activity?.qualityActive;
+    const fallbackCompanion = !!activity || fallbackSessionCount > 0;
+    const fallbackFlowScoreSum = daySessions.reduce(
+      (sum: number, s) => sum + s.derivedFlowIndex,
+      0,
+    );
+    const fallbackFlowScoreCount = daySessions.length;
     return {
       date,
-      sessionCount: daySessions.length,
-      minutes: daySessions.reduce((sum, s) => sum + (s.duration ?? 0), 0),
-      resumeCount: daySessions.reduce((sum, s) => sum + (s.resumeCount ?? 0), 0),
+      sessionCount: storedDailyStats?.focusSessionCount ?? fallbackSessionCount,
+      minutes: storedDailyStats?.focusMinutes ?? fallbackFocusMinutes,
+      resumeCount: daySessions.reduce((sum: number, s) => sum + (s.resumeCount ?? 0), 0),
+      hasCompanion: storedDailyStats?.companionDay ?? fallbackCompanion,
+      isQualified: storedDailyStats?.qualifiedDay ?? fallbackQualified,
+      flowScoreSum: storedDailyStats?.flowScoreSum ?? fallbackFlowScoreSum,
+      flowScoreCount: storedDailyStats?.flowScoreCount ?? fallbackFlowScoreCount,
     };
   });
 
   const totalMinutes = daily.reduce((sum, d) => sum + d.minutes, 0);
   const daysPresent = daily.filter((d) => d.minutes > 0).length;
-  const totalResumeCount = sessions.reduce((sum, s) => sum + (s.resumeCount ?? 0), 0);
-  const distractionCount = sessions.reduce(
-    (sum, s) => sum + ((s.hadDistraction || s.hadTabHide || s.hadIdle || s.hadRapidSwitch) ? 1 : 0),
+  const companionDays = daily.filter((d) => d.hasCompanion).length;
+  const qualifiedDays = daily.filter((d) => d.isQualified).length;
+  const totalFlowScoreSum = daily.reduce((sum: number, day) => sum + day.flowScoreSum, 0);
+  const totalFlowScoreCount = daily.reduce((sum: number, day) => sum + day.flowScoreCount, 0);
+  const flowScore =
+    totalFlowScoreCount > 0
+      ? Math.round(totalFlowScoreSum / totalFlowScoreCount)
+      : 0;
+  const totalResumeCount = sessionsWithDerivedFlow.reduce(
+    (sum: number, s) => sum + (s.resumeCount ?? 0),
     0,
   );
-  const peakTime = getPeakTimeBucket(sessions);
+  const distractionCount = sessions.reduce(
+    (sum: number, s) =>
+      sum + ((s.hadDistraction || s.hadTabHide || s.hadIdle || s.hadRapidSwitch) ? 1 : 0),
+    0,
+  );
+  const completedGoalIds = new Set(
+    sessions
+      .filter((s) => s.isMinMet && !!s.targetMilestoneId)
+      .map((s) => s.targetMilestoneId as string),
+  );
+  const completedGoalsCount = completedGoalIds.size;
+
+  const previousReport = await db.weeklyReport.findFirst({
+    where: { userId, weekStart: { lt: weekStart } },
+    orderBy: { weekStart: "desc" },
+    select: {
+      totalMinutes: true,
+      flowAvg: true,
+      streakDays: true,
+      payloadJson: true,
+    },
+  });
+  const historyReports = await db.weeklyReport.findMany({
+    where: { userId, weekStart: { lt: weekStart } },
+    select: {
+      totalMinutes: true,
+      flowAvg: true,
+    },
+  });
+
+  const previousCompanionDays = getPreviousCompanionDays(previousReport?.payloadJson);
+  const previousQualifiedDays = getPreviousQualifiedDays(previousReport?.payloadJson, previousReport?.streakDays ?? null);
+
+  const isCurrentWeekAllZero =
+    totalMinutes === 0 && flowScore === 0 && companionDays === 0 && qualifiedDays === 0;
+  const hasPreviousReport = !!previousReport;
+  const shouldCompareWithPrevious = hasPreviousReport && !isCurrentWeekAllZero;
+
+  const focusDeltaPercent = shouldCompareWithPrevious
+    ? computePercentDelta(totalMinutes, previousReport?.totalMinutes ?? null)
+    : null;
+  const flowDeltaPercent = shouldCompareWithPrevious
+    ? computePercentDelta(flowScore, previousReport?.flowAvg ?? null)
+    : null;
+  const daysPresentDelta = shouldCompareWithPrevious
+    ? computeAbsoluteDelta(companionDays, previousCompanionDays)
+    : null;
+  const streakDelta = shouldCompareWithPrevious
+    ? computeAbsoluteDelta(qualifiedDays, previousQualifiedDays)
+    : null;
+
+  const focusHistory = historyReports.map((r) => r.totalMinutes);
+  const flowHistory = historyReports
+    .map((r) => r.flowAvg)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const highestFocusMinutes = Math.max(totalMinutes, ...focusHistory, 0);
+  const highestFlowScore =
+    flowHistory.length > 0 || flowScore > 0 ? Math.max(flowScore, ...flowHistory, 0) : null;
+  const averageFocusMinutes = Math.round(
+    average([totalMinutes, ...focusHistory]),
+  );
+  const averageFlowScore =
+    flowHistory.length > 0 || flowScore > 0
+      ? Math.round(average([flowScore, ...flowHistory]))
+      : null;
+  const focusVsAverage = compareAverage(totalMinutes, averageFocusMinutes);
+  const flowVsAverage =
+    typeof averageFlowScore === "number" ? compareAverage(flowScore, averageFlowScore) : "none";
+
+  const peakTime = getPeakTimeBucket(sessionsWithDerivedFlow);
   const rhythmTitle = deriveRhythmTitle({
     daysPresent,
     totalMinutes,
@@ -182,13 +361,24 @@ export async function computeWeeklyReport(
   const rhythmSubtitle = buildCoverSubtitle(daysPresent, totalMinutes);
   const narrativeDay = pickNarrativeDay(daily, peakTime);
   const snippets = buildSnippets({
-    sessions,
+    sessions: sessionsWithDerivedFlow,
     daily,
     daysPresent,
     totalMinutes,
     peakTime,
     totalResumeCount,
     distractionCount,
+    flowScore,
+    completedGoalsCount,
+    totalHoursText: formatHoursMinutes(totalMinutes),
+    topFocusRecord: highestFocusMinutes,
+    topFlowRecord: highestFlowScore,
+    focusVsAverage,
+    flowVsAverage,
+    focusRecordBroken: totalMinutes > Math.max(...focusHistory, 0),
+    flowRecordBroken:
+      typeof highestFlowScore === "number" &&
+      flowScore > Math.max(...flowHistory, 0),
   });
   const closingNote = buildClosingNote(daysPresent, totalMinutes);
 
@@ -209,13 +399,54 @@ export async function computeWeeklyReport(
     },
     presence: {
       daysPresent,
+      companionDays,
+      qualifiedDays,
       totalMinutes,
       totalHours: roundTo1(totalMinutes / 60),
+      flowScore,
       peakTime,
       narrativeDayLabel: narrativeDay?.label ?? null,
       narrative:
         narrativeDay?.sentence ??
         "这一周你在自己的节奏里出现过几次，Echo 都记得。",
+      indicators: {
+        flow: {
+          value: flowScore,
+          deltaPercent: flowDeltaPercent,
+          direction: getPercentDirection(flowDeltaPercent),
+        },
+        focusDuration: {
+          valueMinutes: totalMinutes,
+          deltaPercent: focusDeltaPercent,
+          direction: getPercentDirection(focusDeltaPercent),
+        },
+        daysPresent: {
+          value: companionDays,
+          deltaDays: daysPresentDelta,
+          direction: getDeltaDirection(daysPresentDelta),
+        },
+        streak: {
+          value: qualifiedDays,
+          deltaDays: streakDelta,
+          direction: getDeltaDirection(streakDelta),
+        },
+      },
+      benchmarks: {
+        focusMinutes: {
+          highest: highestFocusMinutes,
+          average: averageFocusMinutes,
+          isNewRecord: totalMinutes > Math.max(...focusHistory, 0),
+          vsAverage: focusVsAverage,
+        },
+        flowScore: {
+          highest: highestFlowScore,
+          average: averageFlowScore,
+          isNewRecord:
+            typeof highestFlowScore === "number" &&
+            flowScore > Math.max(...flowHistory, 0),
+          vsAverage: flowVsAverage,
+        },
+      },
     },
     snippets,
     closingNote,
@@ -246,12 +477,12 @@ async function persistWeekly(
       update: {
         weekEnd,
         totalMinutes: payload.presence.totalMinutes,
-        wowChange: null,
-        streakDays: payload.presence.daysPresent,
+        wowChange: payload.presence.indicators.focusDuration.deltaPercent,
+        streakDays: payload.presence.indicators.streak.value,
         bestDay: null,
         bestDayNote: payload.presence.narrative,
-        flowAvg: null,
-        flowDelta: null,
+        flowAvg: payload.presence.flowScore,
+        flowDelta: payload.presence.indicators.flow.deltaPercent,
         expTotal: null,
         payloadJson: payload,
         expiresAt,
@@ -262,12 +493,12 @@ async function persistWeekly(
         weekStart,
         weekEnd,
         totalMinutes: payload.presence.totalMinutes,
-        wowChange: null,
-        streakDays: payload.presence.daysPresent,
+        wowChange: payload.presence.indicators.focusDuration.deltaPercent,
+        streakDays: payload.presence.indicators.streak.value,
         bestDay: null,
         bestDayNote: payload.presence.narrative,
-        flowAvg: null,
-        flowDelta: null,
+        flowAvg: payload.presence.flowScore,
+        flowDelta: payload.presence.indicators.flow.deltaPercent,
         expTotal: null,
         payloadJson: payload,
         expiresAt,
@@ -375,17 +606,64 @@ function buildSnippets(input: {
   daily: Array<{ date: string; sessionCount: number; minutes: number; resumeCount: number }>;
   daysPresent: number;
   totalMinutes: number;
+  totalHoursText: string;
+  flowScore: number;
+  completedGoalsCount: number;
   peakTime: TimeBucket;
   totalResumeCount: number;
   distractionCount: number;
+  topFocusRecord: number;
+  topFlowRecord: number | null;
+  focusVsAverage: AverageComparison;
+  flowVsAverage: AverageComparison;
+  focusRecordBroken: boolean;
+  flowRecordBroken: boolean;
 }): WeeklySnippet[] {
-  const { sessions, daily, daysPresent, totalMinutes, peakTime, totalResumeCount, distractionCount } = input;
+  const {
+    sessions,
+    daily,
+    daysPresent,
+    totalMinutes,
+    totalHoursText,
+    flowScore,
+    completedGoalsCount,
+    peakTime,
+    totalResumeCount,
+    distractionCount,
+    topFocusRecord,
+    topFlowRecord,
+    focusVsAverage,
+    flowVsAverage,
+    focusRecordBroken,
+    flowRecordBroken,
+  } = input;
   const snippets: WeeklySnippet[] = [];
+
+  if (completedGoalsCount > 0) {
+    snippets.push({
+      id: "goals",
+      content: `这周你点亮了 ${completedGoalsCount} 个小目标。`,
+    });
+  }
+
+  if (totalMinutes > 0) {
+    snippets.push({
+      id: "focus-total",
+      content: `这周你累计专注 ${totalHoursText}，每一次回到当下都很珍贵。`,
+    });
+  }
+
+  if (flowScore > 0) {
+    snippets.push({
+      id: "flow-score",
+      content: `本周心流指数是 ${flowScore}，你的节奏正在被慢慢看见。`,
+    });
+  }
 
   if (daysPresent > 0) {
     snippets.push({
-      id: "presence",
-      content: `这一周你在 ${daysPresent} 天里出现过，共留下了 ${formatMinutes(totalMinutes)}。`,
+      id: "presence-days",
+      content: `这一周你在 ${daysPresent} 天里出现过，Echo 都记得。`,
     });
   }
 
@@ -416,7 +694,40 @@ function buildSnippets(input: {
     snippets.push({
       id: "top-day",
       dateLabel: formatDateLabel(topDay.date),
-      content: `${formatDateLabel(topDay.date)}的${peakTime}，是这周较常出现的一段。`,
+      content: `${formatDateLabel(topDay.date)}是你这周最投入的一天。`,
+    });
+  }
+
+  if (daysPresent > 0) {
+    snippets.push({
+      id: "peak-time",
+      content: `你最常在${peakTime}回来，这段时间像你的专注主场。`,
+    });
+  }
+
+  if (focusRecordBroken) {
+    snippets.push({
+      id: "focus-record",
+      content: `你刷新了自己的周专注纪录（${formatHoursMinutes(topFocusRecord)}）。`,
+    });
+  }
+
+  if (flowRecordBroken && typeof topFlowRecord === "number") {
+    snippets.push({
+      id: "flow-record",
+      content: `你刷新了自己的周心流纪录（${topFlowRecord} 分）。`,
+    });
+  }
+
+  if (focusVsAverage === "above" || flowVsAverage === "above") {
+    snippets.push({
+      id: "above-average",
+      content: "这周整体表现高于你的周均水平。",
+    });
+  } else if (focusVsAverage === "equal" || flowVsAverage === "equal") {
+    snippets.push({
+      id: "equal-average",
+      content: "和你的平均节奏持平，继续保持就很好。",
     });
   }
 
@@ -427,7 +738,7 @@ function buildSnippets(input: {
     });
   }
 
-  return snippets.slice(0, 3);
+  return dedupeSnippets(snippets).slice(0, 5);
 }
 
 function buildClosingNote(daysPresent: number, totalMinutes: number) {
@@ -447,6 +758,12 @@ function formatMinutes(minutes: number) {
   return `${minutes} 分钟`;
 }
 
+function formatHoursMinutes(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h${String(minutes).padStart(2, "0")}m`;
+}
+
 function formatDateLabel(date: string) {
   const d = new Date(date);
   const days = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
@@ -455,6 +772,73 @@ function formatDateLabel(date: string) {
 
 function pad(num: number) {
   return num.toString().padStart(2, "0");
+}
+
+function computePercentDelta(current: number, previous: number | null) {
+  if (previous === null || previous < 0) return null;
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+function computeAbsoluteDelta(current: number, previous: number | null) {
+  if (previous === null || previous < 0) return null;
+  return current - previous;
+}
+
+function getPercentDirection(deltaPercent: number | null): TrendDirection {
+  if (deltaPercent === null) return "none";
+  if (deltaPercent > 0) return "up";
+  if (deltaPercent < 0) return "down";
+  return "flat";
+}
+
+function getDeltaDirection(delta: number | null): TrendDirection {
+  if (delta === null) return "none";
+  if (delta > 0) return "up";
+  if (delta < 0) return "down";
+  return "flat";
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, n) => sum + n, 0) / values.length;
+}
+
+function compareAverage(current: number, baseline: number): AverageComparison {
+  if (baseline <= 0 && current <= 0) return "none";
+  if (current > baseline) return "above";
+  if (current < baseline) return "below";
+  return "equal";
+}
+
+function getPreviousCompanionDays(payloadJson: unknown): number | null {
+  if (!payloadJson || typeof payloadJson !== "object") return null;
+  const root = payloadJson as Record<string, unknown>;
+  const presence = root.presence as Record<string, unknown> | undefined;
+  const value = presence?.companionDays;
+  return typeof value === "number" ? value : null;
+}
+
+function getPreviousQualifiedDays(payloadJson: unknown, fallback: number | null): number | null {
+  if (!payloadJson || typeof payloadJson !== "object") return fallback;
+  const root = payloadJson as Record<string, unknown>;
+  const presence = root.presence as Record<string, unknown> | undefined;
+  const topLevelValue = presence?.qualifiedDays;
+  if (typeof topLevelValue === "number") return topLevelValue;
+  const indicators = presence?.indicators as Record<string, unknown> | undefined;
+  const streak = indicators?.streak as Record<string, unknown> | undefined;
+  const value = streak?.value;
+  if (typeof value === "number" && value >= 0 && value <= 7) return value;
+  return typeof fallback === "number" && fallback >= 0 && fallback <= 7 ? fallback : null;
+}
+
+function dedupeSnippets(snippets: WeeklySnippet[]) {
+  const seen = new Set<string>();
+  return snippets.filter((snippet) => {
+    if (seen.has(snippet.id)) return false;
+    seen.add(snippet.id);
+    return true;
+  });
 }
 
 function getWeekDates(weekStart: Date) {

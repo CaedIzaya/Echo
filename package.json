@@ -7,6 +7,7 @@
     "build": "next build",
     "cleanup:expired": "node scripts/cleanup-expired.mjs",
     "db:generate": "prisma migrate dev",
+    "db:backfill:daily-focus-stats": "node scripts/backfill-daily-focus-stats.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",

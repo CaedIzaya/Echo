@@ -25,6 +25,7 @@ export enum AchievementType {
   HEART_TREE_WATER = 'heart_tree_water', // 心树浇水
   HEART_TREE_FERTILIZER = 'heart_tree_fertilizer', // 心树施肥
   HEART_TREE_LEVEL = 'heart_tree_level', // 心树等级
+  SPECIAL_EVENT = 'special_event',       // 特殊事件
 }
 
 // 成就等级枚举
@@ -141,6 +142,19 @@ export const HEART_TREE_LEVEL_ACHIEVEMENTS: Achievement[] = [
   { id: 'tree_level_30', name: '生命古树', description: '心树等级达到30级', icon: '🎄', rarity: 'RARE', type: AchievementType.HEART_TREE_LEVEL, target: 30, achieved: false, currentProgress: 0, repeatable: false },
 ];
 
+// 特殊事件成就
+export const SPECIAL_EVENT_ACHIEVEMENTS: Achievement[] = [
+  { id: 'night_owl', name: '夜猫子', description: '在22:30~次日3:00区间上线7次', icon: '🦉', rarity: 'RARE', type: AchievementType.SPECIAL_EVENT, target: 7, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'night_walker', name: '深夜行者', description: '在22:30~次日3:00启动并完成一次达标专注', icon: '🌙', rarity: 'EPIC', type: AchievementType.SPECIAL_EVENT, target: 1, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'dawn_witness', name: '晨曦见证者', description: '在5:30~8:30区间上线7次', icon: '🌅', rarity: 'RARE', type: AchievementType.SPECIAL_EVENT, target: 7, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'morning_walker', name: '清晨行者', description: '在5:30~8:30启动并完成一次达标专注', icon: '🌄', rarity: 'EPIC', type: AchievementType.SPECIAL_EVENT, target: 1, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'afternoon_tea', name: '下午茶', description: '在13:00~15:30期间完成一次烹饪类达标专注', icon: '☕', rarity: 'EPIC', type: AchievementType.SPECIAL_EVENT, target: 1, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'morning_exercise', name: '晨练者', description: '在6:30~9:30期间完成一次运动类达标专注', icon: '🏃', rarity: 'EPIC', type: AchievementType.SPECIAL_EVENT, target: 1, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'morning_reading', name: '晨读', description: '在6:30~9:30期间完成一次阅读类达标专注', icon: '📖', rarity: 'EPIC', type: AchievementType.SPECIAL_EVENT, target: 1, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'bedtime_reading', name: '睡前阅读', description: '在21:30~24:00期间完成一次阅读类达标专注', icon: '📚', rarity: 'EPIC', type: AchievementType.SPECIAL_EVENT, target: 1, achieved: false, currentProgress: 0, repeatable: false },
+  { id: 'hardcore_gamer', name: '爆肝选手', description: '在24:00~3:00期间完成一次游戏类达标专注', icon: '🎮', rarity: 'LEGENDARY', type: AchievementType.SPECIAL_EVENT, target: 1, achieved: false, currentProgress: 0, repeatable: false },
+];
+
 // 所有成就
 export const ALL_ACHIEVEMENTS: Achievement[] = [
   ...FLOW_INDEX_ACHIEVEMENTS,
@@ -154,6 +168,7 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
   ...HEART_TREE_WATER_ACHIEVEMENTS,
   ...HEART_TREE_FERTILIZER_ACHIEVEMENTS,
   ...HEART_TREE_LEVEL_ACHIEVEMENTS,
+  ...SPECIAL_EVENT_ACHIEVEMENTS,
 ];
 
 // 按类型获取成就

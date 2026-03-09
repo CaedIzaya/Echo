@@ -2,7 +2,9 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import { db } from "~/server/db";
+import { dateKeyFromDate, rebuildDailyFocusStats } from "~/lib/dailyFocusStats";
 import { formatDateKey } from "~/lib/weeklyReport";
+import { computeSessionFlowIndex } from "~/lib/flowEngine";
 
 type FocusPayload = {
   startTime: string;
@@ -124,7 +126,6 @@ export default async function handler(
       return res.status(400).json({ error: "专注时长不能超过24小时" });
     }
 
-    const flowIndex = clamp(body.flowIndex ?? body.rating ?? 70, 0, 100);
     const expEarned = body.expEarned ?? Math.max(0, Math.round(duration / 5));
 
     let goalMinutes = body.goalMinutes;
@@ -150,6 +151,18 @@ export default async function handler(
       : typeof goalMinutes === 'number'
         ? duration >= goalMinutes
         : false;
+    const explicitFlowIndex =
+      typeof body.flowIndex === "number" && Number.isFinite(body.flowIndex) && body.flowIndex > 3
+        ? clamp(body.flowIndex, 0, 100)
+        : null;
+    const flowIndex =
+      explicitFlowIndex ??
+      computeSessionFlowIndex({
+        sessionMinutes: duration,
+        rating: body.rating,
+        goalMinutes,
+        isMinMet,
+      });
 
     console.log("[focus-sessions] 开始保存专注会话", {
       userId: session.user.id,
@@ -181,6 +194,10 @@ export default async function handler(
       console.log("[focus-sessions] 专注会话保存成功", { id: focusSession.id });
       return focusSession;
     });
+
+    const dateKey = dateKeyFromDate(start);
+
+    await rebuildDailyFocusStats(db, session.user.id, dateKey);
 
     // 异步刷新每日小结（不阻塞响应）
     refreshDailySummary(session.user.id, start).catch((err) => {

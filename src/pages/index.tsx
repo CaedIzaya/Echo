@@ -209,16 +209,16 @@ const LandingHero = ({
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-[1.1] tracking-tight">
-          在这里,
+          从最小开始，
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400">
-            重拾注意力
+            找回节奏
             </span>
           </h1>
 
           <div className="space-y-4 text-lg md:text-xl text-slate-600 leading-relaxed">
             <p>Echo 是一个不催促、不评判的专注空间</p>
-            <p>帮你把注意力从外界噪音，慢慢带回自己身上。</p>
+            <p>不锁屏幕，不打分，不惩罚</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -270,11 +270,11 @@ const LandingHero = ({
                   <p className="text-lg font-semibold text-slate-900 mt-1">25 分钟</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-50 to-white border border-sky-100">
-                  <p className="text-xs text-sky-500">心流指数</p>
-                  <p className="text-lg font-semibold text-slate-900 mt-1">75</p>
+                  <p className="text-xs text-sky-500">心流等级</p>
+                  <p className="text-lg font-semibold text-slate-900 mt-1">萌芽</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-teal-50 to-white border border-teal-100">
-                  <p className="text-xs text-teal-500">当前连胜</p>
+                  <p className="text-xs text-teal-500">本周回来</p>
                   <p className="text-lg font-semibold text-slate-900 mt-1">3 天</p>
                 </div>
               </div>
@@ -320,7 +320,7 @@ const LandingHero = ({
             style={{ animationDuration: '3s' }}
           >
             <span className="text-2xl">⏱️</span>
-            <span className="ml-2 font-mono font-bold">15:00</span>
+            <span className="ml-2 font-mono font-bold">10:00</span>
           </div>
 
           <div
@@ -329,7 +329,7 @@ const LandingHero = ({
           >
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span className="text-sm font-medium text-teal-700">深度专注模式</span>
+              <span className="text-sm font-medium text-teal-700">回心模式</span>
             </div>
           </div>
         </div>
@@ -368,9 +368,9 @@ const LandingHero = ({
           <div className="group relative overflow-hidden rounded-2xl border border-white/80 bg-white/60 p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
             <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <p className="text-base font-light leading-relaxed text-slate-700">
-            不缺目标
+            不缺计划
             <br />
-            只是缺一个安静的空间？
+            总是容易断掉？
             </p>
           </div>
         </div>
@@ -514,7 +514,7 @@ const LandingCTA = ({ onPrimaryAction }: { onPrimaryAction: (email?: string) => 
 const LandingFooter = () => (
   <footer className="bg-slate-50 border-t border-slate-200 pt-16 pb-8">
     <div className="max-w-7xl mx-auto px-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
         <div>
           <div className="flex items-center gap-2 mb-4">
             <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white p-1.5 rounded-xl flex items-center justify-center overflow-hidden w-10 h-10">
@@ -523,64 +523,29 @@ const LandingFooter = () => (
             <span className="text-xl font-bold text-slate-900">Echo</span>
           </div>
           <p className="text-slate-500 text-sm leading-relaxed">
-            我们致力于帮你找回被碎片化信息夺走的专注力，重新建立深度思考的能力。
+            我们希望在这嘈杂世界里面给你一个安静专注的空间，重建自己生活的秩序
           </p>
         </div>
 
         <div>
-          <h4 className="font-bold text-slate-900 mb-3">产品</h4>
-          <ul className="space-y-2 text-sm text-slate-600">
-            <li>
-              <a href="#" className="hover:text-teal-600 transition-colors">
-                功能介绍
-              </a>
-            </li>
-            <li>
-              <a href="#" className="hover:text-teal-600 transition-colors">
-                更新日志
-              </a>
-            </li>
-            <li>
-              <a href="#" className="hover:text-teal-600 transition-colors">
-                
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-bold text-slate-900 mb-3">资源</h4>
-          <ul className="space-y-2 text-sm text-slate-600">
-            <li>
-              <a href="#" className="hover:text-teal-600 transition-colors">
-                专注力指南
-              </a>
-            </li>
-            <li>
-              <a href="#" className="hover:text-teal-600 transition-colors">
-                社区博客
-              </a>
-            </li>
-            <li>
-              <a href="#" className="hover:text-teal-600 transition-colors">
-                帮助中心
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        <div>
           <h4 className="font-bold text-slate-900 mb-3">关注我们</h4>
-          <div className="flex gap-4">
-            {['T', 'G', 'I'].map((icon) => (
-              <a
-                key={icon}
-                href="#"
-                className="h-10 w-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:border-teal-400 hover:text-teal-600 transition-all"
-              >
-                {icon}
-              </a>
-            ))}
+          <div className="flex flex-wrap gap-3 text-sm">
+            <a
+              href="https://www.xiaohongshu.com/user/profile/67419bc3000000001d02c327?xsec_token=ABOSRA4q1KRUWPK8kNJFWrpyJxevsby3cShtqLmutUDpo%3D&xsec_source=pc_search"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-600 transition-all"
+            >
+              小红书
+            </a>
+            <a
+              href="https://space.bilibili.com/3706942042147319?spm_id_from=333.33.0.0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-600 transition-all"
+            >
+              哔哩哔哩
+            </a>
           </div>
         </div>
       </div>

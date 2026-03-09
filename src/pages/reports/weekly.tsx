@@ -44,6 +44,7 @@ const WeeklyReportPage = ({
   const router = useRouter();
   const [page, setPage] = useState<PageState>(PageState.COVER);
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
+  const [showPresenceHints, setShowPresenceHints] = useState(false);
 
   useEffect(() => {
     localforage
@@ -105,6 +106,60 @@ const WeeklyReportPage = ({
   if (!report) return null;
 
   const next = () => setPage((prev) => Math.min(prev + 1, PageState.CLOSING));
+  const presenceMetrics: PresenceMetric[] = [
+    {
+      key: "flow",
+      title: "本周心流指数",
+      value: `${report.presence.indicators.flow.value}`,
+      delta: formatPercentDelta(
+        report.presence.indicators.flow.deltaPercent,
+        report.presence.indicators.flow.direction,
+      ),
+      hint: buildFlowBenchmarkHint(report),
+      progress: ratioAgainstBenchmark(
+        report.presence.indicators.flow.value,
+        report.presence.benchmarks.flowScore.highest,
+      ),
+      accent: "teal",
+      important: true,
+    },
+    {
+      key: "focusDuration",
+      title: "专注时长",
+      value: formatDurationCompact(report.presence.indicators.focusDuration.valueMinutes),
+      delta: formatPercentDelta(
+        report.presence.indicators.focusDuration.deltaPercent,
+        report.presence.indicators.focusDuration.direction,
+      ),
+      hint: buildFocusBenchmarkHint(report),
+      progress: ratioAgainstBenchmark(
+        report.presence.indicators.focusDuration.valueMinutes,
+        report.presence.benchmarks.focusMinutes.highest,
+      ),
+      accent: "cyan",
+      important: true,
+    },
+    {
+      key: "daysPresent",
+      title: "本周陪伴",
+      value: `${report.presence.indicators.daysPresent.value} 天`,
+      delta: formatSignedDelta(report.presence.indicators.daysPresent.deltaDays),
+      hint: "这周你和Echo相伴的天数",
+      progress: ratioOfWeek(report.presence.indicators.daysPresent.value),
+      accent: "violet",
+      important: false,
+    },
+    {
+      key: "streak",
+      title: "回心天数",
+      value: `${report.presence.indicators.streak.value} 天`,
+      delta: formatSignedDelta(report.presence.indicators.streak.deltaDays),
+      hint: "你坐稳完成专注目标的那些日子",
+      progress: ratioOfWeek(report.presence.indicators.streak.value),
+      accent: "slate",
+      important: false,
+    },
+  ];
 
   return (
     <>
@@ -184,34 +239,60 @@ const WeeklyReportPage = ({
 
               {page === PageState.PRESENCE && (
                 <PageWrap key="presence">
-                  <div className="pt-16">
-                    <h2 className="text-2xl leading-relaxed text-slate-100">
+                  <div className="pt-12 sm:pt-16">
+                    <h2 className="text-xl leading-relaxed text-slate-100 sm:text-2xl">
                       这一周，
                       <br />
                       <span className="text-slate-400">你在这里出现过。</span>
                     </h2>
                   </div>
-                  <div className="mt-10 w-full space-y-4">
-                    <FactCard title="出现天数" value={`${report.presence.daysPresent} 天`} hint="只是出现，也很重要" />
-                    <FactCard
-                      title="累计专注"
-                      value={`${report.presence.totalHours} 小时`}
-                      hint={`${report.presence.totalMinutes} 分钟`}
-                    />
-                    <FactCard title="常见时段" value={report.presence.peakTime} hint="你更常在这个时段回来" />
+                  <div className="mt-6 flex w-full items-center justify-between">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">核心数据</p>
+                    <button
+                      onClick={() => setShowPresenceHints((prev) => !prev)}
+                      className={`h-6 w-6 rounded-full border text-[11px] font-semibold transition ${
+                        showPresenceHints
+                          ? "border-teal-400/60 bg-teal-400/10 text-teal-300"
+                          : "border-slate-600/80 bg-slate-800/40 text-slate-400"
+                      }`}
+                      title={showPresenceHints ? "隐藏解释" : "显示全部解释"}
+                    >
+                      !
+                    </button>
                   </div>
-                  <div className="mt-10 w-full border-l border-slate-700/60 pl-4">
+                  <div className="mt-3 w-full space-y-2.5">
+                    {presenceMetrics.map((metric) => (
+                      <PresenceBarCard
+                        key={metric.key}
+                        title={metric.title}
+                        value={metric.value}
+                        delta={metric.delta}
+                        hint={metric.hint}
+                        showHint={showPresenceHints}
+                        progress={metric.progress}
+                        accent={metric.accent}
+                        important={metric.important}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-6 w-full border-l border-slate-700/60 pl-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                       {report.presence.narrativeDayLabel ?? "这一周的一段"}
                     </p>
-                    <p className="mt-2 text-base leading-relaxed text-slate-300">“{report.presence.narrative}”</p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-300 sm:text-base">
+                      “{report.presence.narrative}”
+                    </p>
                   </div>
-                  <button
-                    onClick={next}
-                    className="mb-5 mt-auto text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
-                  >
-                    继续
-                  </button>
+                  <div className="mb-5 mt-auto flex justify-center pt-5">
+                    <div className="rounded-full border border-slate-700/80 p-1">
+                      <button
+                        onClick={next}
+                        className="rounded-full border border-slate-600 bg-slate-800/50 px-5 py-1.5 text-xs uppercase tracking-[0.2em] text-slate-300 hover:border-slate-500 hover:text-slate-100"
+                      >
+                        继续
+                      </button>
+                    </div>
+                  </div>
                 </PageWrap>
               )}
 
@@ -305,21 +386,151 @@ function PageWrap({ children }: { children: React.ReactNode }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -18, scale: 0.98 }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute inset-0 flex flex-col px-7 pb-6"
+      className="absolute inset-0 flex flex-col overflow-y-auto px-7 pb-6"
     >
       {children}
     </motion.div>
   );
 }
 
-function FactCard({ title, value, hint }: { title: string; value: string; hint: string }) {
+type PresenceMetric = {
+  key: string;
+  title: string;
+  value: string;
+  hint: string;
+  delta?: DeltaDisplay | null;
+  progress: number;
+  accent: "teal" | "cyan" | "violet" | "slate";
+  important: boolean;
+};
+
+function PresenceBarCard({
+  title,
+  value,
+  hint,
+  delta,
+  progress,
+  accent,
+  important,
+  showHint,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  delta?: DeltaDisplay | null;
+  progress: number;
+  accent: PresenceMetric["accent"];
+  important: boolean;
+  showHint: boolean;
+}) {
+  const fillClass =
+    accent === "teal"
+      ? "from-teal-400 to-emerald-400"
+      : accent === "cyan"
+        ? "from-sky-400 to-cyan-400"
+        : accent === "violet"
+          ? "from-violet-400 to-fuchsia-400"
+          : "from-slate-400 to-slate-300";
+
   return (
-    <div className="rounded-2xl border border-slate-700/40 bg-slate-800/30 p-4">
+    <div
+      className={`rounded-xl border bg-slate-800/25 px-3 py-2.5 ${
+        important ? "border-teal-400/40 shadow-[0_0_0_1px_rgba(45,212,191,0.12)]" : "border-slate-700/40"
+      }`}
+    >
       <p className="text-xs uppercase tracking-[0.14em] text-slate-500">{title}</p>
-      <p className="mt-1 text-xl text-slate-100">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{hint}</p>
+      <div className="mt-0.5 flex items-end gap-2">
+        <p className={`text-slate-100 ${important ? "text-xl" : "text-lg"}`}>{value}</p>
+        {delta ? (
+          <p
+            className={`pb-0.5 text-[11px] font-medium ${
+              delta.tone === "up"
+                ? "text-emerald-400"
+                : delta.tone === "down"
+                  ? "text-sky-400"
+                  : "text-slate-500"
+            }`}
+          >
+            {delta.label}
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-2 h-1.5 w-full rounded-full bg-slate-900/70">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${fillClass} transition-all duration-700`}
+          style={{ width: `${Math.max(8, Math.round(progress * 100))}%` }}
+        />
+      </div>
+      {showHint ? <p className="mt-1 text-[11px] text-slate-500">{hint}</p> : null}
     </div>
   );
+}
+
+type DeltaDisplay = {
+  label: string;
+  tone: "up" | "down" | "neutral";
+};
+
+function formatPercentDelta(
+  deltaPercent: number | null,
+  direction: "up" | "down" | "flat" | "new" | "none",
+): DeltaDisplay | null {
+  if (direction === "new") return { label: "NEW", tone: "up" };
+  if (deltaPercent === null || direction === "none") return null;
+  if (direction === "flat") return { label: "0%", tone: "neutral" };
+  const abs = Math.abs(deltaPercent);
+  return {
+    label: direction === "up" ? `${abs}%↑` : `${abs}%↓`,
+    tone: direction === "up" ? "up" : "down",
+  };
+}
+
+function formatSignedDelta(delta: number | null): DeltaDisplay | null {
+  if (delta === null) return null;
+  if (delta === 0) return { label: "0", tone: "neutral" };
+  return {
+    label: delta > 0 ? `+${delta}` : `${delta}`,
+    tone: delta > 0 ? "up" : "down",
+  };
+}
+
+function formatDurationCompact(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h${String(minutes).padStart(2, "0")}m`;
+}
+
+function ratioAgainstBenchmark(value: number, benchmark: number | null) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const safeBenchmark =
+    typeof benchmark === "number" && Number.isFinite(benchmark) && benchmark > 0
+      ? benchmark
+      : safeValue > 0
+        ? safeValue
+        : 1;
+  return clampRatio(safeValue / safeBenchmark);
+}
+
+function ratioOfWeek(value: number) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  return clampRatio(safeValue / 7);
+}
+
+function clampRatio(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
+function buildFocusBenchmarkHint(report: WeeklyReportPayload) {
+  const benchmark = report.presence.benchmarks.focusMinutes;
+  return `最高 ${formatDurationCompact(benchmark.highest)} · 周均 ${formatDurationCompact(benchmark.average)}`;
+}
+
+function buildFlowBenchmarkHint(report: WeeklyReportPayload) {
+  const benchmark = report.presence.benchmarks.flowScore;
+  const highest = typeof benchmark.highest === "number" ? benchmark.highest : "--";
+  const average = typeof benchmark.average === "number" ? benchmark.average : "--";
+  return `最高 ${highest} · 周均 ${average}`;
 }
 
 const REPORT_HOUR_LOCAL = 8;

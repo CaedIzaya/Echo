@@ -146,19 +146,19 @@ export default function SummaryShareCard({
               )}
             </div>
 
-            {/* 右侧：连胜天数 */}
+            {/* 右侧：Echo陪伴天数 */}
             <div className="text-right">
               <div className="text-[10px] md:text-sm tracking-wider font-medium uppercase mb-1 md:mb-2" style={{ color: currentStyle.textSecondary }}>
-                连续专注
+                Echo陪伴
               </div>
               {theme === 'mint' ? (
                 <span className="text-3xl md:text-5xl font-bold tracking-tight" style={{ color: '#0d9488' }}>
-                  {streakDays || 1}
+                  {streakDays || 0}
                   <span className="text-base md:text-2xl font-normal" style={{ color: currentStyle.textPrimary }}> 天</span>
                 </span>
               ) : (
                 <span className="text-3xl md:text-5xl font-bold tracking-tight" style={{ color: currentStyle.textPrimary }}>
-                  {streakDays || 1} <span className="text-base md:text-2xl font-normal">天</span>
+                  {streakDays || 0} <span className="text-base md:text-2xl font-normal">天</span>
                 </span>
               )}
             </div>

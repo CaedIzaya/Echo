@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
+import { rebuildDailyFocusStats } from '~/lib/dailyFocusStats';
 import { db } from '~/server/db';
 import { formatDateKey } from '~/lib/weeklyReport';
 
@@ -85,6 +86,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { id: userId },
       data: { lastActiveAt: eventTime },
     });
+
+    await rebuildDailyFocusStats(db, userId, dateKey);
 
     return res.status(200).json({ success: true });
   } catch (error: any) {

@@ -23,6 +23,8 @@ export interface DashboardData {
   totalMinutes: number;
   streakDays: number;
   lastStreakDate: string | null;
+  echoCompanionDays: number;
+  lastEchoCompanionDate: string | null;
   
   // 加载状态
   isLoading: boolean;
@@ -89,6 +91,8 @@ export function useDashboardData() {
         totalMinutes: dbData.totalMinutes || 0,
         streakDays: dbData.streakDays || 0,
         lastStreakDate: dbData.lastStreakDate || null,
+        echoCompanionDays: dbData.echoCompanionDays || 0,
+        lastEchoCompanionDate: dbData.lastEchoCompanionDate || null,
         isLoading: false,
         lastSyncAt: new Date().toISOString(),
       };
@@ -141,6 +145,8 @@ export function useDashboardData() {
     data.totalMinutes,
     data.streakDays,
     data.lastStreakDate,
+    data.echoCompanionDays,
+    data.lastEchoCompanionDate,
     data.isLoading,
     data.lastSyncAt,
   ]);
@@ -164,6 +170,8 @@ function getDefaultData(): DashboardData {
     totalMinutes: 0,
     streakDays: 0,
     lastStreakDate: null,
+    echoCompanionDays: 0,
+    lastEchoCompanionDate: null,
     isLoading: true,
     lastSyncAt: null,
   };
@@ -218,6 +226,7 @@ function syncToLegacyStorage(data: DashboardData) {
     const dashboardStats = {
       yesterdayMinutes: 0, // 需要从数据库计算
       streakDays: data.streakDays,
+      echoCompanionDays: data.echoCompanionDays,
       completedGoals: 0, // 需要从数据库计算
     };
     setUserStorage('dashboardStats', JSON.stringify(dashboardStats));

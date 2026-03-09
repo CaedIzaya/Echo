@@ -75,6 +75,8 @@ model User {
   flowMetrics            Json?          // 心流指标数据（impression, tempFlow等）
   streakDays             Int            @default(0)     // 🔥 连续专注天数
   lastStreakDate         String?                        // 🔥 最后一次更新连续天数的日期 (YYYY-MM-DD)
+  echoCompanionDays      Int            @default(0)     // 🤝 Echo陪伴天数（登录累计）
+  lastEchoCompanionDate  String?                        // 🤝 最后一次累计 Echo陪伴 的日期 (YYYY-MM-DD)
   totalFocusMinutes      Int            @default(0)     // 🔥 总专注时长（分钟）
   activatedAt            DateTime?                      // 首次完成专注（活跃定义）
   qualityActivatedAt     DateTime?                      // 首次质量活跃（达标专注或保存小结）
@@ -90,6 +92,7 @@ model User {
   events                 Event[]
   userSessions           UserSession[]
   dailyActivities        DailyUserActivity[]
+  dailyFocusStats        DailyFocusStats[]
   featureUsageDaily      FeatureUsageDaily[]
   dailySummaries         DailySummary[]
   shareLinks             ShareLink[]
@@ -98,9 +101,26 @@ model User {
   passwordResetTokens    PasswordResetToken[]
   achievements           Achievement[]
   mails                  Mail[]
+  microGoalHistories     MicroGoalHistory[]
 
   @@index([createdAt])
   @@index([email])
+}
+
+model MicroGoalHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  rawText        String
+  normalizedText String
+  usageCount     Int      @default(1)
+  lastUsedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, normalizedText])
+  @@index([userId, lastUsedAt])
+  @@index([userId, usageCount])
 }
 
 model Mail {
@@ -257,6 +277,28 @@ model DailyUserActivity {
   updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+  @@index([dateKey])
+}
+
+model DailyFocusStats {
+  id                    String   @id @default(cuid())
+  userId                String
+  dateKey               String
+  focusMinutes          Int      @default(0)
+  focusSessionCount     Int      @default(0)
+  qualifiedSessionCount Int      @default(0)
+  qualifiedDay          Boolean  @default(false)
+  companionDay          Boolean  @default(false)
+  flowScoreSum          Int      @default(0)
+  flowScoreCount        Int      @default(0)
+  flowScoreAvg          Float?
+  firstFocusAt          DateTime?
+  lastFocusAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, dateKey])
   @@index([dateKey])

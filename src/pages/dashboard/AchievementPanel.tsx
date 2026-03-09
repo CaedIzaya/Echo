@@ -6,7 +6,7 @@ interface AchievementPanelProps {
 }
 
 export default function AchievementPanel({ onClose }: AchievementPanelProps) {
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'flow' | 'time' | 'daily' | 'milestone' | 'first' | 'badge'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'flow' | 'time' | 'daily' | 'milestone' | 'first' | 'special' | 'badge'>('all');
   const [stats, setStats] = useState({ total: 0, achieved: 0, progress: 0 });
   const [badges, setBadges] = useState<string[]>([]);
 
@@ -47,6 +47,8 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
         return 'from-yellow-500 to-orange-600';
       case 'first':
         return 'from-indigo-500 to-purple-600';
+      case 'special':
+        return 'from-rose-500 to-amber-500';
       default:
         return 'from-gray-400 to-gray-500';
     }
@@ -60,6 +62,7 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
     { key: 'time', label: '时长', icon: '⏰' },
     { key: 'daily', label: '每日', icon: '📅' },
     { key: 'milestone', label: '小目标', icon: '🎯' },
+    { key: 'special', label: '特殊', icon: '🦉' },
   ];
   
   // 勋章数据（按等级排序）
@@ -190,6 +193,7 @@ export default function AchievementPanel({ onClose }: AchievementPanelProps) {
                             {achievement.category === 'daily' && `${achievement.requirement}h单日时长`}
                             {achievement.category === 'milestone' && `完成${achievement.requirement}个小目标`}
                             {achievement.category === 'first' && achievement.description}
+                            {achievement.category === 'special' && achievement.description}
                           </span>
                         </div>
                       )}

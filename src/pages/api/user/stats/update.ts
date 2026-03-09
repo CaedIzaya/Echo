@@ -25,12 +25,20 @@ export default async function handler(
   }
 
   try {
-    const { streakDays, lastStreakDate, totalFocusMinutes } = req.body;
+    const {
+      streakDays,
+      lastStreakDate,
+      echoCompanionDays,
+      lastEchoCompanionDate,
+      totalFocusMinutes
+    } = req.body;
 
     // 验证数据
     if (
       (streakDays !== undefined && typeof streakDays !== 'number') ||
       (lastStreakDate !== undefined && typeof lastStreakDate !== 'string') ||
+      (echoCompanionDays !== undefined && typeof echoCompanionDays !== 'number') ||
+      (lastEchoCompanionDate !== undefined && typeof lastEchoCompanionDate !== 'string') ||
       (totalFocusMinutes !== undefined && typeof totalFocusMinutes !== 'number')
     ) {
       return res.status(400).json({ error: '数据格式错误' });
@@ -40,6 +48,8 @@ export default async function handler(
     const updateData: any = {};
     if (streakDays !== undefined) updateData.streakDays = streakDays;
     if (lastStreakDate !== undefined) updateData.lastStreakDate = lastStreakDate;
+    if (echoCompanionDays !== undefined) updateData.echoCompanionDays = echoCompanionDays;
+    if (lastEchoCompanionDate !== undefined) updateData.lastEchoCompanionDate = lastEchoCompanionDate;
     if (totalFocusMinutes !== undefined) updateData.totalFocusMinutes = totalFocusMinutes;
 
     // 更新数据库
@@ -49,6 +59,8 @@ export default async function handler(
       select: {
         streakDays: true,
         lastStreakDate: true,
+        echoCompanionDays: true,
+        lastEchoCompanionDate: true,
         totalFocusMinutes: true,
       },
     });

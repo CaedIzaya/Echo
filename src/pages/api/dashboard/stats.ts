@@ -38,6 +38,8 @@ export default async function handler(
           totalFocusMinutes: true,
           streakDays: true,
           lastStreakDate: true,
+          echoCompanionDays: true,
+          lastEchoCompanionDate: true,
         },
       }),
       
@@ -107,6 +109,8 @@ export default async function handler(
       totalMinutes,
       streakDays: user?.streakDays || 0,
       lastStreakDate: user?.lastStreakDate || null,
+      echoCompanionDays: user?.echoCompanionDays || 0,
+      lastEchoCompanionDate: user?.lastEchoCompanionDate || null,
       syncedAt: new Date().toISOString(),
     };
 

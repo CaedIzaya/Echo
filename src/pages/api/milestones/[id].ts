@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { db } from '~/server/db';
+import { trackMicroGoalUsage } from '~/lib/microGoalHistory';
 
 /**
  * 单个里程碑操作 API
@@ -100,6 +101,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       console.log('[milestone] 更新成功:', updatedMilestone.id);
+
+      if (isCompleted === true && !milestone.isCompleted) {
+        try {
+          await trackMicroGoalUsage(session.user.id, updatedMilestone.title);
+        } catch (historyError) {
+          console.warn('[milestone] 写入小目标历史失败(通用单条完成):', historyError);
+        }
+      }
 
       return res.status(200).json({ milestone: updatedMilestone });
     }

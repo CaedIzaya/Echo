@@ -29,6 +29,8 @@ export default async function handler(
       select: {
         streakDays: true,
         lastStreakDate: true,
+        echoCompanionDays: true,
+        lastEchoCompanionDate: true,
         totalFocusMinutes: true,
       },
     });
@@ -42,6 +44,8 @@ export default async function handler(
       stats: {
         streakDays: user.streakDays || 0,
         lastStreakDate: user.lastStreakDate || null,
+        echoCompanionDays: user.echoCompanionDays || 0,
+        lastEchoCompanionDate: user.lastEchoCompanionDate || null,
         totalFocusMinutes: user.totalFocusMinutes || 0,
       },
     });

@@ -200,6 +200,60 @@ export const calculateSessionQuality = ({
   return normalizedRating * 0.45 + durationFactor * 0.35 + completionFactor * 0.2;
 };
 
+export const computeSessionFlowIndex = ({
+  sessionMinutes,
+  rating,
+  goalMinutes,
+  isMinMet,
+  hadDistraction,
+  hadTabHide,
+  hadIdle,
+  hadRapidSwitch,
+  resumeCount,
+}: {
+  sessionMinutes: number;
+  rating?: number | null;
+  goalMinutes?: number | null;
+  isMinMet?: boolean | null;
+  hadDistraction?: boolean | null;
+  hadTabHide?: boolean | null;
+  hadIdle?: boolean | null;
+  hadRapidSwitch?: boolean | null;
+  resumeCount?: number | null;
+}) => {
+  const safeMinutes = Math.max(0, sessionMinutes || 0);
+  const safeRating =
+    typeof rating === 'number' && Number.isFinite(rating) ? clamp(rating, 1, 3) : 2;
+  const safeGoalMinutes =
+    typeof goalMinutes === 'number' && Number.isFinite(goalMinutes) && goalMinutes > 0
+      ? goalMinutes
+      : 30;
+  const completedGoal =
+    typeof isMinMet === 'boolean' ? isMinMet : safeMinutes >= safeGoalMinutes;
+
+  const quality = calculateSessionQuality({
+    sessionMinutes: safeMinutes,
+    rating: safeRating,
+    dailyGoalMinutes: safeGoalMinutes,
+    completedDailyGoal: completedGoal,
+  });
+
+  const interruptionSignals = [
+    hadDistraction,
+    hadTabHide,
+    hadIdle,
+    hadRapidSwitch,
+  ].filter(Boolean).length;
+  const safeResumeCount =
+    typeof resumeCount === 'number' && Number.isFinite(resumeCount) ? Math.max(0, resumeCount) : 0;
+  const interruptionPenalty = interruptionSignals * 7 + Math.min(safeResumeCount, 4) * 2;
+  const enduranceBonus = clamp((safeMinutes - 15) * 0.4, 0, 14);
+  const completionBonus = completedGoal ? 8 : safeMinutes >= safeGoalMinutes * 0.6 ? 2 : -6;
+  const rawScore = quality * 100 + enduranceBonus + completionBonus - interruptionPenalty;
+
+  return Math.round(clamp(rawScore, 0, 100));
+};
+
 // ---------- 行为记录（localStorage 版） ----------
 
 const defaultBehaviorRecord = (date: string): DailyBehaviorRecord => ({

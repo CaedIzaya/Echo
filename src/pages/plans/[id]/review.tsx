@@ -151,7 +151,7 @@ export default function PlanReview() {
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl">
                 <div className="text-3xl font-bold text-orange-600">{project.streakDays}</div>
-                <div className="text-sm text-orange-600/70 mt-1">连续天数</div>
+                <div className="text-sm text-orange-600/70 mt-1">Echo陪伴</div>
               </div>
               <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl">
                 <div className="text-3xl font-bold text-purple-600">

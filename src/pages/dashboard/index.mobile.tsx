@@ -13,6 +13,7 @@ import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import ShopModal from '~/components/shop/ShopModal';
+import GoalInputModal from '~/components/goals/GoalInputModal';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
 import { useUserExp } from '~/hooks/useUserExp';
@@ -81,6 +82,7 @@ interface WeeklyStats {
 interface DashboardStats {
   yesterdayMinutes: number;  // 昨日专注时长（用于显示）
   streakDays: number;
+  echoCompanionDays: number;
   completedGoals: number;
 }
 
@@ -145,8 +147,8 @@ function AchievementsSection() {
       .filter(a => manager.isAchievementUnlocked(a.id))
       .sort((a, b) => {
         // 按类别优先级排序
-        const order = { 'first': 0, 'flow': 1, 'time': 2, 'daily': 3, 'milestone': 4 };
-        return (order[a.category] || 5) - (order[b.category] || 5);
+        const order: Record<string, number> = { 'first': 0, 'flow': 1, 'time': 2, 'daily': 3, 'milestone': 4, 'special': 5 };
+        return (order[a.category] ?? 6) - (order[b.category] ?? 6);
       });
     
     setAchievements(unlockedAchievements);
@@ -407,12 +409,14 @@ export default function Dashboard() {
       return savedStats ? JSON.parse(savedStats) : {
         yesterdayMinutes: 0,
         streakDays: 0,
+        echoCompanionDays: 0,
         completedGoals: 0
       };
     }
     return {
       yesterdayMinutes: 0,
       streakDays: 0,
+      echoCompanionDays: 0,
       completedGoals: 0
     };
   });
@@ -449,7 +453,9 @@ export default function Dashboard() {
   const [showStreakInfo, setShowStreakInfo] = useState(false);
   const [showFlowInfo, setShowFlowInfo] = useState(false);
   const [showShopModal, setShowShopModal] = useState(false);
+  const [showGoalInputModal, setShowGoalInputModal] = useState(false);
   const [fruits, setFruits] = useState(0);
+  const enableMobileGoalEntry = process.env.NEXT_PUBLIC_ENABLE_MOBILE_MICRO_GOAL_ENTRY !== 'false';
 
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
@@ -461,6 +467,107 @@ export default function Dashboard() {
       return updated;
     });
   };
+
+  // Echo陪伴：当天首次登录 Dashboard 记 1 天（累计，不要求连续）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let cancelled = false;
+
+    const registerCompanionDay = async () => {
+      const today = getTodayDate();
+      const loginCountedKey = `echoCompanionCounted_${today}`;
+      const syncPendingKey = `echoCompanionSyncPending_${today}`;
+      const alreadyCountedLocal = localStorage.getItem(loginCountedKey) === 'true';
+      const pendingSync = localStorage.getItem(syncPendingKey) === 'true';
+
+      let baseCompanionDays = 0;
+      const savedStats = localStorage.getItem('dashboardStats');
+      if (savedStats) {
+        try {
+          baseCompanionDays = JSON.parse(savedStats).echoCompanionDays || 0;
+        } catch {
+          baseCompanionDays = 0;
+        }
+      }
+
+      // 登录态下先读数据库，避免跨设备导致累计值回退
+      if (session?.user?.id) {
+        try {
+          const res = await fetch('/api/user/stats');
+          if (res.ok) {
+            const data = await res.json();
+            const dbCompanionDays = data?.stats?.echoCompanionDays || 0;
+            const dbLastCompanionDate = data?.stats?.lastEchoCompanionDate || null;
+            baseCompanionDays = Math.max(baseCompanionDays, dbCompanionDays);
+
+            if (dbLastCompanionDate === today) {
+              localStorage.setItem(loginCountedKey, 'true');
+              localStorage.removeItem(syncPendingKey);
+              setStats(prev => ({
+                ...prev,
+                echoCompanionDays: Math.max(prev.echoCompanionDays || 0, dbCompanionDays),
+              }));
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️(M) 读取数据库陪伴天数失败，回退本地值:', error);
+        }
+      }
+
+      if (cancelled) return;
+      if (alreadyCountedLocal && !pendingSync) return;
+
+      let targetCompanionDays = baseCompanionDays;
+      if (!alreadyCountedLocal) {
+        targetCompanionDays = baseCompanionDays + 1;
+
+        setStats(prev => {
+          const updated = { ...prev, echoCompanionDays: targetCompanionDays };
+          localStorage.setItem('dashboardStats', JSON.stringify(updated));
+          return updated;
+        });
+        localStorage.setItem('lastFocusDate', today);
+        localStorage.setItem(loginCountedKey, 'true');
+
+        try {
+          gainHeartTreeExp(EXP_STREAK_DAY);
+          if ([7, 14, 30].includes(targetCompanionDays)) {
+            const state = loadHeartTreeExpState();
+            grantFertilizerBuff(state);
+          }
+        } catch (e) {
+          console.error('Echo陪伴累计时更新心树奖励失败（移动端）:', e);
+        }
+      }
+
+      localStorage.setItem(syncPendingKey, 'true');
+      if (session?.user?.id) {
+        fetch('/api/user/stats/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            echoCompanionDays: targetCompanionDays,
+            lastEchoCompanionDate: today,
+          }),
+        }).then(res => {
+          if (res.ok) {
+            localStorage.removeItem(syncPendingKey);
+            console.log('✅(M) Echo陪伴天数已同步到数据库');
+          } else {
+            console.warn('⚠️(M) Echo陪伴天数同步失败');
+          }
+        }).catch(err => {
+          console.error('❌(M) Echo陪伴天数同步出错:', err);
+        });
+      }
+    };
+
+    void registerCompanionDay();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
 
   // 增加完成的小目标计数
   const incrementCompletedGoals = (count: number) => {
@@ -537,6 +644,42 @@ export default function Dashboard() {
   // 取消选择
   const cancelMilestoneSelection = () => {
     setSelectedMilestoneIds(new Set());
+  };
+
+  const handleAddMilestone = async (title: string) => {
+    const cleanedTitle = String(title || '').trim();
+    if (!cleanedTitle) return;
+
+    if (!primaryPlan) {
+      router.push('/plans');
+      return;
+    }
+
+    const newMilestone: Milestone = {
+      id: `milestone-${Date.now()}`,
+      title: cleanedTitle,
+      isCompleted: false,
+      order: (primaryPlan.milestones?.length || 0) + 1,
+    };
+
+    setPrimaryPlan((prev) => {
+      if (!prev) return prev;
+      const updatedPlan = {
+        ...prev,
+        milestones: [...(prev.milestones || []), newMilestone],
+      };
+
+      if (typeof window !== 'undefined') {
+        const savedPlans = localStorage.getItem('userPlans');
+        const plans = savedPlans ? JSON.parse(savedPlans) : [];
+        const updatedPlans = plans.map((item: Project) =>
+          item.id === updatedPlan.id ? updatedPlan : item
+        );
+        localStorage.setItem('userPlans', JSON.stringify(updatedPlans));
+      }
+
+      return updatedPlan;
+    });
   };
 
   // 批量完成多个小目标
@@ -750,37 +893,11 @@ export default function Dashboard() {
       // 更新昨日数据到主统计数据
       updateStats({ yesterdayMinutes });
       
-      // 🔥 修复：更新累计天数逻辑 - 基于主要计划的每日目标，而不是默认25分钟
-      // 判断昨天是否完成了每日目标
-      const MIN_FOCUS_MINUTES = 25; // 用于判断"达到最小专注时长"的日级阈值
-      const dailyGoalMinutes = primaryPlan?.dailyGoalMinutes || MIN_FOCUS_MINUTES;
-      const yesterdayCompletedGoal = yesterdayMinutes >= dailyGoalMinutes;
-      
-      // 🔥 连续天数在完成目标时已实时更新，这里只需检查昨天是否已更新
-      const yesterdayStreakUpdated = localStorage.getItem(`streakUpdated_${yesterdayDate}`) === 'true';
-      
-      console.log('🎯(M) 连续天数检查', {
-        昨日日期: yesterdayDate,
-        昨日时长: yesterdayMinutes,
-        目标时长: dailyGoalMinutes,
-        昨日是否完成: yesterdayCompletedGoal,
-        昨日是否已更新: yesterdayStreakUpdated,
-        当前连续: stats.streakDays,
-        提示: yesterdayStreakUpdated ? '昨日已实时更新，无需重复处理' : '昨日未完成目标，连续天数不变'
+      console.log('🤝(M) Echo陪伴累计策略：按登录累计，不再按达标天补增', {
+        yesterdayDate,
+        yesterdayMinutes,
+        当前累计: stats.streakDays,
       });
-      
-      // 如果昨天完成了目标但没有实时更新（兼容旧逻辑），则在这里更新
-      if (yesterdayCompletedGoal && !yesterdayStreakUpdated) {
-        const newStreakDays = stats.streakDays + 1;
-        console.log('🔥(M) 补充更新昨日连续天数 +1', {
-          原值: stats.streakDays,
-          新值: newStreakDays,
-          原因: '昨日完成目标但未实时更新'
-        });
-        updateStats({ streakDays: newStreakDays });
-        localStorage.setItem(`streakUpdated_${yesterdayDate}`, 'true');
-      }
-      // 如果昨天没完成目标，连续天数不变（不会减少）
       
       // 保存今日日期标记
       localStorage.setItem('lastFocusDate', today);
@@ -894,26 +1011,15 @@ export default function Dashboard() {
             localStorage.setItem(`heartTreeDailyGoalReward_${today}`, 'true');
             console.log('🌳(M) 心树每日目标达成奖励：浇水 + 施肥 各 +1');
           }
-          
-          // 🔥 连续天数更新：当天首次完成目标时，立即 +1
+
+          // 连胜天数（仅用于周报等真实统计）：当天首次达标时 +1
           const streakUpdatedToday = localStorage.getItem(`streakUpdated_${today}`) === 'true';
           if (!streakUpdatedToday) {
             const newStreakDays = stats.streakDays + 1;
-            console.log('🔥(M) 连续专注天数 +1', {
-              原值: stats.streakDays,
-              新值: newStreakDays,
-              日期: today,
-              原因: '完成主要计划最小专注时长目标'
-            });
-            
-            // 更新前端状态
             setStats(prev => ({ ...prev, streakDays: newStreakDays }));
             updateStats({ streakDays: newStreakDays });
-            
-            // 标记今天已更新，防止重复
             localStorage.setItem(`streakUpdated_${today}`, 'true');
-            
-            // 同步到数据库
+
             if (session?.user?.id) {
               fetch('/api/user/stats/update', {
                 method: 'POST',
@@ -922,26 +1028,9 @@ export default function Dashboard() {
                   streakDays: newStreakDays,
                   lastStreakDate: today,
                 }),
-              }).then(res => {
-                if (res.ok) {
-                  console.log('✅(M) 连续天数已同步到数据库');
-                } else {
-                  console.warn('⚠️(M) 连续天数同步失败');
-                }
               }).catch(err => {
-                console.error('❌(M) 连续天数同步出错:', err);
+                console.error('❌(M) 连胜天数同步出错:', err);
               });
-            }
-            
-            // 心树 EXP：累计天数奖励
-            gainHeartTreeExp(EXP_STREAK_DAY);
-            console.log('🌳(M) 心树 EXP +', EXP_STREAK_DAY, '（累计专注', newStreakDays, '天）');
-            
-            // 关键节点：7 / 14 / 30 天 → 授予一次施肥 Buff（7天，+30% EXP）
-            if ([7, 14, 30].includes(newStreakDays)) {
-              const state = loadHeartTreeExpState();
-              grantFertilizerBuff(state);
-              console.log('🌱(M) 心树获得施肥 Buff！（累计', newStreakDays, '天）');
             }
           }
         }
@@ -1380,6 +1469,9 @@ export default function Dashboard() {
       localStorage.removeItem('firstPlanCompleted');
     }
     
+    // 特殊时段上线成就（夜猫子 / 晨曦见证者）
+    const specialVisitAchievements = manager.checkSpecialVisitAchievements();
+
     const allNew = [
       ...flowAchievements, 
       ...timeAchievements, 
@@ -1388,7 +1480,8 @@ export default function Dashboard() {
       ...firstFocusAchievement,
       ...firstPlanCreatedAchievement,
       ...firstMilestoneCreatedAchievement,
-      ...firstPlanCompletedAchievement
+      ...firstPlanCompletedAchievement,
+      ...specialVisitAchievements,
     ];
     
     if (allNew.length > 0) {
@@ -2102,6 +2195,15 @@ export default function Dashboard() {
                     </div>
                   )}
 
+                  {enableMobileGoalEntry && (
+                    <button
+                      onClick={() => setShowGoalInputModal(true)}
+                      className="w-full mb-4 px-4 py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 text-sm font-medium transition-all"
+                    >
+                      复用或添加小目标（可选）
+                    </button>
+                  )}
+
                   {/* 移动端显示的终极目标信息 */}
                   {primaryPlan.finalGoal && (
                     <div className="mt-4 pt-4 border-t border-zinc-100">
@@ -2197,11 +2299,11 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* 连续专注、本周专注和今日总结卡片 */}
+              {/* Echo陪伴、本周专注和今日总结卡片 */}
               <div className="flex flex-row gap-4">
                 <div className="flex-1 bg-white/90 backdrop-blur-sm border-2 border-emerald-50 rounded-[2rem] p-5 shadow-lg shadow-emerald-100/30 flex flex-col justify-between aspect-[4/3] hover:scale-[1.02] transition-all duration-300 cursor-pointer relative">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">连续</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-teal-500 font-medium">Echo陪伴</p>
                     <button
                       onClick={() => setShowStreakInfo(!showStreakInfo)}
                       data-tooltip-trigger
@@ -2213,12 +2315,12 @@ export default function Dashboard() {
                   {showStreakInfo && (
                     <div data-tooltip-trigger className="absolute top-10 right-0 bg-white rounded-xl p-3 shadow-xl border border-zinc-200 z-50 w-[150px]">
                       <p className="text-xs text-zinc-600 leading-relaxed">
-                        你在echo连续累计下来的专注时光
+                        你在Echo停靠过的天数（累积+1）
                       </p>
                     </div>
                   )}
                   <div className="flex-1 flex items-center justify-center">
-                    <p className="text-3xl font-bold text-zinc-900 leading-none">{stats.streakDays}<span className="text-sm text-zinc-500 ml-1">天</span></p>
+                    <p className="text-3xl font-bold text-zinc-900 leading-none">{stats.echoCompanionDays ?? 0}<span className="text-sm text-zinc-500 ml-1">天</span></p>
                   </div>
                   <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden mt-auto">
                     <div className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full w-1/2"></div>
@@ -2299,6 +2401,17 @@ export default function Dashboard() {
         isOpen={showShopModal} 
         onClose={() => setShowShopModal(false)} 
       />
+
+      {enableMobileGoalEntry && (
+        <GoalInputModal
+          visible={showGoalInputModal}
+          userId={session?.user?.id}
+          title="添加小目标"
+          placeholder="例如：读 2 页 / 写 5 行"
+          onClose={() => setShowGoalInputModal(false)}
+          onConfirm={handleAddMilestone}
+        />
+      )}
       
           {/* 快速查找指南 */}
           {showQuickSearchGuide && (

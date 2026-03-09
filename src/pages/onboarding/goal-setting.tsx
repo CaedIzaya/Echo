@@ -1075,6 +1075,9 @@ export default function GoalSetting() {
         <h2 className="text-xl md:text-2xl font-light tracking-wider text-white/90 text-center mb-16 px-4">
           让我们来设置第一个小目标吧！（可跳过）
         </h2>
+        <p className="text-sm text-white/70 text-center -mt-10 mb-10 px-4">
+          先放一个能立刻开始的最小动作，计划就会长出腿。
+        </p>
 
         <div className="relative w-full max-w-4xl flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 min-h-[300px]">
           {/* 左侧提示泡泡 */}

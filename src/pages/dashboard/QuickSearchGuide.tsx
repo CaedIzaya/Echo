@@ -298,7 +298,7 @@ export default function QuickSearchGuide({ onClose }: QuickSearchGuideProps) {
               <div className="space-y-3">
                 <CollapsibleSection title="1. 打开仪表盘（当前首页）" defaultOpen>
                   <p className="text-gray-700">
-                    看一眼「今日节奏」「完成进度」「连续专注」，大致感受今天在什么位置。
+                    看一眼「今日节奏」「完成进度」「Echo陪伴」，大致感受今天在什么位置。
                   </p>
                 </CollapsibleSection>
 
