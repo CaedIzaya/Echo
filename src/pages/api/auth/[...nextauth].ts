@@ -14,6 +14,7 @@ declare module "next-auth" {
       name?: string | null;
       image?: string | null;
       hasCompletedOnboarding?: boolean;
+      hasCompletedNewUserGuide?: boolean;
     };
   }
 
@@ -23,6 +24,7 @@ declare module "next-auth" {
     name?: string | null;
     image?: string | null;
     hasCompletedOnboarding?: boolean;
+    hasCompletedNewUserGuide?: boolean;
   }
 }
 
@@ -30,6 +32,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     hasCompletedOnboarding?: boolean;
+    hasCompletedNewUserGuide?: boolean;
   }
 }
 
@@ -62,6 +65,7 @@ export const authOptions: NextAuthOptions = {
               email: user.email,
               name: user.name,
               hasCompletedOnboarding: user.hasCompletedOnboarding,
+              hasCompletedNewUserGuide: user.hasCompletedNewUserGuide,
             };
           }
         }
@@ -75,13 +79,29 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id;
         session.user.hasCompletedOnboarding = token.hasCompletedOnboarding;
+        session.user.hasCompletedNewUserGuide = token.hasCompletedNewUserGuide;
       }
       return session;
     },
-    jwt: async ({ token, user }) => {
+    jwt: async ({ token, user, trigger }) => {
       if (user) {
         token.id = user.id;
         token.hasCompletedOnboarding = user.hasCompletedOnboarding;
+        token.hasCompletedNewUserGuide = user.hasCompletedNewUserGuide;
+      }
+      if (trigger === 'update' && token.id) {
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: token.id },
+            select: { hasCompletedNewUserGuide: true, hasCompletedOnboarding: true },
+          });
+          if (dbUser) {
+            token.hasCompletedNewUserGuide = dbUser.hasCompletedNewUserGuide;
+            token.hasCompletedOnboarding = dbUser.hasCompletedOnboarding;
+          }
+        } catch {
+          // DB lookup failed; keep existing token values
+        }
       }
       return token;
     }

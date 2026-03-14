@@ -45,6 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name,
         description,
         focusDetail,
+        finalGoal,
         icon,
         color,
         dailyGoalMinutes,
@@ -92,6 +93,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const createData: any = {
         name,
         description: encodeProjectDescription(description, focusDetail),
+        finalGoal: finalGoal ?? null,
         icon: icon || '📋',
         color,
         dailyGoalMinutes: dailyGoalMinutes || 25,

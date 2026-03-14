@@ -7,6 +7,8 @@ import InterruptedSessionAlert from './InterruptedSessionAlert';
 import EchoSpirit from '../dashboard/EchoSpirit';
 import { trackEvent } from '~/lib/analytics';
 import { getAchievementManager } from '~/lib/AchievementSystem';
+import { getUserStorage, setUserStorage, setCurrentUserId } from '~/lib/userStorage';
+import { useGentleReminder } from '~/hooks/useGentleReminder';
 
 // Wake Lock API 类型定义
 interface WakeLockSentinel extends EventTarget {
@@ -102,6 +104,11 @@ type AgitationTier = 0 | 1 | 2 | 3;
 export default function Focus() {
   const router = useRouter();
   const { data: session } = useSession();
+  useEffect(() => {
+    if (session?.user?.id) {
+      setCurrentUserId(session.user.id);
+    }
+  }, [session?.user?.id]);
   
   const [state, setState] = useState<FocusState>('preparing');
   const [countdown, setCountdown] = useState(3);
@@ -131,7 +138,8 @@ export default function Focus() {
   const [isLumiHidden, setIsLumiHidden] = useState(false);
   const [focusLumiMessage, setFocusLumiMessage] = useState<string | null>(null);
   const [focusLumiAutoAnimation, setFocusLumiAutoAnimation] = useState<{ token: number; type: 'happy' | 'nod' | 'excited'; durationMs?: number } | null>(null);
-  
+
+  const [isFocusPageVisible, setIsFocusPageVisible] = useState(true);
 
   // 击掌功能相关状态
   const [highFivePhase, setHighFivePhase] = useState<'none' | 'ready' | 'success' | 'finished'>('none');
@@ -153,6 +161,8 @@ export default function Focus() {
   const focusLumiMessageTimerRef = useRef<NodeJS.Timeout | null>(null);
   const focusLumiAnimationTokenRef = useRef(0);
   const isLumiHiddenRef = useRef(false);
+
+  const dbStreakDaysRef = useRef<number | null>(null);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionRef = useRef<FocusSession | null>(null);
@@ -613,6 +623,27 @@ export default function Focus() {
     }, 5000);
   };
   
+  // 挂载时预取 DB 中的回心天数，避免翻牌动画读 stale localStorage
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    fetch('/api/user/stats')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.stats?.streakDays != null) {
+          dbStreakDaysRef.current = data.stats.streakDays;
+          try {
+            const raw = getUserStorage('dashboardStats');
+            const parsed = raw ? JSON.parse(raw) : {};
+            if ((parsed.streakDays ?? 0) < data.stats.streakDays) {
+              parsed.streakDays = data.stats.streakDays;
+              setUserStorage('dashboardStats', JSON.stringify(parsed));
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [session?.user?.id]);
+
   // 加载主要计划作为默认
   const [availablePlans, setAvailablePlans] = useState<PlanOption[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | 'free'>('free');
@@ -853,10 +884,12 @@ export default function Focus() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        setIsFocusPageVisible(true);
         if (state === 'preparing') {
           void loadPlans(false);
         }
       } else if (document.visibilityState === 'hidden') {
+        setIsFocusPageVisible(false);
         if (state === 'running' || state === 'paused') {
           localStorage.setItem(autoInterruptedAtKey, new Date().toISOString());
         }
@@ -1170,6 +1203,13 @@ export default function Focus() {
     }
   }, [elapsedTime, state, sessionGoalMinutes]);
 
+  useGentleReminder({
+    sessionId: sessionRef.current?.sessionId ?? null,
+    sessionStatus: state,
+    elapsedSeconds: elapsedTime,
+    goalMinutes: sessionGoalMinutes,
+    isFocusPageVisible,
+  });
 
   // 清理计时器
   const cleanupInterval = () => {
@@ -1619,18 +1659,24 @@ export default function Focus() {
       const goalMinutes = sessionRef.current.goalMinutes || sessionGoalMinutes;
       const isMinMet = minutes >= goalMinutes;
       const today = new Date().toISOString().split('T')[0];
-      const streakUpdatedToday = localStorage.getItem(`streakUpdated_${today}`) === 'true';
+      const streakUpdatedKey = session?.user?.id
+        ? `streakUpdated_${session.user.id}_${today}`
+        : `streakUpdated_${today}`;
+      const streakUpdatedToday = getUserStorage(streakUpdatedKey) === 'true';
       const shouldAnimateXinIncrease = completedForStats && isMinMet && !streakUpdatedToday;
 
       let currentXinDays = 0;
       try {
-        const savedStats = localStorage.getItem('dashboardStats');
+        const savedStats = getUserStorage('dashboardStats');
         if (savedStats) {
           const parsed = JSON.parse(savedStats);
           currentXinDays = Number(parsed?.streakDays) || 0;
         }
       } catch (e) {
         console.warn('读取回心天数失败，使用 0 兜底', e);
+      }
+      if (dbStreakDaysRef.current != null) {
+        currentXinDays = Math.max(currentXinDays, dbStreakDaysRef.current);
       }
 
       setXinCounterAnim({

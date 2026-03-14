@@ -30,10 +30,9 @@ export default function BottomNavigation({ active, hasFocusedToday = false, toda
       
       const today = new Date().toISOString().split('T')[0];
       const expState = loadHeartTreeExpState();
-      const hasCompletedFocusToday = todaySessions > 0;
       
-      // 检查是否可以浇水
-      const canWater = canWaterToday(expState, today, hasCompletedFocusToday);
+      // 检查是否可以浇水（只看当日次数上限）
+      const canWater = canWaterToday(expState, today);
       
       // 检查是否有施肥机会
       const fertilizeOps = HeartTreeManager.getFertilizeOpportunities();

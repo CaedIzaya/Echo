@@ -15,9 +15,14 @@ import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import StartupMotivation from './StartupMotivation';
+import NewUserGuide, { GUIDE_STORAGE_KEY } from './NewUserGuide';
+import InstallCard, { InstallHint } from './InstallCard';
 import ShopModal from '~/components/shop/ShopModal';
 import CalendarCard from '~/components/calendar/CalendarCard';
 import GoalInputModal from '~/components/goals/GoalInputModal';
+import LoadingOverlay from '~/components/LoadingOverlay';
+import SplashLoader from '~/components/SplashLoader';
+import { useInstallPrompt } from '~/hooks/useInstallPrompt';
 import { getCurrentTheme, getThemeConfig } from '~/lib/themeSystem';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import type { Achievement } from '~/lib/AchievementSystem';
@@ -32,6 +37,7 @@ import { useDashboardData } from '~/hooks/useDashboardData';
 import { useProjects } from '~/hooks/useProjects';
 import { syncToDatabase } from '~/lib/realtimeSync';
 import { userStorageJSON, getUserStorage, setUserStorage, setCurrentUserId } from '~/lib/userStorage';
+import { trackEvent } from '~/lib/analytics';
 import { 
   pickHomeSentence, 
   pickSentenceFromPool,
@@ -375,7 +381,7 @@ function calculateWeeklyComparison(currentWeek: number, lastWeek: number) {
 }
 
 export default function Dashboard() {
-  const { data: session, status: sessionStatus } = useSession();
+  const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const router = useRouter();
   
   // 🔥 关键修复：在使用任何 Hook 之前，先设置用户ID
@@ -399,6 +405,14 @@ export default function Dashboard() {
         // 🔥 每次进入Dashboard都清除计划缓存时间戳，强制重新加载
         localStorage.removeItem('projectsSyncedAt');
         console.log('🔄 已清除计划缓存时间戳，将从数据库重新加载');
+
+        // 🌿 使用用户级 key 同步新手指引状态，防止跨用户 localStorage 残留
+        const userGuideKey = `${GUIDE_STORAGE_KEY}_${session.user.id}`;
+        if (session.user.hasCompletedNewUserGuide) {
+          localStorage.setItem(userGuideKey, 'true');
+        }
+        // 清理旧版无 userId 的 key（仅做迁移，不影响用户级 key）
+        localStorage.removeItem(GUIDE_STORAGE_KEY);
       }
     }
   }, [session?.user?.id]);
@@ -519,6 +533,11 @@ export default function Dashboard() {
     if (sessionStatus === 'authenticated' && userId) return `authenticated_${userId}`;
     return 'unknown';
   }, [sessionStatus, userId]);
+
+  const getScopedDailyFlagKey = useCallback((baseKey: string, date: string) => {
+    if (!userId) return `${baseKey}_${date}`;
+    return `${baseKey}_${userId}_${date}`;
+  }, [userId]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [spiritState, setSpiritState] = useState<'idle' | 'excited' | 'focus' | 'happy' | 'nod'>('idle'); // 小精灵状态
@@ -643,7 +662,7 @@ export default function Dashboard() {
   // 从localStorage加载统计数据（其他数据）- 🔥 streakDays 优先使用数据库
   const [stats, setStats] = useState<DashboardStats>(() => {
     if (typeof window !== 'undefined') {
-      const savedStats = localStorage.getItem('dashboardStats');
+      const savedStats = userId ? localStorage.getItem(`user_${userId}_dashboardStats`) : null;
       const parsed = savedStats ? JSON.parse(savedStats) : {
         yesterdayMinutes: 0,
         streakDays: 0,
@@ -959,9 +978,28 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, [authKey]);
+
+  const warmLumiRoute = useCallback(() => {
+    void router.prefetch('/lumi');
+    void import('../lumi');
+  }, [router]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      warmLumiRoute();
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [warmLumiRoute]);
   
+  // 新手指引状态
+  const [showNewUserGuide, setShowNewUserGuide] = useState(false);
+  // PWA 安装卡片
+  const { shouldPrompt: shouldPromptInstall } = useInstallPrompt();
+  const [showInstallCard, setShowInstallCard] = useState(false);
   // 启动激励相关状态
   const [showStartupMotivation, setShowStartupMotivation] = useState(false);
+  const [isOpeningLumi, setIsOpeningLumi] = useState(false);
   const [showGoalInputModal, setShowGoalInputModal] = useState(false);
   const [selectedGoalMilestoneId, setSelectedGoalMilestoneId] = useState<string | null>(() => {
     // 从 localStorage 读取今日选中的小目标
@@ -978,13 +1016,30 @@ export default function Dashboard() {
     return null;
   }); // 今日选中的小目标ID
 
+  const handleOpenLumi = useCallback(async () => {
+    if (isOpeningLumi) return;
+
+    setIsOpeningLumi(true);
+
+    try {
+      const navigated = await router.push('/lumi');
+      if (!navigated) {
+        setIsOpeningLumi(false);
+      }
+    } catch (error) {
+      console.error('[Dashboard] 跳转 Lumi 页面失败:', error);
+      setIsOpeningLumi(false);
+    }
+  }, [isOpeningLumi, router]);
+
   // 更新统计数据
   const updateStats = (newStats: Partial<DashboardStats>) => {
     setStats(prev => {
       const updated = { ...prev, ...newStats };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dashboardStats', JSON.stringify(updated));
+      if (typeof window !== 'undefined' && userId) {
+        localStorage.setItem(`user_${userId}_dashboardStats`, JSON.stringify(updated));
       }
+      setUserStorage('dashboardStats', JSON.stringify(updated));
       return updated;
     });
   };
@@ -994,8 +1049,8 @@ export default function Dashboard() {
     if (typeof window === 'undefined' || dashboardDataLoading) return;
 
     const today = getTodayDate();
-    const loginCountedKey = `echoCompanionCounted_${today}`;
-    const syncPendingKey = `echoCompanionSyncPending_${today}`;
+    const loginCountedKey = getScopedDailyFlagKey('echoCompanionCounted', today);
+    const syncPendingKey = getScopedDailyFlagKey('echoCompanionSyncPending', today);
     const alreadyCountedInDB = dashboardData.lastEchoCompanionDate === today;
     const alreadyCountedLocal = localStorage.getItem(loginCountedKey) === 'true';
     const pendingSync = localStorage.getItem(syncPendingKey) === 'true';
@@ -1013,7 +1068,7 @@ export default function Dashboard() {
 
     if (alreadyCountedLocal && !pendingSync) return;
 
-    const savedStats = localStorage.getItem('dashboardStats');
+    const savedStats = userId ? localStorage.getItem(`user_${userId}_dashboardStats`) : null;
     const savedCompanionDays = savedStats ? (JSON.parse(savedStats).echoCompanionDays || 0) : 0;
     let targetCompanionDays = Math.max(savedCompanionDays, dashboardData.echoCompanionDays || 0);
 
@@ -1022,7 +1077,10 @@ export default function Dashboard() {
       targetCompanionDays += 1;
       setStats(prev => {
         const updated = { ...prev, echoCompanionDays: targetCompanionDays };
-        localStorage.setItem('dashboardStats', JSON.stringify(updated));
+        if (typeof window !== 'undefined' && userId) {
+          localStorage.setItem(`user_${userId}_dashboardStats`, JSON.stringify(updated));
+        }
+        setUserStorage('dashboardStats', JSON.stringify(updated));
         return updated;
       });
       localStorage.setItem('lastFocusDate', today);
@@ -1061,7 +1119,7 @@ export default function Dashboard() {
         console.error('❌ Echo陪伴天数同步出错:', err);
       });
     }
-  }, [dashboardDataLoading, dashboardData.echoCompanionDays, dashboardData.lastEchoCompanionDate, session?.user?.id]);
+  }, [dashboardDataLoading, dashboardData.echoCompanionDays, dashboardData.lastEchoCompanionDate, session?.user?.id, getScopedDailyFlagKey]);
 
   // 增加完成的小目标计数
   const incrementCompletedGoals = (count: number) => {
@@ -1213,6 +1271,13 @@ export default function Dashboard() {
         updateMilestonesToDB(primaryPlan.id, updatedMilestones).then(success => {
           if (success) {
             console.log('✅ 小目标已同步到数据库');
+            trackEvent({
+              name: 'milestone_completed',
+              feature: 'plans',
+              page: '/dashboard',
+              action: 'complete',
+              properties: { source: 'dashboard', count: milestoneIds.length },
+            });
             // 刷新计划数据
             refreshProjects();
           } else {
@@ -1542,12 +1607,12 @@ export default function Dashboard() {
           }
 
           // 连胜天数（仅用于周报等真实统计）：当天首次达标时 +1
-          const streakUpdatedToday = localStorage.getItem(`streakUpdated_${today}`) === 'true';
+          const streakUpdatedToday = localStorage.getItem(getScopedDailyFlagKey('streakUpdated', today)) === 'true';
           if (!streakUpdatedToday) {
             const newStreakDays = stats.streakDays + 1;
             setStats(prev => ({ ...prev, streakDays: newStreakDays }));
             updateStats({ streakDays: newStreakDays });
-            localStorage.setItem(`streakUpdated_${today}`, 'true');
+            localStorage.setItem(getScopedDailyFlagKey('streakUpdated', today), 'true');
 
             if (session?.user?.id) {
               fetch('/api/user/stats/update', {
@@ -1779,11 +1844,18 @@ export default function Dashboard() {
     setTotalFocusMinutes(dashboardData.totalMinutes);
     
     // 更新天数：使用较大值，避免“本地已+1但数据库尚未刷新”被覆盖回退
-    setStats(prev => ({
-      ...prev,
-      streakDays: Math.max(prev.streakDays || 0, dashboardData.streakDays || 0),
-      echoCompanionDays: Math.max(prev.echoCompanionDays || 0, dashboardData.echoCompanionDays || 0),
-    }));
+    setStats(prev => {
+      const merged = {
+        ...prev,
+        streakDays: Math.max(prev.streakDays || 0, dashboardData.streakDays || 0),
+        echoCompanionDays: Math.max(prev.echoCompanionDays || 0, dashboardData.echoCompanionDays || 0),
+      };
+      if (typeof window !== 'undefined' && userId) {
+        localStorage.setItem(`user_${userId}_dashboardStats`, JSON.stringify(merged));
+      }
+      setUserStorage('dashboardStats', JSON.stringify(merged));
+      return merged;
+    });
     
     // 同步到 localStorage 缓存
     saveTodayStats(dashboardData.todayMinutes);
@@ -1868,6 +1940,10 @@ export default function Dashboard() {
     }
 
     if (authKey === 'unauthenticated') {
+      if (localStorage.getItem('echo_signing_out') === '1') {
+        console.log('🔄 登出中，跳过重定向（由 signOut 流程接管）');
+        return;
+      }
       console.log('❌ 未认证，重定向到首页');
       router.push('/');
       return;
@@ -1886,6 +1962,10 @@ export default function Dashboard() {
             spiritDialogRef.current.showCompletionMessage();
             localStorage.removeItem('focusCompleted');
           }
+          // 专注完成后延迟弹出安装卡片（仅在条件满足时）
+          if (shouldPromptInstall) {
+            setTimeout(() => setShowInstallCard(true), 4000);
+          }
           return;
         }
 
@@ -1901,6 +1981,21 @@ export default function Dashboard() {
           }
           localStorage.removeItem('focusEndReason');
           return;
+        }
+
+        // 🌿 新手指引：首次进入主界面时触发，优先级高于启动激励
+        const userGuideKey = `${GUIDE_STORAGE_KEY}_${session?.user?.id}`;
+        const guideFromSession = session?.user?.hasCompletedNewUserGuide;
+        const guideFromLocal = localStorage.getItem(userGuideKey) === 'true';
+        if (!guideFromSession && !guideFromLocal) {
+          setShowNewUserGuide(true);
+          return;
+        }
+        // 兼容：localStorage 已完成但 JWT 尚未同步时，静默补写数据库并刷新 JWT
+        if (guideFromLocal && !guideFromSession) {
+          fetch('/api/user/complete-new-user-guide', { method: 'POST' })
+            .then(() => updateSession())
+            .catch(() => {});
         }
         
         // 🌟 启动激励逻辑：当日首次进入 App，且当日尚未开始任何一次专注
@@ -2522,14 +2617,7 @@ export default function Dashboard() {
 
   // 加载状态
   if (sessionStatus === 'loading' || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
+    return <SplashLoader />;
   }
 
   // 未认证状态
@@ -2931,7 +3019,7 @@ export default function Dashboard() {
           localStorage.setItem('lastPeriodicSpiritAt', iso);
           persistSpiritDialogState({ lastPeriodicSpiritAt: iso });
         }}
-        mobileContainerClassName="sm:hidden fixed pointer-events-none w-[220px] max-w-[220px] z-50"
+        mobileContainerClassName={`sm:hidden fixed pointer-events-none w-[220px] max-w-[220px] z-50 ${showNewUserGuide ? 'hidden' : ''}`}
         mobileContainerStyle={{ bottom: '15.5rem', right: '-1.6rem' }}
       />
 
@@ -3010,7 +3098,7 @@ export default function Dashboard() {
                         cy="24"
                       />
                       <circle
-                        stroke={progressColor}
+                        stroke="#22c55e"
                         strokeWidth="4"
                         fill="transparent"
                         strokeDasharray={`${2 * Math.PI * 20} ${2 * Math.PI * 20}`}
@@ -3042,7 +3130,7 @@ export default function Dashboard() {
               今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
             </p>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3" data-guide="quick-start">
               <button
                 onClick={handleStartFocus}
                 className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30"
@@ -3050,19 +3138,23 @@ export default function Dashboard() {
                 开始专注
               </button>
               
-              {/* 🌟 节奏设定按钮 - 与开始专注按钮大小一致 */}
+              {/* Lumi 对话入口 */}
               <button
-                onClick={() => setShowStartupMotivation(true)}
-                className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30"
-                title="节奏设定"
+                onMouseEnter={warmLumiRoute}
+                onTouchStart={warmLumiRoute}
+                onFocus={warmLumiRoute}
+                onClick={handleOpenLumi}
+                disabled={isOpeningLumi}
+                className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-sm font-medium hover:from-emerald-500 hover:to-teal-600 transition shadow-lg shadow-emerald-400/30 disabled:cursor-wait disabled:opacity-70"
+                title="和 Lumi 聊聊"
               >
-                节奏设定
+                和 Lumi 聊聊
               </button>
             </div>
           </div>
 
           {/* 2. 计划 Check 卡片 (Mobile) */}
-          <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40">
+          <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40" data-guide="plan-card">
             <div className="flex items-center justify-between mb-4">
               <div className="flex flex-col gap-1">
                 <div>
@@ -3198,7 +3290,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="flex-[3]">
+              <div className="flex-[3]" data-guide="summary">
                 <TodaySummaryCard
                   userId={session?.user?.id || ''}
                   hasFocusOverride={todayStats.minutes > 0}
@@ -3238,7 +3330,7 @@ export default function Dashboard() {
                 <p className="text-sm text-zinc-500">
                   今日专注 {todayStats.minutes} 分钟 / 目标 {todayGoal || '—'} 分钟
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3" data-guide="quick-start">
                   <button
                     onClick={handleStartFocus}
                     className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
@@ -3246,13 +3338,17 @@ export default function Dashboard() {
                     开始专注
                   </button>
                   
-                  {/* 🌟 节奏设定按钮 - 与开始专注按钮大小一致 */}
+                  {/* Lumi 对话入口 */}
                   <button
-                    onClick={() => setShowStartupMotivation(true)}
-                    className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-medium hover:from-amber-600 hover:to-yellow-600 transition shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
-                    title="节奏设定"
+                    onMouseEnter={warmLumiRoute}
+                    onTouchStart={warmLumiRoute}
+                    onFocus={warmLumiRoute}
+                    onClick={handleOpenLumi}
+                    disabled={isOpeningLumi}
+                    className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-sm font-medium hover:from-emerald-500 hover:to-teal-600 transition shadow-lg shadow-emerald-400/30 hover:shadow-emerald-400/50 disabled:cursor-wait disabled:opacity-70"
+                    title="和 Lumi 聊聊"
                   >
-                    节奏设定
+                    和 Lumi 聊聊
                   </button>
                 </div>
               </div>
@@ -3342,7 +3438,7 @@ export default function Dashboard() {
               </div>
 
               {/* 3. 今日小结 */}
-              <div className="aspect-square [&>*]:h-full">
+              <div className="aspect-square [&>*]:h-full" data-guide="summary">
                 <TodaySummaryCard
                   userId={session?.user?.id || ''}
                   hasFocusOverride={todayStats.minutes > 0}
@@ -3404,7 +3500,7 @@ export default function Dashboard() {
             </div>
 
             {/* 底部：计划详情大卡片 */}
-            <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40 hover:scale-[1.02] transition-all duration-300 cursor-pointer">
+            <div className="bg-white/90 border border-white/70 rounded-3xl p-6 shadow-lg shadow-emerald-100/40 hover:scale-[1.02] transition-all duration-300 cursor-pointer" data-guide="plan-card">
               <div className="flex flex-row gap-8">
                 <div className="flex flex-col items-center justify-center">
                   <FocusDial size={200} />
@@ -3422,25 +3518,32 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <div className="sm:hidden fixed bottom-28 right-6 z-20">
-        <EchoSpiritMobile
-          state={currentSpiritState}
-          allowFocus={false}
-          isCompleted={progress >= 1}
-          autoAnimation={autoSpiritAnimation ?? undefined}
-          onStateChange={(newState) => {
-            if (newState === 'focus') {
-              setCurrentSpiritState('idle');
-            } else {
-              setCurrentSpiritState(newState);
-            }
-          }}
-          onClick={handleSpiritClick}
-        />
-      </div>
+      {!showNewUserGuide && (
+        <div className="sm:hidden fixed bottom-28 right-6 z-20">
+          <EchoSpiritMobile
+            state={currentSpiritState}
+            allowFocus={false}
+            isCompleted={progress >= 1}
+            autoAnimation={autoSpiritAnimation ?? undefined}
+            onStateChange={(newState) => {
+              if (newState === 'focus') {
+                setCurrentSpiritState('idle');
+              } else {
+                setCurrentSpiritState(newState);
+              }
+            }}
+            onClick={handleSpiritClick}
+          />
+        </div>
+      )}
 
       <BottomNavigation active="home" hasFocusedToday={todayStats.minutes > 0} />
-      
+
+      {/* 轻量安装提示（用户关闭过安装卡片后显示） */}
+      <div className="fixed bottom-[5.5rem] left-4 z-30 sm:bottom-6 sm:left-6">
+        <InstallHint onClick={() => setShowInstallCard(true)} />
+      </div>
+
       {/* 成就面板 */}
       {showAchievementPanel && (
         <AchievementPanel 
@@ -3462,7 +3565,13 @@ export default function Dashboard() {
       
       {/* 快速查找指南 */}
       {showQuickSearchGuide && (
-        <QuickSearchGuide onClose={() => setShowQuickSearchGuide(false)} />
+        <QuickSearchGuide
+          onClose={() => setShowQuickSearchGuide(false)}
+          onOpenRefresherGuide={() => {
+            setShowQuickSearchGuide(false);
+            setShowNewUserGuide(true);
+          }}
+        />
       )}
       
       {/* 🌟 启动激励弹窗 */}
@@ -3477,6 +3586,24 @@ export default function Dashboard() {
           onAddMilestone={handleAddMilestoneFromMotivation}
         />
       )}
+
+      {/* 🌿 新手指引 */}
+      {showNewUserGuide && (
+        <NewUserGuide onComplete={() => {
+          if (session?.user?.id) {
+            localStorage.setItem(`${GUIDE_STORAGE_KEY}_${session.user.id}`, 'true');
+          }
+          setShowNewUserGuide(false);
+          updateSession();
+        }} />
+      )}
+
+      {/* PWA 安装卡片 */}
+      {showInstallCard && (
+        <InstallCard onClose={() => setShowInstallCard(false)} />
+      )}
+
+      {isOpeningLumi && <LoadingOverlay message="正在前往 Lumi 对话室..." />}
 
       <GoalInputModal
         visible={showGoalInputModal}

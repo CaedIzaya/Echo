@@ -95,6 +95,14 @@ export default function TermsOfService() {
                 <p className="text-gray-700 leading-relaxed mt-3">
                   Echo 会尽力保障数据一致性与安全，但互联网服务存在客观风险（例如网络波动、浏览器后台策略导致的中断）。我们建议您定期更新浏览器与系统，并在专注时尽量保持应用处于前台以获得最佳体验。
                 </p>
+
+                <h4 className="text-lg font-semibold text-gray-900 mt-5 mb-2">AI 功能声明（Lumi）</h4>
+                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                  <li>Lumi 为 AI 驱动的陪伴功能，所有回复由大语言模型生成，不代表 Echo 团队立场；</li>
+                  <li>Lumi 的回复不构成心理咨询、医学诊断、法律或财务建议，用户不应将其作为专业决策依据；</li>
+                  <li>通过 Lumi 创建的计划仅为辅助整理工具，具体执行与调整由用户自主决定；</li>
+                  <li>如果您正在经历紧急心理危机，请联系当地紧急服务或专业心理援助热线，而非依赖 AI 回复。</li>
+                </ul>
               </div>
 
               <div>

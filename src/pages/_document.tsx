@@ -10,10 +10,27 @@ export default function Document() {
         {/* Favicon - Echo Logo */}
         <link rel="icon" type="image/png" href="/Echo Icon2.png" />
         <link rel="apple-touch-icon" href="/Echo Icon2.png" />
+
+        {/* PWA Manifest */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Echo" />
+        <meta name="theme-color" content="#14b8a6" />
         
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+        {/* 尽早捕获 beforeinstallprompt，防止 React 挂载前事件丢失 */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          window.__pwaInstallEvent = null;
+          window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window.__pwaInstallEvent = e;
+          });
+        `}} />
       </Head>
       <body>
         <Main />

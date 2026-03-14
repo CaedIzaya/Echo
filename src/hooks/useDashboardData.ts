@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
-import { getUserStorage, setUserStorage } from '~/lib/userStorage';
+import { setUserStorage } from '~/lib/userStorage';
 import { trackEffect } from '~/lib/debugTools';
 
 export interface DashboardData {
@@ -36,24 +36,7 @@ const SYNC_KEY = 'dashboardDataSynced';
 
 export function useDashboardData() {
   const { data: session, status } = useSession();
-  const [data, setData] = useState<DashboardData>(() => {
-    // 初始化时先从缓存读取
-    if (typeof window === 'undefined') {
-      return getDefaultData();
-    }
-    
-    // ✅ 使用用户隔离的 localStorage
-    const cached = getUserStorage(CACHE_KEY);
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch {
-        return getDefaultData();
-      }
-    }
-    
-    return getDefaultData();
-  });
+  const [data, setData] = useState<DashboardData>(() => getDefaultData());
 
   // 从数据库加载数据
   const loadFromDatabase = useCallback(async () => {
@@ -222,14 +205,15 @@ function syncToLegacyStorage(data: DashboardData) {
     // totalFocusMinutes
     setUserStorage('totalFocusMinutes', data.totalMinutes.toString());
 
-    // dashboardStats
+    // dashboardStats — 仅写入用户隔离 localStorage，避免多账号串值
     const dashboardStats = {
-      yesterdayMinutes: 0, // 需要从数据库计算
+      yesterdayMinutes: 0,
       streakDays: data.streakDays,
       echoCompanionDays: data.echoCompanionDays,
-      completedGoals: 0, // 需要从数据库计算
+      completedGoals: 0,
     };
-    setUserStorage('dashboardStats', JSON.stringify(dashboardStats));
+    const dashboardStatsJson = JSON.stringify(dashboardStats);
+    setUserStorage('dashboardStats', dashboardStatsJson);
 
     console.log('[syncToLegacyStorage] ✅ 已同步到旧存储结构（用户隔离）');
   } catch (error) {

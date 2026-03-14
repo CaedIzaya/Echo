@@ -20,11 +20,6 @@ export default function SignIn() {
   const [authStatus, setAuthStatus] = useState("未检测");
   const [hasRedirected, setHasRedirected] = useState(false);
 
-  const shouldForceOnboarding = () => {
-    if (typeof window === "undefined") return false;
-    return sessionStorage.getItem("forceOnboarding") === "true";
-  };
-
   const markOnboardingCompleteSilently = async () => {
     try {
       await fetch("/api/user/complete-onboarding", { method: "POST" });
@@ -49,20 +44,9 @@ export default function SignIn() {
         console.log("检测到已登录用户:", session.user);
         setHasRedirected(true);
         
-        const forceOnboarding = shouldForceOnboarding();
-        console.log("是否需要强制进入 onboarding:", forceOnboarding);
-
-        if (forceOnboarding) {
-          router.push("/onboarding");
-          return;
+        if (!session.user.hasCompletedOnboarding) {
+          await markOnboardingCompleteSilently();
         }
-
-        if (session.user.hasCompletedOnboarding) {
-          router.push("/dashboard");
-          return;
-        }
-
-        await markOnboardingCompleteSilently();
         router.push("/dashboard");
       } else {
         setAuthStatus("未登录");
@@ -143,20 +127,10 @@ export default function SignIn() {
         }
       }
       
-      if (session?.user?.hasCompletedOnboarding) {
-        console.log("用户已完成 onboarding，跳转到仪表盘");
-        router.push("/dashboard");
-      } else {
-        const forceOnboarding = shouldForceOnboarding();
-        console.log("登录后是否需要强制进入 onboarding:", forceOnboarding);
-
-        if (forceOnboarding) {
-          router.push("/onboarding");
-        } else {
-          await markOnboardingCompleteSilently();
-          router.push("/dashboard");
-        }
+      if (!session?.user?.hasCompletedOnboarding) {
+        await markOnboardingCompleteSilently();
       }
+      router.push("/dashboard");
     } catch (error) {
       console.error("跳转逻辑出错:", error);
       router.push("/dashboard");
@@ -232,18 +206,14 @@ export default function SignIn() {
           });
           
           if (loginResult?.ok) {
-            // 🔥 注册成功后，获取用户ID并设置
             const sessionResponse = await fetch('/api/auth/session');
             const sessionData = await sessionResponse.json();
             if (sessionData?.user?.id) {
               setCurrentUserId(sessionData.user.id);
-              console.log('✅ 注册成功，已设置用户ID:', sessionData.user.id);
             }
             
-            if (typeof window !== "undefined") {
-              sessionStorage.setItem("forceOnboarding", "true");
-            }
-            router.push("/onboarding");
+            await markOnboardingCompleteSilently();
+            router.push("/dashboard");
           } else {
             setIsLogin(true);
           }
@@ -258,151 +228,88 @@ export default function SignIn() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center relative overflow-hidden bg-gradient-to-br from-teal-50/40 via-cyan-50/30 to-blue-50/40 px-4 py-8">
-      {/* 波浪流线背景 */}
+    <div className="flex min-h-screen items-center justify-center relative overflow-hidden bg-[#f8fffe] px-4 py-8">
+      {/* 浮动光晕背景 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <svg className="absolute bottom-0 left-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="signinWaveGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#5eead4" stopOpacity="0.15" />
-              <stop offset="50%" stopColor="#2dd4bf" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.15" />
-            </linearGradient>
-            <linearGradient id="signinWaveGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.12" />
-              <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.12" />
-            </linearGradient>
-            <linearGradient id="signinWaveGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.1" />
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.1" />
-            </linearGradient>
-          </defs>
-          
-          {/* 第一层波浪 */}
-          <g className="animate-signin-wave-1">
-            <path
-              d="M-200,450 Q100,400 400,450 T1000,450 T1600,450 L1600,800 L-200,800 Z"
-              fill="url(#signinWaveGradient1)"
-            />
-          </g>
-          
-          {/* 第二层波浪 */}
-          <g className="animate-signin-wave-2">
-            <path
-              d="M-200,550 Q100,500 400,550 T1000,550 T1600,550 L1600,800 L-200,800 Z"
-              fill="url(#signinWaveGradient2)"
-            />
-          </g>
-          
-          {/* 第三层波浪 */}
-          <g className="animate-signin-wave-3">
-            <path
-              d="M-200,650 Q100,600 400,650 T1000,650 T1600,650 L1600,800 L-200,800 Z"
-              fill="url(#signinWaveGradient3)"
-            />
-          </g>
-        </svg>
-        
-        {/* 顶部流动光效 */}
-        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-teal-100/20 via-cyan-100/15 to-transparent"></div>
+        <div className="signin-orb signin-orb-1" />
+        <div className="signin-orb signin-orb-2" />
+        <div className="signin-orb signin-orb-3" />
+        <div className="signin-orb signin-orb-4" />
       </div>
 
-      {/* 网格背景 - 更淡 */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808006_1px,transparent_1px),linear-gradient(to_bottom,#80808006_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"></div>
+      {/* 柔光噪点纹理 */}
+      <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
 
-      <div className="relative z-10 w-full max-w-sm md:max-w-md">
-        {/* Logo 和品牌区域 */}
-        <div className="text-center mb-10 animate-fade-in-up">
-          <div className="inline-flex items-center justify-center w-16 h-16 mb-6 relative group">
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-2xl blur-lg opacity-50 group-hover:opacity-70 transition-opacity"></div>
-            <div className="relative bg-gradient-to-br from-teal-500 via-teal-400 to-cyan-500 rounded-2xl p-2 shadow-xl shadow-teal-500/30 transform group-hover:scale-105 transition-transform overflow-hidden">
+      <div className="relative z-10 w-full max-w-[400px]">
+        {/* Logo */}
+        <div className="text-center mb-10 signin-enter" style={{ animationDelay: '0.05s' }}>
+          <div className="inline-flex items-center justify-center w-[72px] h-[72px] mb-5 relative group">
+            <div className="absolute inset-[-6px] bg-gradient-to-br from-teal-300/50 to-cyan-300/50 rounded-[22px] blur-xl opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
+            <div className="relative bg-gradient-to-br from-teal-500 to-cyan-500 rounded-[18px] p-2 shadow-lg shadow-teal-500/20 transition-transform duration-500 ease-out group-hover:scale-105 overflow-hidden">
               <img src="/Echo Icon.png" alt="Echo" className="w-full h-full object-cover scale-150" />
             </div>
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 bg-clip-text text-transparent mb-2 tracking-tight select-none">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-500 bg-clip-text text-transparent tracking-tight select-none">
             Echo
           </h1>
-          <div className="w-16 h-px bg-gray-300 mx-auto mb-3"></div>
-          <p className="text-gray-900 text-base font-medium">开启你的专注之旅</p>
+          <p className="text-gray-400 text-sm font-normal mt-2 tracking-wide">开启你的专注之旅</p>
         </div>
 
-        <div className="bg-white/70 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl shadow-black/5 border border-white/60 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          {/* 登录/注册切换 - 更精致的设计 */}
-          <div className="flex rounded-2xl bg-gray-100/50 p-1 mb-8">
+        {/* 玻璃卡片 */}
+        <div className="signin-card signin-enter" style={{ animationDelay: '0.15s' }}>
+          {/* 登录/注册切换 — 滑块式 */}
+          <div className="relative flex rounded-2xl bg-black/[0.03] p-1 mb-7">
+            <div
+              className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl bg-white shadow-sm transition-transform duration-500 ease-[cubic-bezier(.4,0,.2,1)]"
+              style={{ transform: isLogin ? 'translateX(4px)' : 'translateX(calc(100% + 4px))' }}
+            />
             <button
-              onClick={() => {
-                setIsLogin(true);
-                setPasswordError("");
-                setConfirmPasswordError("");
-                setFormData({...formData, confirmPassword: ""});
-              }}
+              onClick={() => { setIsLogin(true); setPasswordError(""); setConfirmPasswordError(""); setFormData({...formData, confirmPassword: ""}); }}
               disabled={isLoading}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-300 ${
-                isLogin 
-                  ? "bg-white text-gray-900 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-700"
-              } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`relative z-10 flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors duration-300 ${isLogin ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               登录
             </button>
             <button
-              onClick={() => {
-                setIsLogin(false);
-                setPasswordError("");
-                setConfirmPasswordError("");
-                setAgreedToTerms(false);
-                setFormData({...formData, confirmPassword: ""});
-              }}
+              onClick={() => { setIsLogin(false); setPasswordError(""); setConfirmPasswordError(""); setAgreedToTerms(false); setFormData({...formData, confirmPassword: ""}); }}
               disabled={isLoading}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-300 ${
-                !isLogin 
-                  ? "bg-white text-gray-900 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-700"
-              } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`relative z-10 flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors duration-300 ${!isLogin ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               注册
             </button>
           </div>
 
           {/* 表单 */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  昵称
-                </label>
+              <div className="signin-field-enter">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 ml-1">昵称</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   disabled={isLoading}
-                  className="w-full rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm px-4 py-3 transition-all duration-200 focus:border-teal-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
+                  className="signin-input"
                   placeholder="给自己取个昵称"
                 />
               </div>
             )}
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                邮箱
-              </label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 ml-1">邮箱</label>
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
                 disabled={isLoading}
-                className="w-full rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm px-4 py-3 transition-all duration-200 focus:border-teal-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400"
+                className="signin-input"
                 placeholder="your@email.com"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                密码
-              </label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 ml-1">密码</label>
               <input
                 type="password"
                 value={formData.password}
@@ -416,22 +323,16 @@ export default function SignIn() {
                     }
                   }
                 }}
-                onBlur={() => {
-                  if (!isLogin) {
-                    setPasswordError(validatePassword(formData.password));
-                  }
-                }}
+                onBlur={() => { if (!isLogin) setPasswordError(validatePassword(formData.password)); }}
                 disabled={isLoading}
-                className={`w-full rounded-xl border bg-white/50 backdrop-blur-sm px-4 py-3 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400 ${
-                  passwordError ? "border-red-300 focus:border-red-400 focus:ring-red-500/20" : "border-gray-200 focus:border-teal-400"
-                }`}
+                className={`signin-input ${passwordError ? '!border-red-300 focus:!border-red-400 focus:!ring-red-500/20' : ''}`}
                 placeholder={isLogin ? "请输入密码" : "至少8位字符"}
                 required
                 minLength={isLogin ? undefined : 8}
               />
               {passwordError && (
-                <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1 ml-1">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   {passwordError}
@@ -439,44 +340,30 @@ export default function SignIn() {
               )}
             </div>
 
-            {/* 忘记密码链接 - 仅在登录模式显示 */}
             {isLogin && (
-              <div className="text-right -mt-2">
-                <button
-                  type="button"
-                  onClick={() => router.push('/auth/forgot-password')}
-                  className="text-sm text-teal-600 hover:text-teal-700 transition-colors"
-                >
+              <div className="text-right -mt-1">
+                <button type="button" onClick={() => router.push('/auth/forgot-password')} className="text-xs text-teal-500 hover:text-teal-600 transition-colors">
                   忘记密码？
                 </button>
               </div>
             )}
 
             {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  确认密码
-                </label>
+              <div className="signin-field-enter">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 ml-1">确认密码</label>
                 <input
                   type="password"
                   value={formData.confirmPassword}
-                  onChange={(e) => {
-                    setFormData({...formData, confirmPassword: e.target.value});
-                    setConfirmPasswordError(validateConfirmPassword(formData.password, e.target.value));
-                  }}
-                  onBlur={() => {
-                    setConfirmPasswordError(validateConfirmPassword(formData.password, formData.confirmPassword));
-                  }}
+                  onChange={(e) => { setFormData({...formData, confirmPassword: e.target.value}); setConfirmPasswordError(validateConfirmPassword(formData.password, e.target.value)); }}
+                  onBlur={() => setConfirmPasswordError(validateConfirmPassword(formData.password, formData.confirmPassword))}
                   disabled={isLoading}
-                  className={`w-full rounded-xl border bg-white/50 backdrop-blur-sm px-4 py-3 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400 ${
-                    confirmPasswordError ? "border-red-300 focus:border-red-400 focus:ring-red-500/20" : "border-gray-200 focus:border-teal-400"
-                  }`}
+                  className={`signin-input ${confirmPasswordError ? '!border-red-300 focus:!border-red-400 focus:!ring-red-500/20' : ''}`}
                   placeholder="请再次输入密码"
                   required
                 />
                 {confirmPasswordError && (
-                  <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1 ml-1">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                     {confirmPasswordError}
@@ -485,39 +372,20 @@ export default function SignIn() {
               </div>
             )}
 
-            {/* 同意条款 - 仅在注册模式显示 */}
             {!isLogin && (
-              <div className="flex items-start gap-3 p-4 bg-gray-50/50 rounded-xl border border-gray-200">
+              <div className="flex items-start gap-3 p-3.5 bg-white/60 rounded-xl border border-black/[0.04] signin-field-enter">
                 <input
                   type="checkbox"
                   id="agreeTerms"
                   checked={agreedToTerms}
                   onChange={(e) => setAgreedToTerms(e.target.checked)}
-                  className="mt-0.5 w-5 h-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500 focus:ring-2 cursor-pointer"
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-teal-500 focus:ring-teal-500 focus:ring-2 cursor-pointer"
                 />
-                <label htmlFor="agreeTerms" className="flex-1 text-sm text-gray-700 cursor-pointer">
+                <label htmlFor="agreeTerms" className="flex-1 text-xs text-gray-500 cursor-pointer leading-relaxed">
                   我已阅读并同意
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      window.open('/legal/terms', '_blank');
-                    }}
-                    className="text-teal-600 hover:text-teal-700 underline mx-1"
-                  >
-                    用户协议
-                  </button>
+                  <button type="button" onClick={(e) => { e.preventDefault(); window.open('/legal/terms', '_blank'); }} className="text-teal-500 hover:text-teal-600 underline mx-0.5">用户协议</button>
                   和
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      window.open('/legal/privacy', '_blank');
-                    }}
-                    className="text-teal-600 hover:text-teal-700 underline mx-1"
-                  >
-                    隐私政策
-                  </button>
+                  <button type="button" onClick={(e) => { e.preventDefault(); window.open('/legal/privacy', '_blank'); }} className="text-teal-500 hover:text-teal-600 underline mx-0.5">隐私政策</button>
                 </label>
               </div>
             )}
@@ -525,81 +393,165 @@ export default function SignIn() {
             <button
               type="submit"
               disabled={isLoading || (!isLogin && !agreedToTerms)}
-              className="group relative w-full rounded-xl bg-gradient-to-r from-teal-500 via-teal-500 to-cyan-500 px-4 py-3.5 text-white font-semibold hover:from-teal-600 hover:via-teal-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all duration-300 shadow-lg shadow-teal-500/30 hover:shadow-xl hover:shadow-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.01] overflow-hidden"
+              className="signin-btn group relative w-full rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 px-4 py-3.5 text-white font-semibold focus:outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none overflow-hidden"
             >
-              <span className="relative z-10 flex items-center justify-center">
+              <span className="relative z-10 flex items-center justify-center text-sm">
                 {isLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
                     处理中...
                   </>
                 ) : (
                   <>
-                    {isLogin ? "登录" : "注册"}
-                    <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    {isLogin ? '登录' : '注册'}
+                    <svg className="w-4 h-4 ml-1.5 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
                   </>
                 )}
               </span>
-              {/* 按钮光效 */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
             </button>
           </form>
 
-          {/* 返回到欢迎页 */}
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
+          <div className="mt-5 text-center">
+            <button type="button" onClick={() => router.push('/')} className="text-xs text-gray-400 hover:text-gray-500 transition-colors">
               返回到欢迎页
             </button>
           </div>
         </div>
       </div>
 
-      {/* CSS动画 */}
       <style jsx>{`
-        @keyframes fade-in-up {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        /* ===== 浮动光晕 ===== */
+        .signin-orb {
+          position: absolute;
+          border-radius: 9999px;
+          filter: blur(80px);
+          will-change: transform;
         }
-        .animate-fade-in-up {
-          animation: fade-in-up 0.6s ease-out forwards;
+        .signin-orb-1 {
+          width: 420px; height: 420px;
+          background: radial-gradient(circle, rgba(94,234,212,0.25) 0%, transparent 70%);
+          top: -10%; left: -8%;
+          animation: orb-drift-1 18s ease-in-out infinite;
         }
-        
-        @keyframes signin-wave-flow {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(200px);
-          }
+        .signin-orb-2 {
+          width: 350px; height: 350px;
+          background: radial-gradient(circle, rgba(103,232,249,0.20) 0%, transparent 70%);
+          bottom: -5%; right: -10%;
+          animation: orb-drift-2 22s ease-in-out infinite;
         }
-        
-        .animate-signin-wave-1 {
-          animation: signin-wave-flow 15s linear infinite;
+        .signin-orb-3 {
+          width: 260px; height: 260px;
+          background: radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 70%);
+          top: 50%; left: 60%;
+          animation: orb-drift-3 20s ease-in-out infinite;
         }
-        
-        .animate-signin-wave-2 {
-          animation: signin-wave-flow 20s linear infinite;
-          animation-direction: reverse;
+        .signin-orb-4 {
+          width: 200px; height: 200px;
+          background: radial-gradient(circle, rgba(52,211,153,0.15) 0%, transparent 70%);
+          top: 20%; right: 15%;
+          animation: orb-drift-4 16s ease-in-out infinite;
         }
-        
-        .animate-signin-wave-3 {
-          animation: signin-wave-flow 25s linear infinite;
+
+        @keyframes orb-drift-1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(40px, 30px) scale(1.08); }
+          66% { transform: translate(-20px, 50px) scale(0.95); }
+        }
+        @keyframes orb-drift-2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-30px, -40px) scale(1.05); }
+          66% { transform: translate(25px, -20px) scale(0.92); }
+        }
+        @keyframes orb-drift-3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-35px, 25px) scale(1.1); }
+        }
+        @keyframes orb-drift-4 {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(20px, -30px); }
+        }
+
+        /* ===== 弹性入场 ===== */
+        .signin-enter {
+          opacity: 0;
+          transform: translateY(24px) scale(0.97);
+          animation: signin-spring-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes signin-spring-in {
+          0% { opacity: 0; transform: translateY(24px) scale(0.97); }
+          60% { opacity: 1; transform: translateY(-4px) scale(1.01); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ===== 注册字段入场 ===== */
+        .signin-field-enter {
+          animation: field-slide-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes field-slide-in {
+          0% { opacity: 0; transform: translateY(12px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ===== 玻璃卡片 ===== */
+        .signin-card {
+          background: rgba(255, 255, 255, 0.55);
+          backdrop-filter: blur(40px) saturate(1.4);
+          -webkit-backdrop-filter: blur(40px) saturate(1.4);
+          border-radius: 28px;
+          padding: 32px;
+          border: 1px solid rgba(255, 255, 255, 0.7);
+          box-shadow:
+            0 0 0 1px rgba(0,0,0,0.02),
+            0 4px 24px -4px rgba(0,0,0,0.06),
+            0 12px 48px -8px rgba(0,0,0,0.04),
+            inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+
+        /* ===== 输入框 ===== */
+        :global(.signin-input) {
+          width: 100%;
+          border-radius: 14px;
+          border: 1.5px solid rgba(0,0,0,0.06);
+          background: rgba(255,255,255,0.5);
+          backdrop-filter: blur(8px);
+          padding: 12px 16px;
+          font-size: 14px;
+          color: #1f2937;
+          outline: none;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        :global(.signin-input::placeholder) {
+          color: #c4c9d0;
+        }
+        :global(.signin-input:focus) {
+          border-color: rgba(20,184,166,0.4);
+          background: rgba(255,255,255,0.8);
+          box-shadow: 0 0 0 4px rgba(20,184,166,0.08), 0 2px 12px -2px rgba(20,184,166,0.10);
+          transform: scale(1.01);
+        }
+        :global(.signin-input:disabled) {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        /* ===== 提交按钮 ===== */
+        .signin-btn {
+          box-shadow: 0 4px 20px -4px rgba(20,184,166,0.35), 0 2px 8px -2px rgba(20,184,166,0.15);
+          transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .signin-btn:not(:disabled):hover {
+          transform: translateY(-1px) scale(1.02);
+          box-shadow: 0 8px 28px -4px rgba(20,184,166,0.4), 0 4px 12px -2px rgba(20,184,166,0.2);
+        }
+        .signin-btn:not(:disabled):active {
+          transform: translateY(0) scale(0.98);
+          transition-duration: 0.1s;
         }
       `}</style>
-      
-      {/* 加载遮罩 */}
+
       {isLoading && <LoadingOverlay message={isLogin ? "登录中..." : "注册中..."} />}
     </div>
   );

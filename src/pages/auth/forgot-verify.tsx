@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import SplashLoader from '~/components/SplashLoader';
 
 interface Question {
   id: string;
@@ -81,14 +82,7 @@ export default function ForgotVerify() {
   };
 
   if (questions.length === 0) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
+    return <SplashLoader />;
   }
 
   return (

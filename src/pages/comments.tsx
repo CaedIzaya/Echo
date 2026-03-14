@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import SplashLoader from '~/components/SplashLoader';
 
 interface Comment {
   id: string;
@@ -145,10 +146,7 @@ export default function CommentsPage() {
           </h2>
           
           {isLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
-              <p className="mt-4 text-gray-600">加载中...</p>
-            </div>
+            <SplashLoader variant="inline" />
           ) : comments.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">还没有评论，成为第一个评论者吧！</p>

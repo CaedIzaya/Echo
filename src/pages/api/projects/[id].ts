@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // PUT: 更新计划
     if (req.method === 'PUT') {
-      const { name, description, focusDetail, icon, color, dailyGoalMinutes, targetDate, isActive, isCompleted, isPrimary } = req.body;
+      const { name, description, focusDetail, finalGoal, icon, color, dailyGoalMinutes, targetDate, isActive, isCompleted, isPrimary } = req.body;
 
       console.log('[projects] 更新计划:', id);
 
@@ -119,23 +119,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const nextFocusDetail =
         focusDetail !== undefined ? String(focusDetail || '') : currentMeta.focusDetail;
 
+      const updateData: any = {
+        name: name !== undefined ? name : undefined,
+        description:
+          description !== undefined || focusDetail !== undefined
+            ? encodeProjectDescription(nextFocusBranch, nextFocusDetail)
+            : undefined,
+        finalGoal: finalGoal !== undefined ? finalGoal || null : undefined,
+        icon: icon !== undefined ? icon : undefined,
+        color: color !== undefined ? color : undefined,
+        dailyGoalMinutes: dailyGoalMinutes !== undefined ? dailyGoalMinutes : undefined,
+        targetDate: targetDate !== undefined ? (targetDate ? new Date(targetDate) : null) : undefined,
+        isActive: isActive !== undefined ? isActive : undefined,
+        isCompleted: isCompleted !== undefined ? isCompleted : undefined,
+        isPrimary: isPrimary !== undefined ? isPrimary : undefined,
+      };
+
       // 更新计划
       const updatedProject = await db.project.update({
         where: { id },
-        data: {
-          name: name !== undefined ? name : undefined,
-          description:
-            description !== undefined || focusDetail !== undefined
-              ? encodeProjectDescription(nextFocusBranch, nextFocusDetail)
-              : undefined,
-          icon: icon !== undefined ? icon : undefined,
-          color: color !== undefined ? color : undefined,
-          dailyGoalMinutes: dailyGoalMinutes !== undefined ? dailyGoalMinutes : undefined,
-          targetDate: targetDate !== undefined ? (targetDate ? new Date(targetDate) : null) : undefined,
-          isActive: isActive !== undefined ? isActive : undefined,
-          isCompleted: isCompleted !== undefined ? isCompleted : undefined,
-          isPrimary: isPrimary !== undefined ? isPrimary : undefined,
-        },
+        data: updateData,
         include: {
           milestones: {
             orderBy: { order: 'asc' }

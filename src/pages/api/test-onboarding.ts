@@ -14,6 +14,7 @@ declare module "next-auth" {
       name?: string | null;
       image?: string | null;
       hasCompletedOnboarding?: boolean;
+      hasCompletedNewUserGuide?: boolean;
     };
   }
 
@@ -23,6 +24,7 @@ declare module "next-auth" {
     name?: string | null;
     image?: string | null;
     hasCompletedOnboarding?: boolean;
+    hasCompletedNewUserGuide?: boolean;
   }
 }
 
@@ -30,6 +32,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     hasCompletedOnboarding?: boolean;
+    hasCompletedNewUserGuide?: boolean;
   }
 }
 

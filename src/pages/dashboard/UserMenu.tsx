@@ -10,6 +10,7 @@ interface UserMenuProps {
 export default function UserMenu({ userInitial }: UserMenuProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -46,61 +47,39 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
   }, [isOpen]);
 
   const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    setIsOpen(false);
+
     try {
-      // 只清除 sessionStorage（认证相关）
       sessionStorage.clear();
-      
-      // 保留 localStorage 中的所有核心数据，只清除认证相关的临时数据
-      // 核心数据包括：
-      // - totalFocusMinutes: 总专注时长（累计）
-      // - todayStats: 今日数据（历史记录）
-      // - weeklyStats: 本周数据
-      // - dashboardStats: 统计数据（昨日时长、连续天数、完成目标数）
-      // - flowMetrics: 心流指标数据
-      // - userPlans: 用户计划
-      // - userExp: 用户经验值
-      // - achievedAchievements: 已解锁成就
-      // - unviewedAchievements: 未查看成就
-      // - dataRecovered: 数据恢复标记
-      // - lastFocusDate: 最后专注日期
-      // - lastWelcomeDate: 最后欢迎日期
-      // - focusCompleted: 专注完成标记
-      // - hasSecurityQuestions: 安全提示相关
-      // - securityGuideDismissed: 安全指南相关
-      // - loginCount: 登录计数
-      // - nextSecurityReminder: 下次安全提醒
-      // - forceOnboarding: 强制引导流程标记
-      
-      // 如果需要清除某些临时UI状态，可以单独清除：
-      // localStorage.removeItem('focusCompleted'); // 可选：清除专注完成标记
-      
-      // 手动清除所有可能的 NextAuth Cookie（包括生产环境的 __Secure- 前缀）
+
+      // 标记正在登出，防止 dashboard 的 unauthenticated useEffect 抢先 router.push('/')
+      // 造成与 window.location.href 的竞争（闪回根因）
+      localStorage.setItem('echo_signing_out', '1');
+
       const cookiesToDelete = [
         'next-auth.session-token',
         'next-auth.csrf-token',
         '__Secure-next-auth.session-token',
         '__Secure-next-auth.csrf-token',
       ];
-      
+
       cookiesToDelete.forEach(cookieName => {
-        // 清除当前域名的 Cookie
         document.cookie = `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
-        // 如果设置了 Secure，也需要清除
         document.cookie = `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure`;
       });
-      
-      // 调用 NextAuth 的 signOut 清除服务器端 session
-      // 使用 redirect: false 避免自动跳转，我们手动控制跳转
-      await signOut({ 
+
+      await signOut({
         callbackUrl: '/?signedOut=true',
-        redirect: false 
+        redirect: false
       });
-      
-      // 手动跳转，确保 URL 参数被传递
+
+      localStorage.removeItem('echo_signing_out');
       window.location.href = '/?signedOut=true';
     } catch (error) {
       console.error('退出登录失败:', error);
-      // 即使出错也跳转到首页
+      localStorage.removeItem('echo_signing_out');
       window.location.href = '/?signedOut=true';
     }
   };
@@ -112,18 +91,24 @@ export default function UserMenu({ userInitial }: UserMenuProps) {
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden bg-teal-500 text-white font-medium text-sm hover:bg-teal-600 transition shadow-sm hover:shadow-md border border-white/20"
-      >
-        {localAvatar ? (
-          <img src={localAvatar} alt="User Avatar" className="w-full h-full object-cover" />
-        ) : (
-          userInitial
-        )}
-      </button>
+      {isSigningOut ? (
+        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-200 border border-white/20">
+          <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden bg-teal-500 text-white font-medium text-sm hover:bg-teal-600 transition shadow-sm hover:shadow-md border border-white/20"
+        >
+          {localAvatar ? (
+            <img src={localAvatar} alt="User Avatar" className="w-full h-full object-cover" />
+          ) : (
+            userInitial
+          )}
+        </button>
+      )}
 
-      {isOpen && (
+      {isOpen && !isSigningOut && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-50">
           <div className="py-1">
             <button

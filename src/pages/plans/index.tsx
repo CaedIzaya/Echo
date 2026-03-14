@@ -11,6 +11,7 @@ import EditPlanModal from './EditPlanModal';
 import ManageMilestonesModal from '~/components/plans/ManageMilestonesModal';
 import MilestoneManager, { FinalGoal } from '~/components/milestone/MilestoneManager';
 import BottomNavigation from '../dashboard/BottomNavigation';
+import SplashLoader from '~/components/SplashLoader';
 
 interface Project {
   id: string;
@@ -269,8 +270,8 @@ export default function PlansPage() {
     }
     
     router.push({
-      pathname: '/onboarding',
-      query: { from: 'plans' }
+      pathname: '/onboarding/goal-setting',
+      query: { from: 'plans' },
     });
   };
 
@@ -425,21 +426,26 @@ export default function PlansPage() {
   };
 
   // 保存里程碑
-  const handleSaveMilestone = (goal: FinalGoal | undefined) => {
+  const handleSaveMilestone = async (goal: FinalGoal | undefined) => {
     if (!managingMilestonePlanId) return;
 
-    const updatedPlans = plans.map(plan => {
-      if (plan.id === managingMilestonePlanId) {
-        return {
-          ...plan,
-          finalGoal: goal
-        };
-      }
-      return plan;
-    });
+    await updateProject(
+      managingMilestonePlanId,
+      { finalGoal: goal },
+      async () => {
+        const response = await fetch(`/api/projects/${managingMilestonePlanId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            finalGoal: goal ?? null,
+          }),
+        });
 
-    setPlans(updatedPlans);
-    // finalGoal 是前端临时字段，不需要持久化到数据库
+        if (!response.ok) {
+          throw new Error('保存终极目标失败');
+        }
+      }
+    );
   };
 
   // 添加小目标
@@ -509,14 +515,7 @@ export default function PlansPage() {
 
   // 加载状态
   if (sessionStatus === 'loading' || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
+    return <SplashLoader />;
   }
 
   // 未认证状态

@@ -88,12 +88,10 @@ export default function HeartTreeComponent(props: HeartTreeProps) {
 
   // 浇水
   const handleWater = () => {
-    // 检查今天是否可以浇水（需要完成至少一次专注）
     const today = new Date().toISOString().split('T')[0];
-    const hasCompletedFocusToday = (props.todaySessions || 0) > 0;
     
-    if (!canWaterToday(expState, today, hasCompletedFocusToday)) {
-      showTreeMessage('今天已经浇过水了，或者还没有完成专注哦~');
+    if (!canWaterToday(expState, today)) {
+      showTreeMessage('今天浇水次数已达上限，心树需要慢慢成长。');
       return;
     }
     

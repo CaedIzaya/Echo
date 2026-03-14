@@ -36,6 +36,14 @@ export default function App({ Component, pageProps }: AppProps) {
     return () => stop();
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        // SW registration failure is non-critical
+      });
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <SessionProvider session={pageProps.session}>

@@ -8,11 +8,13 @@ import PrimaryPlanCard from './PrimaryPlanCard';
 import AchievementPanel from './AchievementPanel';
 import TodaySummaryCard from './TodaySummaryCard';
 import QuickSearchGuide from './QuickSearchGuide';
+import NewUserGuide from './NewUserGuide';
 import SecurityGuideCard from './SecurityGuideCard';
 import EchoSpirit from './EchoSpirit';
 import EchoSpiritMobile from './EchoSpiritMobile';
 import SpiritDialog, { SpiritDialogRef } from './SpiritDialog';
 import ShopModal from '~/components/shop/ShopModal';
+import SplashLoader from '~/components/SplashLoader';
 import GoalInputModal from '~/components/goals/GoalInputModal';
 import { getAchievementManager, AchievementManager } from '~/lib/AchievementSystem';
 import { LevelManager, UserLevel } from '~/lib/LevelSystem';
@@ -44,6 +46,7 @@ import {
   EXP_STREAK_DAY,
 } from '~/lib/HeartTreeExpSystem';
 import { MailSystem } from '~/lib/MailSystem';
+import { setUserStorage, setCurrentUserId } from '~/lib/userStorage';
 
 interface Project {
   id: string;
@@ -295,6 +298,17 @@ export default function Dashboard() {
     if (sessionStatus === 'authenticated' && userId) return `authenticated_${userId}`;
     return 'unknown';
   }, [sessionStatus, userId]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      setCurrentUserId(session.user.id);
+    }
+  }, [session?.user?.id]);
+
+  const getScopedDailyFlagKey = (baseKey: string, date: string) => {
+    if (!userId) return `${baseKey}_${date}`;
+    return `${baseKey}_${userId}_${date}`;
+  };
   
   const [isLoading, setIsLoading] = useState(true);
   const [panicMode, setPanicMode] = useState(false);
@@ -405,7 +419,7 @@ export default function Dashboard() {
   // 从localStorage加载统计数据（其他数据）
   const [stats, setStats] = useState<DashboardStats>(() => {
     if (typeof window !== 'undefined') {
-      const savedStats = localStorage.getItem('dashboardStats');
+      const savedStats = userId ? localStorage.getItem(`user_${userId}_dashboardStats`) : null;
       return savedStats ? JSON.parse(savedStats) : {
         yesterdayMinutes: 0,
         streakDays: 0,
@@ -437,6 +451,7 @@ export default function Dashboard() {
   const [newAchievements, setNewAchievements] = useState<any[]>([]);
   const [unviewedAchievements, setUnviewedAchievements] = useState<any[]>([]);
   const [showQuickSearchGuide, setShowQuickSearchGuide] = useState(false);
+  const [showNewUserGuide, setShowNewUserGuide] = useState(false);
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
   
   // ========== 同步 Hook 的用户等级到本地 state ==========
@@ -461,9 +476,10 @@ export default function Dashboard() {
   const updateStats = (newStats: Partial<DashboardStats>) => {
     setStats(prev => {
       const updated = { ...prev, ...newStats };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dashboardStats', JSON.stringify(updated));
+      if (typeof window !== 'undefined' && userId) {
+        localStorage.setItem(`user_${userId}_dashboardStats`, JSON.stringify(updated));
       }
+      setUserStorage('dashboardStats', JSON.stringify(updated));
       return updated;
     });
   };
@@ -475,13 +491,13 @@ export default function Dashboard() {
 
     const registerCompanionDay = async () => {
       const today = getTodayDate();
-      const loginCountedKey = `echoCompanionCounted_${today}`;
-      const syncPendingKey = `echoCompanionSyncPending_${today}`;
+      const loginCountedKey = getScopedDailyFlagKey('echoCompanionCounted', today);
+      const syncPendingKey = getScopedDailyFlagKey('echoCompanionSyncPending', today);
       const alreadyCountedLocal = localStorage.getItem(loginCountedKey) === 'true';
       const pendingSync = localStorage.getItem(syncPendingKey) === 'true';
 
       let baseCompanionDays = 0;
-      const savedStats = localStorage.getItem('dashboardStats');
+      const savedStats = userId ? localStorage.getItem(`user_${userId}_dashboardStats`) : null;
       if (savedStats) {
         try {
           baseCompanionDays = JSON.parse(savedStats).echoCompanionDays || 0;
@@ -505,6 +521,7 @@ export default function Dashboard() {
               localStorage.removeItem(syncPendingKey);
               setStats(prev => ({
                 ...prev,
+                streakDays: Math.max(prev.streakDays || 0, data?.stats?.streakDays || 0),
                 echoCompanionDays: Math.max(prev.echoCompanionDays || 0, dbCompanionDays),
               }));
               return;
@@ -524,7 +541,10 @@ export default function Dashboard() {
 
         setStats(prev => {
           const updated = { ...prev, echoCompanionDays: targetCompanionDays };
-          localStorage.setItem('dashboardStats', JSON.stringify(updated));
+          if (typeof window !== 'undefined' && userId) {
+            localStorage.setItem(`user_${userId}_dashboardStats`, JSON.stringify(updated));
+          }
+          setUserStorage('dashboardStats', JSON.stringify(updated));
           return updated;
         });
         localStorage.setItem('lastFocusDate', today);
@@ -1013,12 +1033,12 @@ export default function Dashboard() {
           }
 
           // 连胜天数（仅用于周报等真实统计）：当天首次达标时 +1
-          const streakUpdatedToday = localStorage.getItem(`streakUpdated_${today}`) === 'true';
+          const streakUpdatedToday = localStorage.getItem(getScopedDailyFlagKey('streakUpdated', today)) === 'true';
           if (!streakUpdatedToday) {
             const newStreakDays = stats.streakDays + 1;
             setStats(prev => ({ ...prev, streakDays: newStreakDays }));
             updateStats({ streakDays: newStreakDays });
-            localStorage.setItem(`streakUpdated_${today}`, 'true');
+            localStorage.setItem(getScopedDailyFlagKey('streakUpdated', today), 'true');
 
             if (session?.user?.id) {
               fetch('/api/user/stats/update', {
@@ -1627,10 +1647,8 @@ export default function Dashboard() {
   }, [showWeeklyInfo, showStreakInfo, showFlowInfo]);
 
   // UI 辅助函数 - 进度颜色
-  const getProgressColor = (progress: number): string => {
-    if (progress < 0.33) return '#ef4444'; // 红色 - 未达标
-    if (progress < 1) return '#eab308';    // 金色 - 接近目标
-    return '#22c55e';                      // 绿色 - 已完成
+  const getProgressColor = (_progress: number): string => {
+    return '#22c55e'; // 移动端统一绿色
   };
 
   const getGreeting = (): string => {
@@ -1988,12 +2006,7 @@ export default function Dashboard() {
           </div>
         </div>
       ) : showLoading ? (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">加载中...</p>
-          </div>
-        </div>
+        <SplashLoader />
       ) : showUnauthed ? null : (
         <>
           {/* 成就通知 */}
@@ -2415,7 +2428,18 @@ export default function Dashboard() {
       
           {/* 快速查找指南 */}
           {showQuickSearchGuide && (
-            <QuickSearchGuide onClose={() => setShowQuickSearchGuide(false)} />
+            <QuickSearchGuide
+              onClose={() => setShowQuickSearchGuide(false)}
+              onOpenRefresherGuide={() => {
+                setShowQuickSearchGuide(false);
+                setShowNewUserGuide(true);
+              }}
+            />
+          )}
+
+          {/* 回温新手指引（从快速指南内启动） */}
+          {showNewUserGuide && (
+            <NewUserGuide onComplete={() => setShowNewUserGuide(false)} />
           )}
         </>
       )}

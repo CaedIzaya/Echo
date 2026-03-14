@@ -216,46 +216,53 @@ export default function EchoSpiritMobile({
       >
         <defs>
           {/* 外圈光晕 */}
-          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+          <radialGradient id="glowMobile" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#FFD27F" stopOpacity="1" />
             <stop offset="100%" stopColor="#FFB84D" stopOpacity="0" />
           </radialGradient>
+          {/* 底部柔光滤镜 */}
+          <filter id="bottomGlowM" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
+          </filter>
+          {/* 腮红柔化滤镜 */}
+          <filter id="cheekSoftM" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" />
+          </filter>
         </defs>
-        <circle cx="60" cy="60" r="45" fill="url(#glow)" className="glow-layer" />
+        <ellipse cx="60" cy="60" rx="49" ry="45" fill="url(#glowMobile)" className="glow-layer" />
         
-        {/* 身体圆形 */}
-        <circle cx="60" cy="60" r="32" fill={colors.body} />
+        {/* 底部柔光 - 重力团子效果 */}
+        <ellipse cx="60" cy="88" rx="42" ry="10" fill="#FFE4A0" opacity="0.5" filter="url(#bottomGlowM)" />
         
-        {/* 腮红 - 新增，位于身体和眼睛之间 */}
-        <ellipse cx="40" cy="62" rx="5" ry="3" fill="#FFAB91" opacity="0.5" />
-        <ellipse cx="80" cy="62" rx="5" ry="3" fill="#FFAB91" opacity="0.5" />
+        {/* 身体椭圆 */}
+        <ellipse cx="60" cy="60" rx="35" ry="32" fill={colors.body} />
         
-        {/* 眼睛组 - 用于动画 */}
+        {/* 腮红 - 坐在横轴上 */}
+        <ellipse cx="41" cy="60" rx="6" ry="4" fill="#F8A0B0" opacity="0.7" filter="url(#cheekSoftM)" />
+        <ellipse cx="79" cy="60" rx="6" ry="4" fill="#F8A0B0" opacity="0.7" filter="url(#cheekSoftM)" />
+        
+        {/* 眼睛组 - 以内下角为锚点缩小10% */}
         <g className="eyes-group">
-          {/* 眼睛（偏上，大间距） */}
-          <ellipse className="left-eye" cx="48" cy="50" rx="6" ry="10" fill="#3A2F2F" />
-          <ellipse className="right-eye" cx="72" cy="50" rx="6" ry="10" fill="#3A2F2F" />
+          <ellipse className="left-eye" cx="47.5" cy="49.5" rx="7.5" ry="9.5" fill="#1A1A1A" />
+          <ellipse className="right-eye" cx="72.5" cy="49.5" rx="7.5" ry="9.5" fill="#1A1A1A" />
           
-          {/* 高光 - 固定居于眼睛内部上方 */}
-          <circle className="eye-high left-high" cx="48" cy="46.5" r="2" fill="white" opacity="0.7" />
-          <circle className="eye-high right-high" cx="72" cy="46.5" r="2" fill="white" opacity="0.7" />
+          <circle className="eye-high left-high" cx="50.5" cy="45.5" r="3" fill="white" opacity="0.9" />
+          <circle className="eye-high right-high" cx="75.5" cy="45.5" r="3" fill="white" opacity="0.9" />
         </g>
         
-        {/* 小手组 - happy和nod状态时显示 */}
+        {/* 小手组 */}
         <g className="hand-group">
-          {/* 左手 */}
           <circle 
             className="hand hand-left" 
-            cx="28" 
+            cx="25" 
             cy="70" 
             r="6" 
             fill={colors.body}
             opacity="0"
           />
-          {/* 右手 */}
           <circle 
             className="hand hand-right" 
-            cx="92" 
+            cx="95" 
             cy="70" 
             r="6" 
             fill={colors.body}
@@ -450,12 +457,12 @@ export default function EchoSpiritMobile({
 
         .spirit-svg[data-state="happy"] .hand-left,
         .spirit-svg[data-state="nod"] .hand-left {
-          transform-origin: 28px 70px;
+          transform-origin: 25px 70px;
         }
 
         .spirit-svg[data-state="happy"] .hand-right,
         .spirit-svg[data-state="nod"] .hand-right {
-          transform-origin: 92px 70px;
+          transform-origin: 95px 70px;
           animation-delay: 0.15s; /* 右手稍微延迟，形成自然的交替摆动 */
         }
 

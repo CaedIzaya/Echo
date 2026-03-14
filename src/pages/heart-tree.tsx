@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import SplashLoader from '~/components/SplashLoader';
 import HeartTreeComponent from './dashboard/HeartTree';
 import BottomNavigation from './dashboard/BottomNavigation';
 import { getNamingGuideText, getFirstMeetingText } from '~/awareness/heart-tree-naming';
@@ -93,11 +94,7 @@ export default function HeartTreePage() {
 
   // 未登录时重定向
   if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    );
+    return <SplashLoader />;
   }
 
   if (status === 'unauthenticated') {

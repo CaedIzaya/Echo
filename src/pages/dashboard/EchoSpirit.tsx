@@ -121,34 +121,49 @@ export default function EchoSpirit({
             <stop offset="0%" stopColor={colors.bodyStart} />
             <stop offset="100%" stopColor={colors.bodyEnd} />
           </radialGradient>
-          {/* Eyes: 深棕色 */}
+          {/* Eyes: 纯黑色 */}
           <linearGradient id="gradEye" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#3A2F2F" />
-            <stop offset="100%" stopColor="#2A1F1F" />
+            <stop offset="0%" stopColor="#1A1A1A" />
+            <stop offset="100%" stopColor="#111111" />
           </linearGradient>
+          {/* 底部柔光滤镜 - 重度高斯模糊 */}
+          <filter id="bottomGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="15" />
+          </filter>
+          {/* 腮红柔化滤镜 */}
+          <filter id="cheekSoft" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4" />
+          </filter>
         </defs>
         
         {/* --- GROUP: MAIN ROTATOR (Handles Body Tilt) --- */}
         <g className="main-rotator" transform="translate(100, 100)">
           <g className="main-rotator-inner">
-          {/* 外圈光晕层 - 扩大半径确保可见，且位于底层 */}
-          <circle cx="0" cy="0" r="110" fill="url(#glow)" className="glow-layer" />
+          {/* 外圈光晕层 */}
+          <ellipse cx="0" cy="0" rx="115" ry="105" fill="url(#glow)" className="glow-layer" />
           
-          {/* --- LAYER 2: BODY (The Spirit) - 使用圆形建模，参考手机版 --- */}
+          {/* BODY */}
           <g className="body-physics-group">
-            {/* 身体圆形 - 参考手机版设计 */}
-            <circle 
+            {/* 底部柔光 - 在body后面，产生"重力团子坐在光上"的效果 */}
+            <ellipse 
+              cx="0" cy="55" rx="80" ry="18" 
+              fill="#FFE4A0" opacity="0.5" 
+              filter="url(#bottomGlow)" 
+            />
+            
+            <ellipse 
               className="body-shape"
               cx="0"
               cy="0"
-              r="64"
+              rx="68"
+              ry="62"
               fill="url(#gradBodySoft)"
             />
             
-            {/* 小手组 - 参考手机版，初始隐藏 */}
+            {/* 小手组 */}
             <g className="hand-group">
               <circle 
-                cx="-64" 
+                cx="-70" 
                 cy="20" 
                 r="12" 
                 fill="url(#gradBodySoft)" 
@@ -156,7 +171,7 @@ export default function EchoSpirit({
                 opacity="0"
               />
               <circle 
-                cx="64" 
+                cx="70" 
                 cy="20" 
                 r="12" 
                 fill="url(#gradBodySoft)" 
@@ -165,25 +180,21 @@ export default function EchoSpirit({
               />
             </g>
             
-            {/* 3.3 Face Container (Independent from body stretch) */}
-            <g className="face-container" transform="translate(0, -10)">
-              {/* 腮红 - 新增 */}
-              <ellipse cx="-40" cy="15" rx="10" ry="6" fill="#FFAB91" opacity="0.5" />
-              <ellipse cx="40" cy="15" rx="10" ry="6" fill="#FFAB91" opacity="0.5" />
+            {/* Face Container */}
+            <g className="face-container" transform="translate(0, -3)">
+              {/* 腮红 - 坐在横轴(y=0)上，眼睛左下/右下 */}
+              <ellipse cx="-37" cy="3" rx="11" ry="7" fill="#F8A0B0" opacity="0.7" filter="url(#cheekSoft)" />
+              <ellipse cx="37" cy="3" rx="11" ry="7" fill="#F8A0B0" opacity="0.7" filter="url(#cheekSoft)" />
 
-              {/* EXPRESSIVE EYES GROUP - 参考手机版的眼睛设计 */}
+              {/* 眼睛组 - 以内下角为锚点缩小10% */}
               <g className="eyes-look-controller">
-                {/* Left Eye - 参考手机版：偏上，大间距 */}
-                <g className="eye-left" transform="translate(-24, -10)">
-                  <ellipse cx="0" cy="0" rx="12" ry="20" fill="url(#gradEye)" />
-                  {/* 高光 - 固定居于眼睛内部上方 */}
-                  <circle cx="4" cy="-7" r="4" fill="white" opacity="0.7" className="eye-high left-high" />
+                <g className="eye-left" transform="translate(-25.1, -16.9)">
+                  <ellipse cx="0" cy="0" rx="15.1" ry="18.9" fill="url(#gradEye)" />
+                  <circle cx="4.7" cy="-6.3" r="5.8" fill="white" opacity="0.9" className="eye-high left-high" />
                 </g>
-                {/* Right Eye */}
-                <g className="eye-right" transform="translate(24, -10)">
-                  <ellipse cx="0" cy="0" rx="12" ry="20" fill="url(#gradEye)" />
-                  {/* 高光 */}
-                  <circle cx="4" cy="-7" r="4" fill="white" opacity="0.7" className="eye-high right-high" />
+                <g className="eye-right" transform="translate(25.1, -16.9)">
+                  <ellipse cx="0" cy="0" rx="15.1" ry="18.9" fill="url(#gradEye)" />
+                  <circle cx="4.7" cy="-6.3" r="5.8" fill="white" opacity="0.9" className="eye-high right-high" />
                 </g>
               </g>
             </g>

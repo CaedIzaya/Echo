@@ -7,6 +7,7 @@ import SummaryShareCard from '../components/SummaryShareCard';
 import localforage from 'localforage';
 import { getRandomQuote } from '../lib/quoteLibrary';
 import { trackEvent } from '~/lib/analytics';
+import { getUserStorage, setCurrentUserId } from '~/lib/userStorage';
 
 export default function DailySummaryPage() {
   const router = useRouter();
@@ -26,6 +27,12 @@ export default function DailySummaryPage() {
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const [theme, setTheme] = useState<'note' | 'mint'>('note');
   const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      setCurrentUserId(session.user.id);
+    }
+  }, [session?.user?.id]);
 
   useEffect(() => {
     trackEvent({
@@ -88,7 +95,7 @@ export default function DailySummaryPage() {
     // Echo陪伴天数：与 Dashboard 同口径（数据库优先，本地兜底，取最大值）
     const loadCompanionDays = async () => {
       let localStreakDays = 0;
-      const savedStats = localStorage.getItem('dashboardStats');
+      const savedStats = getUserStorage('dashboardStats');
       if (savedStats) {
         try {
           const stats = JSON.parse(savedStats);

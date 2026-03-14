@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import SplashLoader from '~/components/SplashLoader';
 
 interface DaySummary {
   date: string;
@@ -140,14 +141,7 @@ export default function JournalPage() {
   };
 
   if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-[#0B1026] via-[#050a14] to-black flex items-center justify-center text-slate-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/60 mx-auto mb-4"></div>
-          <p className="text-white/70">加载中...</p>
-        </div>
-      </div>
-    );
+    return <SplashLoader />;
   }
 
   // UI: 只展示有记录的日期（星星），不展示空白
@@ -216,10 +210,7 @@ export default function JournalPage() {
           )}
 
           {isLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/60 mx-auto mb-4"></div>
-              <p className="text-white/70">加载日历中...</p>
-            </div>
+            <SplashLoader message="加载日历中" variant="inline" />
           ) : (
             <div className="bg-transparent p-2">
               {/* UI: 星空时间线（最多 10 颗星） */}
@@ -338,10 +329,7 @@ function DetailDrawer({ date, detail, isLoading, onClose }: DetailDrawerProps) {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/60 mx-auto mb-4"></div>
-              <p className="text-white/70">加载中...</p>
-            </div>
+            <SplashLoader variant="inline" />
           ) : detail ? (
             <div className="space-y-6">
               {/* 统计信息 */}

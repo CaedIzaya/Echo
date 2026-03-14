@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Head from 'next/head';
+import SplashLoader from '~/components/SplashLoader';
 import BottomNavigation from '../dashboard/BottomNavigation';
 
 interface QuestionTemplate {
@@ -153,14 +154,7 @@ export default function SecurityQuestions() {
   };
 
   if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50/40 via-cyan-50/30 to-blue-50/40 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
+    return <SplashLoader />;
   }
 
   if (!session?.user) {

@@ -119,7 +119,7 @@ export default function PrimaryPlanCard({
         </p>
         <div className="space-y-3">
           <button 
-            onClick={() => router.push('/onboarding')}
+            onClick={() => router.push('/onboarding/goal-setting')}
             className="w-full px-6 py-3 bg-teal-500 text-white rounded-full hover:bg-teal-600 font-medium transition shadow-sm"
           >
             设置项目

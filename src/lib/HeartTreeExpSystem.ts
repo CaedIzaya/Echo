@@ -25,6 +25,12 @@ export interface HeartTreeExpState {
 
   /** 最近一次浇水的日期（YYYY-MM-DD） */
   lastWateredDate?: string;
+
+  /** 记录最近一次浇水计数所属的日期（YYYY-MM-DD） */
+  wateredDate?: string;
+
+  /** 最近一次日期内已浇水次数（用于控制每日上限） */
+  wateredCountToday?: number;
 }
 
 // ------- 常量配置（可日后整体重算时统一调整） -------
@@ -40,6 +46,9 @@ export function expToNextLevel(level: number): number {
 
 /** 浇水基础 EXP（会被肥料 Buff 放大） */
 export const WATER_BASE_EXP = 12;
+
+/** 每天最多浇水次数上限 */
+export const WATER_MAX_PER_DAY = 3;
 
 /** 施肥 Buff 倍率（+30% EXP） */
 export const FERTILIZER_MULTIPLIER = 1.3;
@@ -117,6 +126,11 @@ export function loadHeartTreeExpState(): HeartTreeExpState {
       totalExp,
       fertilizerBuff: parsed.fertilizerBuff,
       lastWateredDate: parsed.lastWateredDate,
+      wateredDate: parsed.wateredDate,
+      wateredCountToday:
+        typeof parsed.wateredCountToday === 'number' && parsed.wateredCountToday >= 0
+          ? parsed.wateredCountToday
+          : 0,
     };
 
     return normalizeHeartTreeState(state);
@@ -245,14 +259,20 @@ export function gainHeartTreeExp(baseExp: number, now: Date = new Date()): Heart
 
 // ------- 浇水 / 施肥 逻辑 -------
 
-/** 判断今天是否可以浇水（不考虑「水的机会」，只考虑当天频次和专注完成条件） */
+/** 判断今天是否可以浇水（只考虑当天频次，不再要求必须完成专注） */
 export function canWaterToday(
   state: HeartTreeExpState,
   today: string,
-  hasCompletedFocusToday: boolean,
 ): boolean {
-  if (!hasCompletedFocusToday) return false;
-  if (state.lastWateredDate === today) return false;
+  const wateredDate = state.wateredDate;
+  const count = state.wateredCountToday ?? 0;
+
+  // 同一天且已达到上限，则不可再浇水
+  if (wateredDate === today && count >= WATER_MAX_PER_DAY) {
+    return false;
+  }
+
+  // 其他情况均可浇水（包括今天还没浇过，或是新的一天）
   return true;
 }
 
@@ -263,12 +283,19 @@ export function waterTree(
   baseExp: number = WATER_BASE_EXP,
 ): HeartTreeExpState {
   const today = now.toISOString().split('T')[0];
+  const prevDate = state.wateredDate;
+  const prevCount = state.wateredCountToday ?? 0;
+
+  const nextCount = prevDate === today ? prevCount + 1 : 1;
+
   const gained = applyExpGain(baseExp, state, now);
   const updated = addExp(state, gained);
 
   const finalState: HeartTreeExpState = {
     ...updated,
     lastWateredDate: today,
+    wateredDate: today,
+    wateredCountToday: nextCount,
   };
 
   saveHeartTreeExpState(finalState);
